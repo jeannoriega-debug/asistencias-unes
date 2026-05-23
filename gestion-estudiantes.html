@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Estudiantes - UNES</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- NAV -->
+    <nav class="bg-blue-700 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="font-bold text-lg">🎓 Gestión de Estudiantes</h1>
+            <div class="flex items-center gap-4">
+                <span id="user-info" class="text-sm"></span>
+                <button onclick="window.location.href='index.html'"
+                    class="bg-blue-600 hover:bg-blue-800 px-3 py-1 rounded text-sm transition">
+                    ← Volver al Inicio
+                </button>
+                <button onclick="cerrarSesion()"
+                    class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm transition">
+                    Salir
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-4">
+
+        <!-- FILTROS Y BÚSQUEDA -->
+        <section class="bg-white rounded-xl shadow-md p-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
+                <select id="filtro-pnf" class="border p-2 rounded text-sm"
+                    onchange="window.modules.gestion.onPnfChange()"></select>
+                <select id="filtro-categoria" class="border p-2 rounded text-sm"
+                    onchange="window.modules.gestion.onCategoriaChange()">
+                    <option value="">Todas las categorías</option>
+                </select>
+                <select id="filtro-proceso" class="border p-2 rounded text-sm"
+                    onchange="window.modules.gestion.onProcesoChange()">
+                    <option value="">Todos los procesos</option>
+                </select>
+                <select id="filtro-trayecto" class="border p-2 rounded text-sm"
+                    onchange="window.modules.gestion.onTrayectoChange()">
+                    <option value="">Todos los trayectos</option>
+                </select>
+                <select id="filtro-ambiente" class="border p-2 rounded text-sm"
+                    onchange="window.modules.gestion.onAmbienteChange()">
+                    <option value="">Todos los ambientes</option>
+                </select>
+                <select id="filtro-genero" class="border p-2 rounded text-sm"
+                    onchange="window.modules.gestion.onGeneroChange()">
+                    <option value="">Todos los géneros</option>
+                </select>
+                <select id="filtro-status" class="border p-2 rounded text-sm">
+                    <option value="">Todos los estados</option>
+                    <option value="Activo">✅ Activos</option>
+                    <option value="Inactivo">❌ Inactivos</option>
+                </select>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="window.modules.gestion.aplicarFiltros()"
+                    class="bg-blue-600 text-white px-6 py-2 rounded font-bold text-sm hover:bg-blue-700 transition">
+                    🔍 Filtrar
+                </button>
+                <input type="text" id="busqueda-texto" placeholder="Buscar por cédula, nombre o apellido..."
+                    class="flex-1 border p-2 rounded text-sm"
+                    onkeyup="window.modules.gestion.buscarEnTiempoReal(event)">
+                <button onclick="window.modules.gestion.limpiarFiltros()"
+                    class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded text-sm transition">
+                    🔄 Limpiar
+                </button>
+            </div>
+        </section>
+
+        <!-- ACCIONES MASIVAS -->
+        <section class="bg-white rounded-xl shadow-md p-4 mb-6">
+            <div class="flex flex-wrap gap-2 items-center">
+                <button onclick="window.modules.gestion.abrirModalCrear()"
+                    class="bg-green-600 text-white px-4 py-2 rounded font-bold text-sm hover:bg-green-700 transition">
+                    ➕ Nuevo Estudiante
+                </button>
+                <button onclick="window.modules.gestion.exportarExcel()"
+                    class="bg-green-600 text-white px-4 py-2 rounded font-bold text-sm hover:bg-green-700 transition">
+                    📊 Exportar a Excel
+                </button>
+                <span id="contador-estudiantes" class="text-sm text-gray-600 ml-auto">Cargando estudiantes...</span>
+            </div>
+        </section>
+
+        <!-- TABLA DE ESTUDIANTES -->
+        <section class="bg-white rounded-xl shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-3 text-left">#</th>
+                            <th class="p-3 text-left">Cédula</th>
+                            <th class="p-3 text-left">Nombres</th>
+                            <th class="p-3 text-left">Apellidos</th>
+                            <th class="p-3 text-left">Género</th>
+                            <th class="p-3 text-left">F. Nacimiento</th>
+                            <th class="p-3 text-left">Categoría</th>
+                            <th class="p-3 text-left">PNF</th>
+                            <th class="p-3 text-left">Ambiente</th>
+                            <th class="p-3 text-left">Trayecto</th>
+                            <th class="p-3 text-left">Proceso</th>
+                            <th class="p-3 text-left">Estado</th>
+                            <th class="p-3 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-estudiantes" class="divide-y">
+                        <tr>
+                            <td colspan="13" class="p-8 text-center text-gray-500">Cargando estudiantes...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- PAGINACIÓN -->
+            <div id="paginacion" class="p-4 border-t flex justify-between items-center">
+                <span class="text-sm text-gray-600" id="info-paginacion"></span>
+                <div class="flex gap-1">
+                    <button onclick="window.components.tablas.cambiarPagina(-1)"
+                        class="px-3 py-1 border rounded hover:bg-gray-100 text-sm" id="btn-anterior">← Anterior</button>
+                    <span id="pagina-actual" class="px-3 py-1 bg-blue-100 rounded text-sm font-bold">1</span>
+                    <button onclick="window.components.tablas.cambiarPagina(1)"
+                        class="px-3 py-1 border rounded hover:bg-gray-100 text-sm" id="btn-siguiente">Siguiente
+                        →</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN DE CARGA MASIVA -->
+        <section class="bg-white rounded-xl shadow-md p-6 mb-6 border-t-4 border-green-500">
+            <h3 class="font-bold text-lg mb-3 text-green-700">📥 Carga Masiva de Estudiantes</h3>
+            <p class="text-sm text-gray-600 mb-4">Sube un archivo CSV para registrar múltiples estudiantes a la vez.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <button onclick="window.modules.upload.descargarPlantillaCSV()"
+                    class="bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg text-sm font-bold transition">
+                    ⬇️ Descargar Plantilla CSV
+                </button>
+                <label
+                    class="bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg text-sm font-bold cursor-pointer transition flex items-center justify-center gap-2">
+                    📂 Seleccionar Archivo CSV
+                    <input type="file" id="csv-file" accept=".csv" class="hidden"
+                        onchange="window.modules.upload.procesarCSV(this)">
+                </label>
+                <button onclick="window.modules.upload.limpiarCargaMasiva()"
+                    class="bg-red-100 hover:bg-red-200 text-red-700 py-3 px-4 rounded-lg text-sm font-bold transition">
+                    🗑️ Limpiar Proceso
+                </button>
+            </div>
+
+            <!-- Progreso y Resultados -->
+            <div id="carga-masiva-status" class="hidden bg-gray-50 border rounded-lg p-4">
+                <div class="flex justify-between items-center mb-2">
+                    <span id="carga-progreso-texto" class="text-sm font-semibold text-gray-700">Procesando...</span>
+                    <span id="carga-contador" class="text-xs text-gray-500">0 / 0</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="carga-barra" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                        style="width: 0%"></div>
+                </div>
+                <div id="carga-resultados" class="mt-3 text-sm"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL CREAR/EDITAR -->
+    <div id="modal-estudiante" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 class="font-bold text-lg" id="modal-titulo">Nuevo Estudiante</h3>
+                <button onclick="window.modules.gestion.cerrarModal()"
+                    class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <form id="form-estudiante" onsubmit="window.modules.gestion.guardarEstudiante(event)" class="p-4 space-y-4">
+                <input type="hidden" id="est-id">
+
+                <!-- DATOS PERSONALES -->
+                <div class="bg-blue-50 p-3 rounded-lg">
+                    <h4 class="font-bold text-sm text-blue-700 mb-3">📋 Datos Personales</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="block text-sm font-medium mb-1">Cédula *</label><input type="text"
+                                id="est-cedula" required class="w-full border p-2 rounded text-sm uppercase"></div>
+                        <div><label class="block text-sm font-medium mb-1">Fecha de Nacimiento</label><input type="date"
+                                id="est-fecha-nac" class="w-full border p-2 rounded text-sm"></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-3">
+                        <div><label class="block text-sm font-medium mb-1">Nombres *</label><input type="text"
+                                id="est-nombres" required class="w-full border p-2 rounded text-sm uppercase"></div>
+                        <div><label class="block text-sm font-medium mb-1">Apellidos *</label><input type="text"
+                                id="est-apellidos" required class="w-full border p-2 rounded text-sm uppercase"></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-3">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Género</label>
+                            <select id="est-genero" class="w-full border p-2 rounded text-sm">
+                                <option value="">Seleccione</option>
+                                <option value="Masculino">Masculino</option>
+                                <option value="Femenino">Femenino</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Categoría</label>
+                            <select id="est-categoria" class="w-full border p-2 rounded text-sm">
+                                <option value="">Seleccione</option>
+                                <option value="TSU">TSU</option>
+                                <option value="LICENCIATURA">LICENCIATURA</option>
+                                <option value="DOCTORADO">DOCTORADO</option>
+                                <option value="TSU - BACHILLER">TSU - BACHILLER</option>
+                                <option value="ESPECIALIZACION">ESPECIALIZACION</option>
+                                <option value="TSU MULTIMODAL - ALTOS ESTUDIOS">TSU MULTIMODAL</option>
+                                <option value="LICENCIAT - ALTOS ESTUDIOS">LICENCIAT</option>
+                                <option value="DIPLOMADO - ALTOS ESTUDIOS">DIPLOMADO</option>
+                                <option value="TSU VIRTUAL">TSU VIRTUAL</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DATOS ACADÉMICOS -->
+                <div class="bg-green-50 p-3 rounded-lg">
+                    <h4 class="font-bold text-sm text-green-700 mb-3">🎓 Datos Académicos</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="block text-sm font-medium mb-1">Número de Lista</label><input type="number"
+                                id="est-numero-lista" class="w-full border p-2 rounded text-sm" min="1"></div>
+                        <div><label class="block text-sm font-medium mb-1">PNF *</label><select id="est-pnf" required
+                                class="w-full border p-2 rounded text-sm"></select></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 mt-3">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Ambiente *</label>
+                            <select id="est-ambiente" required class="w-full border p-2 rounded text-sm">
+                                <option value="1">Ambiente 1</option>
+                                <option value="2">Ambiente 2</option>
+                                <option value="3">Ambiente 3</option>
+                                <option value="4">Ambiente 4</option>
+                                <option value="5">Ambiente 5</option>
+                                <option value="6">Ambiente 6</option>
+                            </select>
+                        </div>
+                        <div><label class="block text-sm font-medium mb-1">Trayecto *</label><select id="est-trayecto"
+                                required class="w-full border p-2 rounded text-sm"></select></div>
+                        <div><label class="block text-sm font-medium mb-1">Proceso *</label><select id="est-proceso"
+                                required class="w-full border p-2 rounded text-sm">
+                                <option value="">Cargando procesos...</option>
+                            </select></div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="block text-sm font-medium mb-1">Estado</label>
+                        <select id="est-status" class="w-full border p-2 rounded text-sm">
+                            <option value="Activo">✅ Activo</option>
+                            <option value="Inactivo">❌ Inactivo</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-4 border-t">
+                    <button type="button" onclick="window.modules.gestion.cerrarModal()"
+                        class="px-4 py-2 border rounded hover:bg-gray-100 transition">Cancelar</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition">💾
+                        Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= SCRIPTS MODULARES ================= -->
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/utils.js"></script>
+    <script src="assets/js/components/tablas.js"></script>
+    <script src="assets/js/modules/gestion.js"></script>
+    <script src="assets/js/modules/upload.js"></script>
+
+</body>
+
+</html>
