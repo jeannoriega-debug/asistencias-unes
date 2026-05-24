@@ -259,8 +259,9 @@ window.modules.asistencia.marcarAsistencia = async function(estId, estado, btn) 
     const matId = document.getElementById('select-materia')?.value;
     const amb = document.getElementById('select-ambiente')?.value;
     const proc = document.getElementById('select-proceso')?.value;
-    const fecha = window.utils.getFechaISO();
-
+    const fecha = new Date().toISOString().split('T')[0];
+	//const fecha = window.utils.getFechaISO();
+    
     console.log('📤 Intentando guardar:', { estId, estado, matId, amb, proc, fecha });
 
     const { data, error } = await window.supabaseClient
