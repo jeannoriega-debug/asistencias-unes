@@ -191,57 +191,59 @@
             </div>
         </section>
 
-        <!-- SECCIÓN PRINCIPAL DE ASISTENCIA -->
-        <section class="bg-white rounded-xl shadow-md p-6 mb-6">
-            <!-- FILTROS EN CASCADA -->
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
-                <select id="select-pnf" class="border p-2 rounded-lg w-full bg-gray-50 text-sm"
-                    onchange="onPnfChangeAsistencia()">
-                    <option value="">Seleccione PNF</option>
-                </select>
-                <select id="select-categoria" class="border p-2 rounded-lg w-full bg-gray-50 text-sm"
-                    onchange="onCategoriaChangeAsistencia()">
-                    <option value="">Todas las categorías</option>
-                </select>
-                <select id="select-materia" class="border p-2 rounded-lg w-full bg-gray-50 text-sm"
-                    onchange="onMateriaChangeAsistencia()">
-                    <option value="">Seleccione Unidad Curricular</option>
-                </select>
-                <select id="select-proceso" class="border p-2 rounded-lg w-full bg-gray-50 text-sm"
-                    onchange="onProcesoChangeAsistencia()">
-                    <option value="">Seleccione Proceso</option>
-                </select>
-                <select id="select-trayecto" class="border p-2 rounded-lg w-full bg-gray-50 text-sm"
-                    onchange="onTrayectoChangeAsistencia()">
-                    <option value="">Seleccione Trayecto</option>
-                </select>
-                <select id="select-ambiente" class="border p-2 rounded-lg w-full bg-gray-50 text-sm"
-                    onchange="onAmbienteChangeAsistencia()">
-                    <option value="">Seleccione Ambiente</option>
-                </select>
-                <select id="select-status-asist" class="border p-2 rounded-lg w-full bg-gray-50 text-sm"
-                    onchange="onStatusChangeAsistencia()">
-                    <option value="">Todos los estados</option>
-                    <option value="Activo">✅ Activos</option>
-                    <option value="Inactivo">❌ Inactivos</option>
-                </select>
-                <select id="select-genero" class="border p-2 rounded-lg w-full bg-gray-50 text-sm"
-                    onchange="onGeneroChangeAsistencia()">
-                    <option value="">Todos los géneros</option>
-                </select>
-            </div>
+<!-- SECCIÓN PRINCIPAL DE ASISTENCIA -->
+<section class="bg-white rounded-xl shadow-md p-6 mb-6">
+    <!-- FILTROS EN CASCADA -->
+    <!-- ✅ CAMBIO: lg:grid-cols-4 organiza en 4 columnas en PC -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3 mb-4">
+        
+        <!-- Fila 1 -->
+        <select id="select-pnf" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onPnfChangeAsistencia()">
+            <option value="">Seleccione PNF</option>
+        </select>
+        
+        <select id="select-categoria" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onCategoriaChangeAsistencia()">
+            <option value="">Todas las categorías</option>
+        </select>
+        
+        <select id="select-materia" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onMateriaChangeAsistencia()">
+            <option value="">Seleccione Unidad Curricular</option>
+        </select>
+        
+        <select id="select-proceso" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onProcesoChangeAsistencia()">
+            <option value="">Seleccione Proceso</option>
+        </select>
 
-            <!-- BOTONES -->
-            <div class="flex flex-col md:flex-row gap-3 mt-4 border-t pt-4">
-                <button id="btn-cargar"
-                    class="bg-blue-600 text-white py-2 px-4 rounded-lg font-bold text-sm hover:bg-blue-800 transition flex-1">
-                    Cargar Lista
-                </button>
-                <button id="btn-reporte"
-                    class="bg-purple-600 text-white py-2 px-4 rounded-lg font-bold text-sm hover:bg-purple-800 transition flex-1">
-                    Reporte Matriz
-                </button>
-            </div>
+        <!-- Fila 2 -->
+        <select id="select-trayecto" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onTrayectoChangeAsistencia()">
+            <option value="">Seleccione Trayecto</option>
+        </select>
+        
+        <select id="select-ambiente" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onAmbienteChangeAsistencia()">
+            <option value="">Seleccione Ambiente</option>
+        </select>
+        
+        <select id="select-status-asist" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onStatusChangeAsistencia()">
+            <option value="">Todos los estados</option>
+            <option value="Activo">✅ Activos</option>
+            <option value="Inactivo">❌ Inactivos</option>
+        </select>
+        
+        <select id="select-genero" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onGeneroChangeAsistencia()">
+            <option value="">Todos los géneros</option>
+        </select>
+    </div>
+
+    <!-- BOTONES -->
+    <div class="flex flex-col md:flex-row gap-3 mt-4 border-t pt-4">
+        <button id="btn-cargar" class="bg-blue-600 text-white py-2 px-4 rounded-lg font-bold text-sm hover:bg-blue-800 transition flex-1">
+            Cargar Lista
+        </button>
+        <button id="btn-reporte" class="bg-purple-600 text-white py-2 px-4 rounded-lg font-bold text-sm hover:bg-purple-800 transition flex-1">
+            Reporte Matriz
+        </button>
+    </div>
+</section>
 
             <!-- FILTROS ADICIONALES -->
             <div id="filtro-profesor-reporte" class="hidden mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
