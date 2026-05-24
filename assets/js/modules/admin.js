@@ -613,14 +613,17 @@ async function activarTodosPendientes() {
 // ================= EXPORTAR FUNCIONES AL SCOPE GLOBAL =================
 window.crearProfesor = window.modules.admin.crearProfesor;
 
-window.abrirPanelAdmin = function () {
+window.abrirPanelAdmin = function() {
     if (window.appState.rolUsuarioActual !== 'super_usuario') {
         return Swal.fire("Acceso denegado", "Solo super usuarios", "error");
     }
     const panel = document.getElementById('panel-admin');
     if (panel) {
         panel.classList.remove('hidden');
-        window.modules.admin.init();
+        // 🔥 ESTO ES LO QUE FALTA:
+        if (window.modules && window.modules.admin) {
+            window.modules.admin.init();
+        }
     }
 };
 
