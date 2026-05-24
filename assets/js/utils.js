@@ -1,5 +1,6 @@
 /**
  * FUNCIONES UTILITARIAS REUTILIZABLES
+ * Todas las fechas usan hora de Venezuela (UTC-4)
  */
 
 window.utils = window.utils || {};
@@ -78,16 +79,35 @@ window.utils.hideLoader = (elementId) => {
 };
 
 /**
- * Obtener fecha actual en formato ISO (YYYY-MM-DD)
+ * 🇻 Obtener fecha actual en formato ISO (YYYY-MM-DD) - HORA VENEZUELA
  */
 window.utils.getFechaISO = function() {
-    const fecha = new Date();
-    const year = fecha.getFullYear();
-    const month = String(fecha.getMonth() + 1).padStart(2, '0');
-    const day = String(fecha.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
 };
 
-console.log('✅ Utils cargado - getFechaISO disponible');
+/**
+ * 🇻🇪 Obtener fecha y hora actual de Venezuela (para logs)
+ */
+window.utils.getFechaHoraVenezuela = function() {
+    return new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' });
+};
 
-console.log('✅ Utilidades cargadas');
+/**
+ * Formatear fecha de BD (YYYY-MM-DD) a formato legible (DD/MM/YYYY)
+ */
+window.utils.formatearFecha = function(fechaISO) {
+    if (!fechaISO) return '';
+    const [year, month, day] = fechaISO.split('-');
+    return `${day}/${month}/${year}`;
+};
+
+/**
+ * Formatear fecha con hora de Venezuela
+ */
+window.utils.formatearFechaHora = function(fechaISO) {
+    if (!fechaISO) return '';
+    const fecha = new Date(fechaISO);
+    return fecha.toLocaleString('es-VE', { timeZone: 'America/Caracas' });
+};
+
+console.log('✅ Utils cargado - Todas las funciones usan hora Venezuela');
