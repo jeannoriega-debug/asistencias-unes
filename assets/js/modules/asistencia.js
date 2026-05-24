@@ -249,17 +249,44 @@ window.modules.asistencia.cargarLista = async function () {
 	window.components?.tablas?.renderizarListaEstudiantes?.();
 };
 
-window.modules.asistencia.marcarAsistencia = async function (estId, estado, btn) {
-	const matId = document.getElementById('select-materia')?.value;
-	const amb = document.getElementById('select-ambiente')?.value;
-	const proc = document.getElementById('select-proceso')?.value;
-	const fecha = window.utils.getFechaISO();
-	const { error } = await window.supabaseClient.from('asistencias').upsert({
-		estudiante_id: estId, unidad_curricular_id: matId, profesor_id: window.appState.usuarioActualId, estado, proceso: proc, ambiente_registro: amb, fecha
-	}, { onConflict: 'estudiante_id, unidad_curricular_id, fecha' });
-	if (error) return Swal.fire("Error", error.message, "error");
-	btn.parentElement.querySelectorAll('button').forEach(b => b.className = 'bg-gray-300 px-3 py-1 rounded text-xs');
-	btn.className = (estado === 'P' ? 'bg-green-500' : 'bg-red-500') + ' text-white px-3 py-1 rounded font-bold text-xs';
+window.modules.asistencia.marcarAsistencia = async function(estId, estado, btn) {
+    // Guardar referencia a los botones para poder revertirlos si hay error
+    const contenedor = btn.parentElement;
+    const btnP = contenedor.querySelector('button:first-child');
+    const btnA = contenedor.querySelector('button:last-child');
+    const claseGris = 'bg-gray-300 hover:bg-gray-400 text-gray-700 w-8 h-8 rounded-lg font-bold text-xs transition shadow-sm flex items-center justify-center';
+
+    const matId = document.getElementById('select-materia')?.value;
+    const amb = document.getElementById('select-ambiente')?.value;
+    const proc = document.getElementById('select-proceso')?.value;
+    const fecha = window.utils.getFechaISO();
+
+    console.log('📤 Intentando guardar:', { estId, estado, matId, amb, proc, fecha });
+
+    const { data, error } = await window.supabaseClient
+        .from('asistencias')
+        .upsert({
+            estudiante_id: estId,
+            unidad_curricular_id: matId,
+            profesor_id: window.appState.usuarioActualId,
+            estado: estado,
+            proceso: proc,
+            ambiente_registro: amb,
+            fecha: fecha
+        }, { onConflict: 'estudiante_id, unidad_curricular_id, fecha' });
+
+    if (error) {
+        console.error('❌ ERROR SUPABASE:', error);
+        Swal.fire("No se guardó", error.message || "Verifica consola (F12) para más detalles", "error");
+        
+        // 🔙 Revertir botones a gris si falla
+        if(btnP) btnP.className = claseGris;
+        if(btnA) btnA.className = claseGris;
+        return;
+    }
+
+    console.log('✅ Guardado exitoso en BD');
+    // La UI ya se actualizó al hacer clic. Si todo salió bien, se mantiene el color.
 };
 
 window.onPnfChangeAsistencia = window.modules.asistencia.onPnfChangeAsistencia;
