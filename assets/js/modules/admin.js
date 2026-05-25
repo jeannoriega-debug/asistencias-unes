@@ -17,7 +17,8 @@ window.modules.admin.init = async function () {
     await window.modules.admin.cargarListaProfesores();
     await window.modules.admin.cargarProfesoresParaSelect();
     await window.modules.admin.cargarPNFParaAsignacion();
-    await window.modules.admin.cargarTrayectosParaAsignacion(); // ✅ NUEVO: Cargar trayectos
+    await window.modules.admin.cargarTrayectosParaAsignacion();
+    await window.modules.admin.cargarProcesosParaAsignacion(); // ✅ NUEVO: Cargar procesos dinámicos
 
     console.log('✅ Panel de administración inicializado');
 };
@@ -258,7 +259,7 @@ window.modules.admin.asignarRecursos = async function (e) {
     const amb = document.getElementById('asign-ambiente')?.value || null;
     const proceso = document.getElementById('asign-proceso')?.value;
     const trayecto = document.getElementById('asign-trayecto')?.value;
-    const categoria = document.getElementById('asign-categoria')?.value || null; // ✅ NUEVO
+    const categoria = document.getElementById('asign-categoria')?.value || null;
 
     if (!pid || !pnfId || !uid || !trayecto) {
         return Swal.fire("Atención", "Complete Profesor, PNF, Unidad y Trayecto", "warning");
@@ -277,7 +278,7 @@ window.modules.admin.asignarRecursos = async function (e) {
             ambiente: amb,
             proceso: proceso,
             trayecto_id: trayecto,
-            categoria: categoria, // ✅ Guardamos la categoría
+            categoria: categoria,
             asignado_por: window.appState.usuarioActualId
         });
 
@@ -287,7 +288,6 @@ window.modules.admin.asignarRecursos = async function (e) {
         e.target.reset();
         await window.modules.admin.cargarListaProfesores();
 
-        // Recargar unidades y categorías por si se cambia el PNF
         const selPnf = document.getElementById('asign-pnf');
         if (selPnf?.value) {
             await window.modules.admin.cargarUnidadesPorPNF(selPnf.value);
@@ -337,12 +337,12 @@ window.modules.admin.cargarPNFParaAsignacion = async function () {
 
     sel.addEventListener('change', async () => {
         await window.modules.admin.cargarUnidadesPorPNF(sel.value);
-        await window.modules.admin.cargarCategoriasPorPNF(sel.value); // ✅ NUEVO
+        await window.modules.admin.cargarCategoriasPorPNF(sel.value);
     });
 };
 
 /**
- * Cargar unidades curriculares por PNF (función extraída para reutilizar)
+ * Cargar unidades curriculares por PNF
  */
 window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
     const sU = document.getElementById('asign-unidad');
@@ -369,7 +369,7 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
 };
 
 /**
- * ✅ NUEVO: Cargar categorías disponibles por PNF (desde estudiantes activos)
+ * Cargar categorías disponibles por PNF
  */
 window.modules.admin.cargarCategoriasPorPNF = async function (pnfId) {
     const sel = document.getElementById('asign-categoria');
@@ -404,7 +404,40 @@ window.modules.admin.cargarCategoriasPorPNF = async function (pnfId) {
 };
 
 /**
- * ✅ NUEVO: Cargar trayectos para el formulario de asignación
+ * ✅ NUEVO: Cargar procesos únicos desde la tabla estudiantes
+ */
+window.modules.admin.cargarProcesosParaAsignacion = async function () {
+    const select = document.getElementById('asign-proceso');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Cargando procesos...</option>';
+
+    try {
+        const { data, error } = await window.supabaseClient
+            .from('estudiantes')
+            .select('proceso');
+
+        if (error) throw error;
+
+        // Filtrar nulos, obtener únicos y ordenar
+        const procesosUnicos = [...new Set(data.map(item => item.proceso).filter(Boolean))].sort();
+
+        select.innerHTML = '<option value="">Seleccione Proceso</option>';
+        procesosUnicos.forEach(proc => {
+            const opt = document.createElement('option');
+            opt.value = proc;
+            opt.textContent = proc;
+            select.appendChild(opt);
+        });
+
+    } catch (err) {
+        console.error('Error cargando procesos:', err);
+        select.innerHTML = '<option value="">Error al cargar</option>';
+    }
+};
+
+/**
+ * Cargar trayectos para el formulario de asignación
  */
 window.modules.admin.cargarTrayectosParaAsignacion = async function () {
     const select = document.getElementById('asign-trayecto');
@@ -472,7 +505,6 @@ window.modules.admin.promocionarEstudiantes = async function () {
         return Swal.fire("Atención", "El trayecto origen y destino deben ser diferentes", "warning");
     }
 
-    // Cargar trayectos si no están en appState
     if (!window.appState.tiposTrayectos || window.appState.tiposTrayectos.length === 0) {
         const { data } = await window.supabaseClient.from('tipos_trayecto').select('*').eq('activo', true).order('orden');
         window.appState.tiposTrayectos = data || [];
@@ -620,7 +652,6 @@ window.abrirPanelAdmin = function() {
     const panel = document.getElementById('panel-admin');
     if (panel) {
         panel.classList.remove('hidden');
-        // 🔥 ESTO ES LO QUE FALTA:
         if (window.modules && window.modules.admin) {
             window.modules.admin.init();
         }
@@ -644,6 +675,7 @@ window.cargarPNFParaAsignacion = window.modules.admin.cargarPNFParaAsignacion;
 window.cargarUnidadesPorPNF = window.modules.admin.cargarUnidadesPorPNF;
 window.cargarCategoriasPorPNF = window.modules.admin.cargarCategoriasPorPNF;
 window.cargarTrayectosParaAsignacion = window.modules.admin.cargarTrayectosParaAsignacion;
+window.cargarProcesosParaAsignacion = window.modules.admin.cargarProcesosParaAsignacion;
 
 window.toggleSelectAll = toggleSelectAll;
 window.activarProfesoresSeleccionados = activarProfesoresSeleccionados;
