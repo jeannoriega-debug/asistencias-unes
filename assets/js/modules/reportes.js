@@ -9,7 +9,7 @@ window.modules.reportes = {};
 /**
  * Generar reporte de asistencia en formato matriz
  */
-window.modules.reportes.generarReporteMatriz = async function() {
+window.modules.reportes.generarReporteMatriz = async function () {
     const pnfId = document.getElementById('select-pnf')?.value;
     const ambiente = document.getElementById('select-ambiente')?.value;
     const materiaId = document.getElementById('select-materia')?.value;
@@ -45,7 +45,7 @@ window.modules.reportes.generarReporteMatriz = async function() {
     // Cargar datos
     const { data: dataPnf } = await window.supabaseClient.from('pnf').select('nombre').eq('id', pnfId).single();
     const { data: dataMateria } = await window.supabaseClient.from('unidades_curriculares').select('nombre').eq('id', materiaId).single();
-    
+
     const tiposTrayectos = window.appState.tiposTrayectos || [];
     const trayectoSeleccionado = tiposTrayectos.find(t => t.id === window.appState.trayectoActual);
     const nombreTrayecto = trayectoSeleccionado?.nombre || 'Trayecto';
@@ -168,7 +168,14 @@ window.modules.reportes.generarReporteMatriz = async function() {
 
     const unidadNombre = dataMateria?.nombre?.split(' ')[0].toUpperCase() || "REPORTE";
     doc.save(`Asistencia ${unidadNombre} ${window.appState.procesoActual} ${nombreTrayecto} AMB${ambiente}.pdf`);
-    Swal.fire("Éxito", `Reporte generado para ${window.appState.procesoActual} - ${nombreTrayecto}`, "success");
+    Swal.fire({
+        title: "Éxito",
+        text: `Reporte generado para ${window.appState.procesoActual} - ${nombreTrayecto}`,
+        icon: "success",
+        timer: 3000,              // 3 segundos
+        timerProgressBar: true,   // barra de progreso
+        showConfirmButton: false  // oculta el botón OK
+    });
 };
 
 // Exportar función al scope global
