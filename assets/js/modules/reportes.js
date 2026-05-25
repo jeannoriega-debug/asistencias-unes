@@ -103,18 +103,48 @@ window.modules.reportes.generarReporteMatriz = async function () {
         return filaCompleta;
     });
 
-    // Generar PDF
+    // ================= GENERAR PDF =================
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
 
+    // --- ENCABEZADO REORGANIZADO ---
+    // Línea 1: Universidad (centrado)
     doc.setFontSize(11).setFont(undefined, 'bold').text(`UNIVERSIDAD NACIONAL EXPERIMENTAL DE LA SEGURIDAD`, 140, 10, { align: 'center' });
-    doc.setFontSize(8).setFont(undefined, 'normal').text(`PNF: ${dataPnf?.nombre || ''} - AMBIENTE: ${ambiente} - PROCESO: ${window.appState.procesoActual} - ${nombreTrayecto}`, 140, 15, { align: 'center' });
-    doc.setFont(undefined, 'bold').text(`UNIDAD: ${dataMateria?.nombre || ''} - PROFESOR: ${nombreProfesorReporte.toUpperCase()}`, 140, 20, { align: 'center' });
+    
+    // Línea 2: PNF - PROCESO - TRAYECTO (completo) - AMBIENTE
+    const pnfNombre = (dataPnf?.nombre || 'PNF').toUpperCase();
+    const procesoNombre = window.appState.procesoActual || 'PROCESO';
+    const ambienteTexto = `AMB${ambiente}`;
+    
+    // ✅ CORRECCIÓN: Usar nombreTrayecto directamente (ya viene completo de la BD)
+    doc.setFontSize(8).setFont(undefined, 'normal').text(
+        `PNF: ${pnfNombre} - PROCESO: ${procesoNombre} - ${nombreTrayecto} - AMBIENTE: ${ambiente}`, 
+        140, 15, { align: 'center' }
+    );
+    
+    // Línea 3: Unidad Curricular - Profesor
+    doc.setFont(undefined, 'bold').text(
+        `UNIDAD: ${dataMateria?.nombre || ''} - PROFESOR: ${nombreProfesorReporte.toUpperCase()}`, 
+        140, 20, { align: 'center' }
+    );
+    
+    // Línea 4 (NUEVA): Fecha y hora de generación
+    const ahora = new Date();
+    const fechaFormateada = ahora.toLocaleDateString('es-VE', { 
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false 
+    }).replace(',', ' -');
+    
+    doc.setFontSize(7).setFont(undefined, 'italic').text(
+        `Generado: ${fechaFormateada}`, 
+        140, 25, { align: 'center' }
+    );
 
     const cabeceras = ["N°", "CÉDULA", "NOMBRES Y APELLIDOS", ...fechasUnicas.map(f => f.split('-').reverse().slice(0, 2).join('/')), "P", "A", "%"];
 
+    // ================= MATRIZ DE ASISTENCIA (SIN MODIFICACIONES) =================
     doc.autoTable({
-        startY: 25,
+        startY: 30, // Ajustado por la nueva línea de fecha
         margin: { left: 10, right: 10 },
         head: [cabeceras],
         body: bodyTabla,
@@ -166,15 +196,26 @@ window.modules.reportes.generarReporteMatriz = async function () {
         }
     });
 
-    const unidadNombre = dataMateria?.nombre?.split(' ')[0].toUpperCase() || "REPORTE";
-    doc.save(`Asistencia ${unidadNombre} ${window.appState.procesoActual} ${nombreTrayecto} AMB${ambiente}.pdf`);
+    // ================= NOMBRE DEL PDF =================
+    // Formato: "Asistencia [PNF] [UNIDAD] [PROCESO] [AMBX] [PROFESOR].pdf"
+    const pnfPdf = (dataPnf?.nombre || "PNF").toUpperCase().trim();
+    const unidadPdf = (dataMateria?.nombre || "UNIDAD").split(' ')[0].toUpperCase();
+    const procesoPdf = window.appState.procesoActual || "PROCESO";
+    const ambientePdf = `AMB${ambiente}`;
+    const profesorPdf = nombreProfesorReporte.toUpperCase().trim().replace(/\s+/g, '_');
+    
+    const filename = `Asistencia ${pnfPdf} ${unidadPdf} ${procesoPdf} ${ambientePdf} ${profesorPdf}.pdf`;
+    
+    // Guardar PDF
+    doc.save(filename);
+    
     Swal.fire({
         title: "Éxito",
-        text: `Reporte generado para ${window.appState.procesoActual} - ${nombreTrayecto}`,
+        text: `Reporte generado para ${procesoPdf} - ${nombreTrayecto}`,
         icon: "success",
-        timer: 3000,              // 3 segundos
-        timerProgressBar: true,   // barra de progreso
-        showConfirmButton: false  // oculta el botón OK
+        timer: 3000,
+        timerProgressBar: true,
+        showConfirmButton: false
     });
 };
 
