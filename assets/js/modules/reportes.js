@@ -45,10 +45,15 @@ window.modules.reportes.generarReporteMatriz = async function () {
     // Cargar datos
     const { data: dataPnf } = await window.supabaseClient.from('pnf').select('nombre').eq('id', pnfId).single();
     const { data: dataMateria } = await window.supabaseClient.from('unidades_curriculares').select('nombre').eq('id', materiaId).single();
-
-    const tiposTrayectos = window.appState.tiposTrayectos || [];
-    const trayectoSeleccionado = tiposTrayectos.find(t => t.id === window.appState.trayectoActual);
-    const nombreTrayecto = trayectoSeleccionado?.nombre || 'Trayecto';
+    
+    // ✅ CONSULTAR DIRECTAMENTE EL NOMBRE DEL TRAYECTO DESDE LA BD
+    const { data: dataTrayecto } = await window.supabaseClient
+        .from('tipos_trayecto')
+        .select('nombre')
+        .eq('id', window.appState.trayectoActual)
+        .single();
+    
+    const nombreTrayecto = dataTrayecto?.nombre || 'Trayecto';
 
     // Consultar estudiantes
     let queryEst = window.supabaseClient
@@ -116,7 +121,6 @@ window.modules.reportes.generarReporteMatriz = async function () {
     const procesoNombre = window.appState.procesoActual || 'PROCESO';
     const ambienteTexto = `AMB${ambiente}`;
     
-    // ✅ CORRECCIÓN: Usar nombreTrayecto directamente (ya viene completo de la BD)
     doc.setFontSize(8).setFont(undefined, 'normal').text(
         `PNF: ${pnfNombre} - PROCESO: ${procesoNombre} - ${nombreTrayecto} - AMBIENTE: ${ambiente}`, 
         140, 15, { align: 'center' }
