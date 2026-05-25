@@ -110,12 +110,12 @@
                             <option value="5">Ambiente 5</option>
                             <option value="6">Ambiente 6</option>
                         </select>
+                        
+                        <!-- ✅ DROPDOWN PROCESO DINÁMICO -->
                         <select id="asign-proceso" required class="border p-2 rounded text-sm w-full mt-2">
-                            <option value="I-2026">I-2026</option>
-                            <option value="II-2026">II-2026</option>
-                            <option value="I-2027">I-2027</option>
-                            <option value="II-2027">II-2027</option>
+                            <option value="">Cargando procesos...</option>
                         </select>
+                        
                         <select id="asign-trayecto" required class="border p-2 rounded text-sm w-full mt-2">
                             <option value="">Cargando trayectos...</option>
                         </select>
@@ -126,21 +126,13 @@
                 </div>
             </div>
 
-            <!-- PROMOCIÓN MASIVA -->
-            <div class="mt-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                <h3 class="font-bold text-lg mb-2 text-orange-700">📈 Promoción Masiva de Trayectos</h3>
-                <p class="text-sm text-gray-600 mb-3">Actualiza el trayecto de múltiples estudiantes simultáneamente</p>
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <select id="promo-trayecto-origen" class="border p-2 rounded text-sm">
-                        <option value="">Cargando...</option>
-                    </select>
-                    <select id="promo-trayecto-destino" class="border p-2 rounded text-sm">
-                        <option value="">Cargando...</option>
-                    </select>
-                </div>
-                <button onclick="promocionarEstudiantes()" class="w-full bg-orange-600 text-white py-2 rounded-lg font-bold hover:bg-orange-700 transition">
-                    🚀 Promocionar Estudiantes
-                </button>
+            <!-- ✅ GESTIÓN DE ESTUDIANTES (MOVIDO AQUÍ) -->
+            <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 class="font-bold text-lg mb-2 text-blue-700">🎓 Gestión de Estudiantes</h3>
+                <p class="text-sm text-gray-600 mb-3">Administra, busca, edita y exporta estudiantes con filtros avanzados</p>
+                <a href="gestion-estudiantes.html" class="inline-block bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm hover:bg-blue-700 transition">
+                    Ir a Gestión de Estudiantes →
+                </a>
             </div>
 
             <!-- LISTA DE PROFESORES -->
@@ -181,69 +173,68 @@
                 </div>
             </div>
 
-            <!-- ENLACE A GESTIÓN DE ESTUDIANTES -->
-            <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 class="font-bold text-lg mb-2 text-blue-700">🎓 Gestión de Estudiantes</h3>
-                <p class="text-sm text-gray-600 mb-3">Administra, busca, edita y exporta estudiantes con filtros avanzados</p>
-                <a href="gestion-estudiantes.html" class="inline-block bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm hover:bg-blue-700 transition">
-                    Ir a Gestión de Estudiantes →
-                </a>
+            <!-- PROMOCIÓN MASIVA (MOVIDO AL FINAL) -->
+            <div class="mt-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <h3 class="font-bold text-lg mb-2 text-orange-700">📈 Promoción Masiva de Trayectos</h3>
+                <p class="text-sm text-gray-600 mb-3">Actualiza el trayecto de múltiples estudiantes simultáneamente</p>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <select id="promo-trayecto-origen" class="border p-2 rounded text-sm">
+                        <option value="">Cargando...</option>
+                    </select>
+                    <select id="promo-trayecto-destino" class="border p-2 rounded text-sm">
+                        <option value="">Cargando...</option>
+                    </select>
+                </div>
+                <button onclick="promocionarEstudiantes()" class="w-full bg-orange-600 text-white py-2 rounded-lg font-bold hover:bg-orange-700 transition">
+                    🚀 Promocionar Estudiantes
+                </button>
             </div>
+
         </section>
 
-<!-- SECCIÓN PRINCIPAL DE ASISTENCIA -->
-<section class="bg-white rounded-xl shadow-md p-6 mb-6">
-    <!-- FILTROS EN CASCADA -->
-    <!-- ✅ CAMBIO: lg:grid-cols-4 organiza en 4 columnas en PC -->
-    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3 mb-4">
-        
-        <!-- Fila 1 -->
-        <select id="select-pnf" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onPnfChangeAsistencia()">
-            <option value="">Seleccione PNF</option>
-        </select>
-        
-        <select id="select-categoria" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onCategoriaChangeAsistencia()">
-            <option value="">Todas las categorías</option>
-        </select>
-        
-        <select id="select-materia" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onMateriaChangeAsistencia()">
-            <option value="">Seleccione Unidad Curricular</option>
-        </select>
-        
-        <select id="select-proceso" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onProcesoChangeAsistencia()">
-            <option value="">Seleccione Proceso</option>
-        </select>
+        <!-- SECCIÓN PRINCIPAL DE ASISTENCIA -->
+        <section class="bg-white rounded-xl shadow-md p-6 mb-6">
+            <!-- FILTROS EN CASCADA -->
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3 mb-4">
+                <!-- Fila 1 -->
+                <select id="select-pnf" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onPnfChangeAsistencia()">
+                    <option value="">Seleccione PNF</option>
+                </select>
+                <select id="select-categoria" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onCategoriaChangeAsistencia()">
+                    <option value="">Todas las categorías</option>
+                </select>
+                <select id="select-materia" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onMateriaChangeAsistencia()">
+                    <option value="">Seleccione Unidad Curricular</option>
+                </select>
+                <select id="select-proceso" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onProcesoChangeAsistencia()">
+                    <option value="">Seleccione Proceso</option>
+                </select>
+                <!-- Fila 2 -->
+                <select id="select-trayecto" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onTrayectoChangeAsistencia()">
+                    <option value="">Seleccione Trayecto</option>
+                </select>
+                <select id="select-ambiente" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onAmbienteChangeAsistencia()">
+                    <option value="">Seleccione Ambiente</option>
+                </select>
+                <select id="select-status-asist" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onStatusChangeAsistencia()">
+                    <option value="">Todos los estados</option>
+                    <option value="Activo">✅ Activos</option>
+                    <option value="Inactivo">❌ Inactivos</option>
+                </select>
+                <select id="select-genero" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onGeneroChangeAsistencia()">
+                    <option value="">Todos los géneros</option>
+                </select>
+            </div>
 
-        <!-- Fila 2 -->
-        <select id="select-trayecto" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onTrayectoChangeAsistencia()">
-            <option value="">Seleccione Trayecto</option>
-        </select>
-        
-        <select id="select-ambiente" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onAmbienteChangeAsistencia()">
-            <option value="">Seleccione Ambiente</option>
-        </select>
-        
-        <select id="select-status-asist" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onStatusChangeAsistencia()">
-            <option value="">Todos los estados</option>
-            <option value="Activo">✅ Activos</option>
-            <option value="Inactivo">❌ Inactivos</option>
-        </select>
-        
-        <select id="select-genero" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onGeneroChangeAsistencia()">
-            <option value="">Todos los géneros</option>
-        </select>
-    </div>
-
-    <!-- BOTONES -->
-    <div class="flex flex-col md:flex-row gap-3 mt-4 border-t pt-4">
-        <button id="btn-cargar" class="bg-blue-600 text-white py-2 px-4 rounded-lg font-bold text-sm hover:bg-blue-800 transition flex-1">
-            Cargar Lista
-        </button>
-        <button id="btn-reporte" class="bg-purple-600 text-white py-2 px-4 rounded-lg font-bold text-sm hover:bg-purple-800 transition flex-1">
-            Reporte Matriz
-        </button>
-    </div>
-</section>
+            <!-- BOTONES -->
+            <div class="flex flex-col md:flex-row gap-3 mt-4 border-t pt-4">
+                <button id="btn-cargar" class="bg-blue-600 text-white py-2 px-4 rounded-lg font-bold text-sm hover:bg-blue-800 transition flex-1">
+                    Cargar Lista
+                </button>
+                <button id="btn-reporte" class="bg-purple-600 text-white py-2 px-4 rounded-lg font-bold text-sm hover:bg-purple-800 transition flex-1">
+                    Reporte Matriz
+                </button>
+            </div>
 
             <!-- FILTROS ADICIONALES -->
             <div id="filtro-profesor-reporte" class="hidden mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
