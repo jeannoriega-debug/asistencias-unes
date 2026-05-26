@@ -170,6 +170,7 @@ window.modules.disciplina = {
             tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos. Verifica la conexión.</td></tr>';
         }
     },
+
 buscarPorCedula: async function() {
     const cedulaInput = document.getElementById('buscar-cedula').value.trim();
     if (!cedulaInput) {
@@ -183,10 +184,10 @@ buscarPorCedula: async function() {
     console.log('🔍 Buscando cédula:', cedulaNumeros);
 
     try {
-        // PASO 1: Buscar en ESTUDIANTES
+        // PASO 1: Buscar en ESTUDIANTES (tabla maestra de matrícula)
         const { data: estudiantesData, error: errorEst } = await window.supabaseClient
             .from('estudiantes')
-            .select('id, cedula, nombres, apellidos, genero, pnf_id, proceso, status')
+            .select('id, cedula, nombres, apellidos, genero, pnf_id, proceso, status, ambiente, categoria, trayecto_id')
             .or(`cedula.ilike.%${cedulaNumeros}%,cedula.ilike.%V-${cedulaNumeros}%,cedula.ilike.%E-${cedulaNumeros}%`)
             .limit(1);
 
@@ -201,12 +202,12 @@ buscarPorCedula: async function() {
         if (estudiante) {
             console.log('✅ Estudiante encontrado en tabla ESTUDIANTES:', estudiante);
             
-            // Llenar formulario izquierdo con datos del estudiante
+            // Llenar formulario izquierdo CON DATOS DE ESTUDIANTES (tabla maestra)
             this.llenarFormularioEstudiante(estudiante);
             this.mostrarFiltroActivo(cedulaInput);
             document.getElementById('datos-personales-panel').classList.remove('hidden');
 
-            // PASO 2: Buscar SOLO los registros disciplinarios de ESTA cédula
+            // Buscar en DISC_REGISTROS solo para mostrar el historial disciplinario
             const { data: registrosDisc, error: errorDisc } = await window.supabaseClient
                 .from('disc_registros')
                 .select('*')
@@ -219,15 +220,16 @@ buscarPorCedula: async function() {
 
             console.log('📋 Registros disciplina encontrados:', registrosDisc?.length || 0);
 
-            // PASO 3: Mostrar en tabla derecha SOLO los registros de esta cédula
+            // Renderizar tabla con SOLO los registros disciplinarios de este estudiante
             if (registrosDisc && registrosDisc.length > 0) {
-                // Actualizar campo PNF con el de disc_registros (texto)
-                document.getElementById('disc-pnf').value = registrosDisc[0].pnf || ''; 
+                // ⚠️ IMPORTANTE: NO actualizamos el PNF del formulario con disc_registros
+                // El formulario ya tiene los datos correctos de estudiantes
                 
-                // Cargar el registro más reciente en el formulario
+                // Solo cargamos el último registro disciplinario para editar si es necesario
+                // Pero NO sobrescribimos los datos personales
                 this.llenarFormulario(registrosDisc[0]);
 
-                // Renderizar tabla con SOLO estos registros (agrupados)
+                // Renderizar tabla filtrada
                 await this.renderizarTablaFiltrada(registrosDisc);
 
                 Swal.fire({
@@ -240,7 +242,7 @@ buscarPorCedula: async function() {
                     showCancelButton: false
                 });
             } else {
-                // Sin registros disciplinarios - mostrar tabla vacía o mensaje
+                // Sin registros disciplinarios - mostrar tabla vacía
                 Swal.fire({
                     icon: 'info',
                     title: '📝 Sin Antecedentes',
@@ -256,7 +258,7 @@ buscarPorCedula: async function() {
             return;
         }
 
-        // Si no encuentra en estudiantes, buscar solo en disc_registros
+        // PASO 2: Si no está en ESTUDIANTES, buscar solo en DISC_REGISTROS
         console.log('⚠️ No encontrado en ESTUDIANTES, buscando en DISC_REGISTROS...');
         
         const { data: registrosDiscFallback } = await window.supabaseClient
@@ -296,9 +298,9 @@ buscarPorCedula: async function() {
             }
 
             Swal.fire({
-                icon: 'success',
-                title: '✅ Estudiante Encontrado (Solo Disciplina)',
-                html: `<div class="text-left"><p><strong>${reg.nombres} ${reg.apellidos}</strong></p><p class="text-xs text-orange-600 mt-2">⚠️ Datos obtenidos de disc_registros</p></div>`,
+                icon: 'warning',
+                title: '⚠️ Solo en Disciplina',
+                html: `<div class="text-left"><p><strong>${reg.nombres} ${reg.apellidos}</strong></p><p class="text-xs text-orange-600 mt-2">No existe en tabla ESTUDIANTES<br>Datos obtenidos de disc_registros</p></div>`,
                 toast: false,
                 showConfirmButton: true
             });
@@ -316,8 +318,7 @@ buscarPorCedula: async function() {
         console.error('❌ Error general:', e);
         Swal.fire({ icon: 'error', title: 'Error', text: e.message });
     }
-},
-    
+},    
 
 /**
  * Renderizar tabla SOLO con los registros filtrados de una cédula específica
