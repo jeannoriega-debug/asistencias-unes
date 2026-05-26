@@ -6,18 +6,11 @@
     <title>Consejo Disciplinario 2026</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <style>
-        /* Scrollbar personalizado para el modal */
         .modal-body::-webkit-scrollbar { width: 8px; }
         .modal-body::-webkit-scrollbar-track { background: #f1f5f9; }
         .modal-body::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
         .modal-body::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        
-        /* Animación del modal */
-        .modal-backdrop { transition: opacity 0.2s ease-in-out; }
-        .modal-content { transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -43,7 +36,6 @@
 
     <main class="container mx-auto p-3 md:p-4">
         
-        <!-- PANEL PRINCIPAL: 2 COLUMNAS -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
             
             <!-- ========== COLUMNA IZQUIERDA: FORMULARIO ========== -->
@@ -59,11 +51,10 @@
                         <div class="flex gap-2">
                             <input type="text" id="buscar-cedula" placeholder="Ej: V-12345678" 
                                    class="flex-1 p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                            <button onclick="window.modules.disciplina.buscarPorCedula()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold transition"></button>
+                            <button onclick="window.modules.disciplina.buscarPorCedula()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold transition">🔍</button>
                         </div>
                         <p class="text-xs text-gray-500 mt-1">Presiona Enter para buscar</p>
                         
-                        <!-- Indicador de filtro activo -->
                         <div id="filtro-activo" class="hidden mt-2 flex items-center gap-2 text-sm">
                             <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">🔍 Filtrado por: <span id="cedula-filtrada"></span></span>
                             <button onclick="window.modules.disciplina.limpiarBusqueda()" class="text-blue-600 hover:text-blue-800 text-xs underline">Limpiar</button>
@@ -71,10 +62,10 @@
                     </div>
                 </div>
 
-                <!-- DATOS PERSONALES (Auto-llenado desde búsqueda) -->
-                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <!-- DATOS PERSONALES -->
+                <div id="datos-personales-panel" class="bg-white rounded-lg shadow-md overflow-hidden hidden">
                     <div class="bg-blue-800 text-white p-3">
-                        <h2 class="font-bold text-sm flex items-center gap-2"> DATOS PERSONALES</h2>
+                        <h2 class="font-bold text-sm flex items-center gap-2">👤 DATOS PERSONALES</h2>
                     </div>
                     <div class="p-4 space-y-3">
                         <div class="grid grid-cols-2 gap-3">
@@ -183,7 +174,7 @@
                 <!-- REGISTRO DE FALTAS -->
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     <div class="bg-blue-800 text-white p-3">
-                        <h2 class="font-bold text-sm flex items-center gap-2"> REGISTRO DE FALTAS</h2>
+                        <h2 class="font-bold text-sm flex items-center gap-2">📊 REGISTRO DE FALTAS</h2>
                     </div>
                     <div class="p-4 space-y-3">
                         <div class="grid grid-cols-3 gap-2">
@@ -237,19 +228,13 @@
                             <textarea id="disc-observaciones" rows="2" class="w-full p-2 border border-gray-300 rounded text-sm" placeholder="Ingrese observaciones..."></textarea>
                         </div>
                         
-                        <!-- BOTONES DE ACCIÓN -->
                         <div class="flex gap-2 pt-2">
-                            <button onclick="window.modules.disciplina.guardarRegistro()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-bold text-sm transition shadow-md">
-                                 GUARDAR
-                            </button>
-                            <button onclick="window.modules.disciplina.limpiarFormulario()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded font-bold text-sm transition shadow-md">
-                                🔄 LIMPIAR
-                            </button>
+                            <button onclick="window.modules.disciplina.guardarRegistro()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-bold text-sm transition shadow-md">💾 GUARDAR</button>
+                            <button onclick="window.modules.disciplina.limpiarFormulario()" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded font-bold text-sm transition shadow-md">🔄 LIMPIAR</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- INFO ADICIONAL -->
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 space-y-1">
                     <p><strong>ℹ️ Info:</strong></p>
                     <p>• Busca cédula en MATRICULA (1520 estudiantes)</p>
@@ -263,7 +248,6 @@
             <!-- ========== COLUMNA DERECHA: LISTADO DE FALTAS ========== -->
             <div class="lg:col-span-2">
                 <div class="bg-white rounded-lg shadow-md overflow-hidden h-full">
-                    <!-- Header de la tabla -->
                     <div class="bg-gray-800 text-white p-3 flex flex-wrap justify-between items-center gap-2">
                         <h2 class="font-bold text-sm flex items-center gap-2">📋 LISTADO DE FALTAS</h2>
                         <div class="flex gap-2">
@@ -273,7 +257,6 @@
                         </div>
                     </div>
 
-                    <!-- Tabla responsive -->
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead class="bg-gray-100 border-b border-gray-200">
@@ -302,26 +285,20 @@
 
     <!-- ========== MODAL DETALLE DE FALTAS ========== -->
     <div id="modal-detalle" class="fixed inset-0 z-50 hidden">
-        <!-- Backdrop oscuro -->
         <div class="modal-backdrop absolute inset-0 bg-black bg-opacity-60" onclick="window.modules.disciplina.cerrarModal()"></div>
         
-        <!-- Contenido del modal -->
         <div class="modal-content absolute inset-4 md:inset-10 lg:inset-20 bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
-            
-            <!-- Header del modal -->
             <div class="bg-blue-700 text-white p-4 flex justify-between items-center shrink-0">
                 <h3 class="font-bold text-lg flex items-center gap-2">📋 DETALLE DE FALTAS</h3>
                 <button onclick="window.modules.disciplina.cerrarModal()" class="text-white hover:text-gray-200 text-2xl font-bold transition">&times;</button>
             </div>
 
-            <!-- Info del estudiante en el modal -->
             <div class="bg-blue-50 border-b border-blue-200 p-3 flex flex-wrap gap-4 text-sm shrink-0">
                 <span class="font-bold text-blue-800">Cédula: <span id="modal-cedula" class="font-normal"></span></span>
                 <span class="font-bold text-blue-800">Estudiante: <span id="modal-estudiante" class="font-normal"></span></span>
                 <span class="font-bold text-blue-800">Total Registros: <span id="modal-total" class="font-normal"></span></span>
             </div>
 
-            <!-- Cuerpo del modal con scroll -->
             <div class="modal-body flex-1 overflow-y-auto p-4">
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm border border-gray-200 rounded-lg">
@@ -337,23 +314,17 @@
                                 <th class="p-2 text-center border-b text-xs font-bold text-gray-600 uppercase">ACCIONES</th>
                             </tr>
                         </thead>
-                        <tbody id="modal-body-faltas" class="divide-y divide-gray-100">
-                            <!-- Se llena dinámicamente -->
-                        </tbody>
+                        <tbody id="modal-body-faltas" class="divide-y divide-gray-100"></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Footer del modal -->
             <div class="bg-gray-50 border-t border-gray-200 p-3 flex justify-end shrink-0">
-                <button onclick="window.modules.disciplina.cerrarModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded font-bold text-sm transition">
-                    Cerrar
-                </button>
+                <button onclick="window.modules.disciplina.cerrarModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded font-bold text-sm transition">Cerrar</button>
             </div>
         </div>
     </div>
 
-    <!-- SCRIPTS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="assets/js/config.js"></script>
     <script src="assets/js/auth.js"></script>
