@@ -1,6 +1,6 @@
 /**
  * MÓDULO CONSEJO DISCIPLINARIO 2026
- * Versión: 3.0 - Búsqueda mejorada + Ordenamiento por gravedad
+ * Versión: 3.1 - Corregido PNF y botón Limpiar
  */
 
 window.modules = window.modules || {};
@@ -10,7 +10,7 @@ window.modules.disciplina = {
     datosCache: [],
 
     init: async function() {
-        console.log('🚀 Iniciando módulo Disciplinario v3.0...');
+        console.log('🚀 Iniciando módulo Disciplinario v3.1...');
         await this.cargarLista();
         
         const inputBusqueda = document.getElementById('buscar-cedula');
@@ -182,9 +182,14 @@ window.modules.disciplina = {
         console.log('🔍 Buscando cédula:', cedulaNumeros);
 
         try {
+            // Buscar en ESTUDIANTES con relación PNF
             const { data: estudiantesData, error: errorEst } = await window.supabaseClient
                 .from('estudiantes')
-                .select('id, cedula, nombres, apellidos, genero, proceso, status, ambiente, categoria, trayecto_id, pnf:pnf_id(nombre)')
+                .select(`
+                    id, cedula, nombres, apellidos, genero, proceso, status, 
+                    ambiente, categoria, trayecto_id, 
+                    pnf:pnf_id(nombre)
+                `)
                 .or(`cedula.ilike.%${cedulaNumeros}%,cedula.ilike.%V-${cedulaNumeros}%,cedula.ilike.%E-${cedulaNumeros}%`)
                 .limit(1);
 
@@ -199,10 +204,12 @@ window.modules.disciplina = {
             if (estudiante) {
                 console.log('✅ Estudiante encontrado en tabla ESTUDIANTES:', estudiante);
                 
+                // Llenar formulario con datos de ESTUDIANTES
                 this.llenarFormularioEstudiante(estudiante);
                 this.mostrarFiltroActivo(cedulaInput);
                 document.getElementById('datos-personales-panel').classList.remove('hidden');
 
+                // Buscar en DISC_REGISTROS
                 const { data: registrosDisc, error: errorDisc } = await window.supabaseClient
                     .from('disc_registros')
                     .select('*')
@@ -213,6 +220,7 @@ window.modules.disciplina = {
                 console.log('📋 Registros disciplina encontrados:', registrosDisc?.length || 0);
 
                 if (registrosDisc && registrosDisc.length > 0) {
+                    // Cargar datos disciplinarios SIN sobrescribir PNF
                     this.llenarDatosDisciplinarios(registrosDisc[0]);
                     await this.renderizarTablaFiltrada(registrosDisc);
 
@@ -237,6 +245,7 @@ window.modules.disciplina = {
                 return;
             }
 
+            // Fallback: buscar en DISC_REGISTROS
             const { data: registrosDiscFallback } = await window.supabaseClient
                 .from('disc_registros')
                 .select('*')
@@ -272,18 +281,35 @@ window.modules.disciplina = {
 
     llenarFormularioEstudiante: function(est) {
         this.registroActualId = null;
-        console.log(' Llenando formulario con:', est);
+        console.log('📝 Llenando formulario con:', est);
 
-        const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
+        const setVal = (id, val) => { 
+            const el = document.getElementById(id); 
+            if(el) el.value = val || ''; 
+        };
 
         setVal('disc-cedula', est.cedula);
         setVal('disc-nombres', est.nombres);
         setVal('disc-apellidos', est.apellidos);
+        
+        // Género en mayúsculas
         setVal('disc-genero', est.genero ? est.genero.toUpperCase() : 'SELECCIONAR');
-        setVal('disc-pnf', est.pnf?.nombre || '');
+        
+        // CORRECCIÓN PNF: Extraer nombre del objeto pnf o usar string directo
+        let pnfNombre = '';
+        if (est.pnf) {
+            if (typeof est.pnf === 'object' && est.pnf.nombre) {
+                pnfNombre = est.pnf.nombre;
+            } else if (typeof est.pnf === 'string') {
+                pnfNombre = est.pnf;
+            }
+        }
+        setVal('disc-pnf', pnfNombre);
+        
         setVal('disc-proceso', est.proceso || '');
         setVal('disc-nucleo', 'NUEVA ESPARTA');
         
+        // Limpiar campos disciplinarios
         setVal('disc-tipo-baja', 'SELECCIONAR');
         setVal('disc-estatus-general', 'ACTIVO');
         setVal('disc-leves-cant', 0);
@@ -294,11 +320,13 @@ window.modules.disciplina = {
         setVal('disc-acta-compromiso', '');
         setVal('disc-observaciones', '');
         
-        ['disc-fecha-baja', 'disc-fecha-leve', 'disc-fecha-leve-recibida', 
-         'disc-fecha-grave', 'disc-fecha-grave-recibida', 'disc-fecha-gravisima',
-         'disc-fecha-gravisima-recibida', 'disc-fecha-incidencia', 'disc-fecha-consejo'].forEach(id => {
-            setVal(id, '');
-        });
+        // Limpiar todas las fechas
+        const fechasIds = [
+            'disc-fecha-baja', 'disc-fecha-leve', 'disc-fecha-leve-recibida', 
+            'disc-fecha-grave', 'disc-fecha-grave-recibida', 'disc-fecha-gravisima',
+            'disc-fecha-gravisima-recibida', 'disc-fecha-incidencia', 'disc-fecha-consejo'
+        ];
+        fechasIds.forEach(id => setVal(id, ''));
     },
 
     llenarDatosDisciplinarios: function(data) {
@@ -306,6 +334,7 @@ window.modules.disciplina = {
 
         const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
 
+        // Fechas
         setVal('disc-fecha-baja', data.fecha_baja);
         setVal('disc-fecha-leve', data.faltas_leves_fecha);
         setVal('disc-fecha-leve-recibida', data.fecha_falta_leve_recibida);
@@ -316,15 +345,18 @@ window.modules.disciplina = {
         setVal('disc-fecha-incidencia', data.fecha_incidencia_estudiante);
         setVal('disc-fecha-consejo', data.consejo_disciplinario_fecha);
 
+        // Contadores
         setVal('disc-leves-cant', data.faltas_leves_cant || 0);
         setVal('disc-graves-cant', data.faltas_graves_cant || 0);
         setVal('disc-gravisimas-cant', data.faltas_gravisimas_cant || 0);
 
+        // Textos largos
         setVal('disc-causal-graves', data.causal_faltas_graves_impuesta || '');
         setVal('disc-programa-supervision', data.programa_supervision_intensiva_aplicado_grave_impuesta || '');
         setVal('disc-acta-compromiso', data.acta_compromiso || '');
         setVal('disc-observaciones', data.observaciones_jefe || '');
 
+        // Estatus
         setVal('disc-estatus-general', data.estatus_general || 'ACTIVO');
     },
 
@@ -677,32 +709,48 @@ window.modules.disciplina = {
         document.getElementById('filtro-activo').classList.add('hidden');
     },
 
+    /**
+     * LIMPIAR FORMULARIO COMPLETO
+     * Limpia TODOS los inputs, selects, textareas y date inputs
+     */
     limpiarFormulario: function() {
         this.registroActualId = null;
         
+        // Limpiar TODOS los elementos del formulario
         document.querySelectorAll('input, select, textarea').forEach(el => {
             if (el.id !== 'buscar-cedula') {
                 if (el.tagName === 'SELECT') {
+                    // Resetear selects a su opción por defecto
                     if (el.id === 'disc-genero') el.value = 'SELECCIONAR';
                     else if (el.id === 'disc-tipo-baja') el.value = 'SELECCIONAR';
                     else if (el.id === 'disc-supervision') el.value = 'NO APLICA';
                     else if (el.id === 'disc-estatus-general') el.value = 'ACTIVO';
+                    else el.selectedIndex = 0;
+                } else if (el.type === 'checkbox' || el.type === 'radio') {
+                    el.checked = false;
                 } else {
                     el.value = '';
                 }
             }
         });
 
+        // Resetear valores numéricos específicos
         document.getElementById('disc-leves-cant').value = 0;
         document.getElementById('disc-graves-cant').value = 0;
         document.getElementById('disc-gravisimas-cant').value = 0;
         document.getElementById('disc-nucleo').value = 'NUEVA ESPARTA';
+        
+        // Ocultar panel de datos personales
         document.getElementById('datos-personales-panel').classList.add('hidden');
 
+        // Limpiar búsqueda
         this.limpiarBusqueda();
+        
+        console.log('🧹 Formulario limpiado completamente');
     }
 };
 
+// Exportar funciones globales
 window.buscarEstudiante = function() { window.modules.disciplina.buscarPorCedula(); };
 window.guardarRegistro = function() { window.modules.disciplina.guardarRegistro(); };
 window.limpiarFormulario = function() { window.modules.disciplina.limpiarFormulario(); };
@@ -726,4 +774,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('✅ Módulo Consejo Disciplinario v3.0 Cargado');
+console.log('✅ Módulo Consejo Disciplinario v3.1 Cargado');
