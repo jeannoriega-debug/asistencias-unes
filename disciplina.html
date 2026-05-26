@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consejo Disciplinario 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        .container-custom { max-width: 1400px; }
+        .table-responsive { overflow-x: auto; }
+        @media (max-width: 768px) {
+            .hide-mobile { display: none; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- NAVBAR -->
+    <nav class="bg-blue-800 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="container-custom mx-auto flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-bold">🏛️ CONSEJO DISCIPLINARIO 2026</h1>
+            <div class="flex gap-2">
+                <button onclick="generarReporteProceso()" class="bg-red-600 hover:bg-red-700 px-3 py-2 rounded text-sm font-bold hidden md:block">
+                    📄 PDF BAJAS
+                </button>
+                <button onclick="generarReporteBajas()" class="bg-gray-700 hover:bg-gray-800 px-3 py-2 rounded text-sm font-bold hidden md:block">
+                    📊 REPORTE PROCESO
+                </button>
+                <button onclick="cerrarSesion()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded font-bold">
+                    Salir
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-custom mx-auto p-4">
+        
+        <!-- PANEL IZQUIERDO: BÚSQUEDA Y DATOS -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            
+            <!-- BÚSQUEDA -->
+            <div class="lg:col-span-1 bg-white rounded-lg shadow-md p-4">
+                <div class="bg-gray-800 text-white p-2 rounded mb-3">
+                    <h2 class="font-bold text-sm">📋 DATOS DEL ESTUDIANTE</h2>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">BUSCAR CEDULA EN MATRICULA *</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="buscar-cedula" placeholder="Ej: V-12345678" 
+                               class="flex-1 p-2 border rounded text-sm" onkeypress="if(event.key==='Enter') buscarEstudiante()">
+                        <button onclick="buscarEstudiante()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded font-bold">
+                            🔍
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Presiona Enter para buscar</p>
+                </div>
+
+                <!-- DATOS PERSONALES -->
+                <div class="bg-blue-800 text-white p-2 rounded mb-3">
+                    <h2 class="font-bold text-sm">👤 DATOS PERSONALES</h2>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">CEDULA *</label>
+                        <input type="text" id="disc-cedula" class="w-full p-2 border rounded text-sm" readonly>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">PROCESO</label>
+                        <input type="text" id="disc-proceso" class="w-full p-2 border rounded text-sm" readonly>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-gray-700 mb-1">NOMBRES</label>
+                        <input type="text" id="disc-nombres" class="w-full p-2 border rounded text-sm" readonly>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-gray-700 mb-1">APELLIDOS</label>
+                        <input type="text" id="disc-apellidos" class="w-full p-2 border rounded text-sm" readonly>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">GENERO</label>
+                        <select id="disc-genero" class="w-full p-2 border rounded text-sm">
+                            <option value="SELECCIONAR">SELECCIONAR</option>
+                            <option value="MASCULINO">MASCULINO</option>
+                            <option value="FEMENINO">FEMENINO</option>
+                            <option value="OTRO">OTRO</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">NUCLEO</label>
+                        <input type="text" id="disc-nucleo" value="NUEVA ESPARTA" class="w-full p-2 border rounded text-sm">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-gray-700 mb-1">PNF</label>
+                        <input type="text" id="disc-pnf" class="w-full p-2 border rounded text-sm" readonly>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-gray-700 mb-1">SUPERVISION</label>
+                        <select id="disc-supervision" class="w-full p-2 border rounded text-sm">
+                            <option value="NO APLICA">NO APLICA</option>
+                            <option value="SI">SI</option>
+                            <option value="NO">NO</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- FECHAS -->
+                <div class="bg-blue-800 text-white p-2 rounded mb-3">
+                    <h2 class="font-bold text-sm">📅 FECHAS</h2>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">TIPO DE BAJA</label>
+                        <select id="disc-tipo-baja" class="w-full p-2 border rounded text-sm">
+                            <option value="SELECCIONAR">SELECCIONAR</option>
+                            <option value="BAJA_VOLUNTARIA">BAJA VOLUNTARIA</option>
+                            <option value="BAJA_POR_INASISTENCIA">BAJA POR INASISTENCIA</option>
+                            <option value="BAJA_ACADEMICA">BAJA ACADEMICA</option>
+                            <option value="BAJA_MEDICA">BAJA MEDICA</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">FECHA BAJA</label>
+                        <input type="date" id="disc-fecha-baja" class="w-full p-2 border rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">FECHA FALTA LEVE</label>
+                        <input type="date" id="disc-fecha-leve" class="w-full p-2 border rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">FECHA FALTA LEVE RECIBIDA</label>
+                        <input type="date" id="disc-fecha-leve-recibida" class="w-full p-2 border rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">FECHA FALTA GRAVE</label>
+                        <input type="date" id="disc-fecha-grave" class="w-full p-2 border rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">FECHA FALTA GRAVE RECIBIDA</label>
+                        <input type="date" id="disc-fecha-grave-recibida" class="w-full p-2 border rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">FECHA FALTA GRAVISIMA</label>
+                        <input type="date" id="disc-fecha-gravisima" class="w-full p-2 border rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">FECHA FALTA GRAVISIMA RECIBIDA</label>
+                        <input type="date" id="disc-fecha-gravisima-recibida" class="w-full p-2 border rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">FECHA INCIDENCIA</label>
+                        <input type="date" id="disc-fecha-incidencia" class="w-full p-2 border rounded text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">FECHA CONSEJO</label>
+                        <input type="date" id="disc-fecha-consejo" class="w-full p-2 border rounded text-sm">
+                    </div>
+                </div>
+
+                <!-- BOTONES DE ACCIÓN -->
+                <div class="mt-4 grid grid-cols-2 gap-2">
+                    <button onclick="guardarRegistro()" class="bg-green-600 hover:bg-green-700 text-white py-2 rounded font-bold text-sm">
+                        💾 GUARDAR
+                    </button>
+                    <button onclick="limpiarFormulario()" class="bg-gray-600 hover:bg-gray-700 text-white py-2 rounded font-bold text-sm">
+                        🔄 LIMPIAR
+                    </button>
+                </div>
+            </div>
+
+            <!-- PANEL DERECHO: LISTA DE REGISTROS -->
+            <div class="lg:col-span-2 bg-white rounded-lg shadow-md p-4">
+                <div class="bg-gray-800 text-white p-2 rounded mb-3 flex justify-between items-center">
+                    <h2 class="font-bold text-sm">📋 LISTADO DE FALTAS</h2>
+                    <div class="flex gap-2">
+                        <button onclick="filtrarRegistros('TODOS')" class="bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded text-xs font-bold">TODOS</button>
+                        <button onclick="filtrarRegistros('ACTIVOS')" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs font-bold">✅ ACTIVOS</button>
+                        <button onclick="filtrarRegistros('INACTIVOS')" class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-bold">❌ INACTIVOS</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="p-2 text-left hide-mobile">ID</th>
+                                <th class="p-2 text-left">CEDULA</th>
+                                <th class="p-2 text-left hide-mobile">ESTUDIANTE</th>
+                                <th class="p-2 text-left hide-mobile">PNF</th>
+                                <th class="p-2 text-left hide-mobile">PROCESO</th>
+                                <th class="p-2 text-left">ESTADO</th>
+                                <th class="p-2 text-center">LEVES</th>
+                                <th class="p-2 text-center">GRAVES</th>
+                                <th class="p-2 text-center">GRAVISIMAS</th>
+                                <th class="p-2 text-center">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-disciplina-body">
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/modules/disciplina.js"></script>
+</body>
+</html>
