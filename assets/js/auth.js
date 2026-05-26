@@ -7,62 +7,64 @@
  * Iniciar sesión con email y contraseña
  */
 async function iniciarSesion() {
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value.trim();
     
     if (!email || !password) {
-        return Swal.fire('Atención', 'Ingresa email y contraseña', 'warning');
-    }
-    
-    // 1. Intentar login con Supabase Auth
-    const { data: authData, error: authError } = await window.supabaseClient.auth.signInWithPassword({ 
-        email, 
-        password 
-    });
-    
-    if (authError) {
-        const errEl = document.getElementById('login-error');
-        if (errEl) {
-            errEl.innerText = "Error: Credenciales inválidas";
-            errEl.classList.remove('hidden');
-        }
+        Swal.fire('Atención', 'Ingrese correo y contraseña', 'warning');
         return;
     }
-    
-    // 2. Verificar que el usuario exista en perfiles_profesores
-    const userId = authData.user.id;
-    const { data: perfil, error: perfilError } = await window.supabaseClient
-        .from('perfiles_profesores')
-        .select('status, rol')
-        .eq('id', userId)
-        .single();
-    
-    if (perfilError || !perfil) {
-        // No tiene perfil, cerrar sesión
-        await window.supabaseClient.auth.signOut();
-        const errEl = document.getElementById('login-error');
-        if (errEl) {
-            errEl.innerText = "Error: Usuario no registrado en el sistema";
-            errEl.classList.remove('hidden');
+
+    try {
+        // 1. Autenticar con Supabase
+        const { data: authData, error: authError } = await window.supabaseClient.auth.signInWithPassword({
+            email,
+            password
+        });
+
+        if (authError) throw authError;
+        if (!authData.user) throw new Error('Usuario no encontrado');
+
+        // 2. Obtener perfil del usuario
+        const { data: perfil, error: perfilError } = await window.supabaseClient
+            .from('perfiles_profesores')
+            .select('rol, status, nombre, apellido')
+            .eq('id', authData.user.id)
+            .single();
+
+        if (perfilError || !perfil) {
+            await window.supabaseClient.auth.signOut();
+            throw new Error('Perfil no encontrado');
         }
-        return;
-    }
-    
-    // 3. Verificar si está activo
-    if (perfil.status !== 'Activo') {
-        // Cerrar sesión inmediatamente
-        await window.supabaseClient.auth.signOut();
-        
-        const errEl = document.getElementById('login-error');
-        if (errEl) {
-            errEl.innerText = "⏳ Cuenta pendiente de activación. Contacta al administrador.";
-            errEl.classList.remove('hidden');
+
+        if (perfil.status !== 'Activo') {
+            await window.supabaseClient.auth.signOut();
+            Swal.fire('Acceso denegado', 'Su cuenta no está activada', 'error');
+            return;
         }
-        return;
+
+        // 3. Guardar datos en appState
+        window.appState.usuarioActualId = authData.user.id;
+        window.appState.rolUsuarioActual = perfil.rol;
+        window.appState.nombreProfesorGlobal = `${perfil.nombre} ${perfil.apellido}`.trim();
+
+        // 🔥 4. REDIRECCIÓN ESPECIAL PARA USUARIO DISCIPLINA
+        if (email.toLowerCase() === 'controlydisciplina@gmail.com' || perfil.rol === 'disciplina_admin') {
+            window.location.href = 'disciplina.html';
+            return;
+        }
+
+        // 5. Redirección normal según rol
+        if (perfil.rol === 'super_usuario') {
+            window.location.href = 'index.html?panel=admin';
+        } else {
+            window.location.href = 'index.html';
+        }
+
+    } catch (error) {
+        console.error('Error login:', error);
+        Swal.fire('Error', error.message || 'No se pudo iniciar sesión', 'error');
     }
-    
-    // 4. Todo OK - Recargar página
-    location.reload();
 }
 
 /**
