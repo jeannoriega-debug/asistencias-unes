@@ -172,52 +172,104 @@ window.modules.disciplina = {
     },
 buscarPorCedula: async function() {
     const cedulaInput = document.getElementById('buscar-cedula').value.trim();
-    if (!cedulaInput) return Swal.fire('Atención', 'Ingrese cédula', 'warning');
+    if (!cedulaInput) {
+        Swal.fire({ icon: 'warning', title: 'Atención', text: 'Ingrese una cédula', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+        return;
+    }
 
     // Normalizar: quitar V, E, puntos, guiones, espacios
     const cedulaNumeros = cedulaInput.replace(/[^0-9]/g, '');
     
+    console.log('🔍 Buscando cédula:', cedulaNumeros);
+
     try {
-        // 1. Buscar en ESTUDIANTES con búsqueda flexible
-        const { data: estudiantes, error: errEst } = await window.supabaseClient
+        // PASO 1: Buscar en ESTUDIANTES
+        const { data: estudiantesData, error: errorEst } = await window.supabaseClient
             .from('estudiantes')
-            .select('*')
-            .ilike('cedula', `%${cedulaNumeros}%`)  // Busca coincidencia parcial
+            .select('id, cedula, nombres, apellidos, genero, pnf_id, proceso, status')
+            .or(`cedula.ilike.%${cedulaNumeros}%,cedula.ilike.%V-${cedulaNumeros}%,cedula.ilike.%E-${cedulaNumeros}%`)
             .limit(1);
 
-        if (errEst) throw errEst;
+        if (errorEst) {
+            console.error('❌ Error en estudiantes:', errorEst);
+        }
 
-        if (estudiantes && estudiantes.length > 0) {
-            // ✅ ENCONTRADO EN ESTUDIANTES
-            const est = estudiantes[0];
-            this.llenarFormularioEstudiante(est);
+        console.log('📊 Resultado estudiantes:', estudiantesData);
+
+        let estudiante = estudiantesData && estudiantesData.length > 0 ? estudiantesData[0] : null;
+
+        if (estudiante) {
+            console.log('✅ Estudiante encontrado en tabla ESTUDIANTES:', estudiante);
             
-            // Buscar si tiene registros en disc_registros
-            const { data: disc } = await window.supabaseClient
+            // Llenar formulario izquierdo con datos del estudiante
+            this.llenarFormularioEstudiante(estudiante);
+            this.mostrarFiltroActivo(cedulaInput);
+            document.getElementById('datos-personales-panel').classList.remove('hidden');
+
+            // PASO 2: Buscar SOLO los registros disciplinarios de ESTA cédula
+            const { data: registrosDisc, error: errorDisc } = await window.supabaseClient
                 .from('disc_registros')
                 .select('*')
-                .eq('cedula', est.cedula)
+                .eq('cedula', estudiante.cedula)
                 .order('id', { ascending: false });
 
-            if (disc && disc.length > 0) {
-                document.getElementById('disc-pnf').value = disc[0].pnf || '';
-                this.llenarFormulario(disc[0]);
-                Swal.fire('✅ Encontrado', `${est.nombres} ${est.apellidos}\n${disc.length} registro(s) disciplinario(s)`, 'success');
+            if (errorDisc) {
+                console.warn('⚠️ Error buscando disciplina:', errorDisc);
+            }
+
+            console.log('📋 Registros disciplina encontrados:', registrosDisc?.length || 0);
+
+            // PASO 3: Mostrar en tabla derecha SOLO los registros de esta cédula
+            if (registrosDisc && registrosDisc.length > 0) {
+                // Actualizar campo PNF con el de disc_registros (texto)
+                document.getElementById('disc-pnf').value = registrosDisc[0].pnf || ''; 
+                
+                // Cargar el registro más reciente en el formulario
+                this.llenarFormulario(registrosDisc[0]);
+
+                // Renderizar tabla con SOLO estos registros (agrupados)
+                await this.renderizarTablaFiltrada(registrosDisc);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '✅ Estudiante Encontrado',
+                    html: `<div class="text-left"><p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p><p class="text-sm text-blue-600 mt-2">📋 ${registrosDisc.length} registro(s) disciplinario(s) encontrado(s)</p></div>`,
+                    toast: false,
+                    showConfirmButton: true,
+                    confirmButtonText: 'Aceptar',
+                    showCancelButton: false
+                });
             } else {
-                Swal.fire('ℹ️ Sin antecedentes', `${est.nombres} ${est.apellidos}\nNo tiene registros disciplinarios`, 'info');
+                // Sin registros disciplinarios - mostrar tabla vacía o mensaje
+                Swal.fire({
+                    icon: 'info',
+                    title: '📝 Sin Antecedentes',
+                    html: `<div class="text-left"><p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p><p class="text-sm text-gray-600 mt-1">No tiene registros disciplinarios.</p></div>`,
+                    toast: false,
+                    showConfirmButton: true
+                });
+                
+                // Limpiar tabla derecha
+                document.getElementById('lista-disciplina-body').innerHTML = 
+                    '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros disciplinarios para este estudiante</td></tr>';
             }
             return;
         }
 
-        // 2. Si no está en ESTUDIANTES, buscar en DISC_REGISTROS
-        const { data: discFallback } = await window.supabaseClient
+        // Si no encuentra en estudiantes, buscar solo en disc_registros
+        console.log('⚠️ No encontrado en ESTUDIANTES, buscando en DISC_REGISTROS...');
+        
+        const { data: registrosDiscFallback } = await window.supabaseClient
             .from('disc_registros')
             .select('*')
-            .ilike('cedula', `%${cedulaNumeros}%`)
+            .or(`cedula.ilike.%${cedulaNumeros}%,cedula.ilike.%V-${cedulaNumeros}%,cedula.ilike.%E-${cedulaNumeros}%`)
+            .order('id', { ascending: false })
             .limit(1);
 
-        if (discFallback && discFallback.length > 0) {
-            const reg = discFallback[0];
+        if (registrosDiscFallback && registrosDiscFallback.length > 0) {
+            const reg = registrosDiscFallback[0];
+            console.log('✅ Encontrado en disc_registros:', reg);
+            
             const estudianteFake = {
                 cedula: reg.cedula,
                 nombres: reg.nombres,
@@ -229,18 +281,126 @@ buscarPorCedula: async function() {
             
             this.llenarFormularioEstudiante(estudianteFake);
             this.llenarFormulario(reg);
-            Swal.fire('⚠️ Solo en Disciplina', `${reg.nombres}\nNo existe en tabla ESTUDIANTES`, 'warning');
+            this.mostrarFiltroActivo(cedulaInput);
+            document.getElementById('datos-personales-panel').classList.remove('hidden');
+
+            // Buscar todos los registros de esta cédula
+            const { data: todosLosRegistros } = await window.supabaseClient
+                .from('disc_registros')
+                .select('*')
+                .eq('cedula', reg.cedula)
+                .order('id', { ascending: false });
+
+            if (todosLosRegistros) {
+                await this.renderizarTablaFiltrada(todosLosRegistros);
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: '✅ Estudiante Encontrado (Solo Disciplina)',
+                html: `<div class="text-left"><p><strong>${reg.nombres} ${reg.apellidos}</strong></p><p class="text-xs text-orange-600 mt-2">⚠️ Datos obtenidos de disc_registros</p></div>`,
+                toast: false,
+                showConfirmButton: true
+            });
         } else {
-            Swal.fire('❌ No encontrado', `Cédula ${cedulaInput}`, 'error');
+            Swal.fire({ 
+                icon: 'error', 
+                title: 'No Encontrado', 
+                html: `Cédula <strong>${cedulaInput}</strong> no encontrada en ninguna tabla.<br><br><small class="text-gray-600">Cédula buscada: ${cedulaNumeros}</small>`,
+                toast: false 
+            });
+            this.limpiarFormulario();
         }
 
     } catch (e) {
-        console.error('Error:', e);
-        Swal.fire('Error', e.message, 'error');
+        console.error('❌ Error general:', e);
+        Swal.fire({ icon: 'error', title: 'Error', text: e.message });
     }
 },
     
-    
+
+/**
+ * Renderizar tabla SOLO con los registros filtrados de una cédula específica
+ */
+renderizarTablaFiltrada: async function(registrosFiltrados) {
+    const tbody = document.getElementById('lista-disciplina-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (!registrosFiltrados || registrosFiltrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">No hay registros</td></tr>';
+        return;
+    }
+
+    // Agrupar por cédula (aunque ya deberían ser de la misma cédula)
+    const estudiantesUnicos = {};
+
+    registrosFiltrados.forEach(reg => {
+        if (!estudiantesUnicos[reg.cedula]) {
+            estudiantesUnicos[reg.cedula] = {
+                cedula: reg.cedula,
+                nombres: reg.nombres,
+                apellidos: reg.apellidos,
+                pnf: reg.pnf,
+                proceso: reg.proceso,
+                estatus_general: reg.estatus_general,
+                _total_leves: 0,
+                _total_graves: 0,
+                _total_gravisimas: 0,
+                _ids_registros: [],
+                _ultimo_id: reg.id
+            };
+        }
+        
+        estudiantesUnicos[reg.cedula]._total_leves += (reg.faltas_leves_cant || 0);
+        estudiantesUnicos[reg.cedula]._total_graves += (reg.faltas_graves_cant || 0);
+        estudiantesUnicos[reg.cedula]._total_gravisimas += (reg.faltas_gravisimas_cant || 0);
+        estudiantesUnicos[reg.cedula]._ids_registros.push(reg.id);
+        
+        if (reg.id > estudiantesUnicos[reg.cedula]._ultimo_id) {
+            estudiantesUnicos[reg.cedula].nombres = reg.nombres;
+            estudiantesUnicos[reg.cedula].apellidos = reg.apellidos;
+            estudiantesUnicos[reg.cedula].estatus_general = reg.estatus_general;
+        }
+    });
+
+    // Renderizar
+    Object.values(estudiantesUnicos).forEach(est => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-blue-50 border-b border-gray-100 transition';
+        
+        const leveClass = est._total_leves > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'bg-gray-100 text-gray-500';
+        const graveClass = est._total_graves > 0 ? 'bg-red-200 text-red-800 font-bold' : 'bg-gray-100 text-gray-500';
+        const gravisimaClass = est._total_gravisimas > 0 ? 'bg-gray-800 text-white font-bold' : 'bg-gray-100 text-gray-500';
+        
+        const statusBadge = (est.estatus_general === 'ACTIVO') 
+            ? '<span class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-bold shadow-sm">ACTIVO</span>'
+            : '<span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-bold shadow-sm">INACTIVO</span>';
+
+        tr.innerHTML = `
+            <td class="p-2 text-sm text-gray-600 font-mono">${est._ultimo_id}</td>
+            <td class="p-2 text-sm font-bold text-gray-800">${est.cedula}</td>
+            <td class="p-2 text-sm text-gray-700">${est.nombres} ${est.apellidos}</td>
+            <td class="p-2 text-xs uppercase font-bold tracking-wide text-gray-600 hidden md:table-cell">${est.pnf}</td>
+            <td class="p-2 text-sm hidden md:table-cell"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">${est.proceso}</span></td>
+            <td class="p-2">${statusBadge}</td>
+            <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_leves}</span></td>
+            <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_graves}</span></td>
+            <td class="p-2 text-center">
+                <span class="${gravisimaClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_gravisimas}</span>
+            </td>
+            <td class="p-2 text-center">
+                <div class="flex justify-center gap-1">
+                    <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" 
+                            class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" 
+                            title="Ver Detalle">👁️</button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+},  
     
     llenarFormulario: function(data) {
         this.registroActualId = data.id;
