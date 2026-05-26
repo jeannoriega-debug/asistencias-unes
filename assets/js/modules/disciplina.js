@@ -194,35 +194,43 @@ buscarPorCedula: async function() {
     try {
         console.log('🔍 Buscando cédula normalizada:', cedulaNormalizada);
 
-        // PASO 1: Buscar en tabla ESTUDIANTES
-        const { data: estudiante, error: errorEst } = await window.supabaseClient
+        // PASO 1: Buscar en tabla ESTUDIANTES (usar limit(1) en lugar de single)
+        const { data: estudiantesData, error: errorEst } = await window.supabaseClient
             .from('estudiantes')
             .select(`
                 id, cedula, nombres, apellidos, genero, 
                 pnf:pnf_id(nombre), proceso, ambiente, categoria, 
                 trayecto:trayecto_id(nombre), status
             `)
-            .ilike('cedula', `%${cedulaNormalizada}%`)  // Búsqueda flexible
-            .maybeSingle();
+            .eq('cedula', cedulaNormalizada)
+            .limit(1);
 
         if (errorEst) {
             console.error('❌ Error buscando en estudiantes:', errorEst);
         }
+
+        let estudiante = estudiantesData && estudiantesData.length > 0 ? estudiantesData[0] : null;
 
         if (estudiante) {
             console.log('✅ Estudiante encontrado en tabla estudiantes:', estudiante);
             this.llenarFormularioEstudiante(estudiante);
             this.mostrarFiltroActivo(cedulaInput);
 
-            // Buscar registros disciplinarios
-            const { data: registrosDisc } = await window.supabaseClient
+            // Buscar registros disciplinarios (puede haber múltiples)
+            const { data: registrosDisc, error: errorDisc } = await window.supabaseClient
                 .from('disc_registros')
                 .select('*')
-                .ilike('cedula', `%${cedulaNormalizada}%`)
+                .eq('cedula', cedulaNormalizada)
                 .order('id', { ascending: false });
 
+            if (errorDisc) {
+                console.warn('⚠️ Error buscando en disc_registros:', errorDisc.message);
+            }
+
             if (registrosDisc && registrosDisc.length > 0) {
+                // Cargar el registro MÁS RECIENTE en el formulario
                 this.llenarFormulario(registrosDisc[0]);
+                
                 Swal.fire({
                     icon: 'success',
                     title: '✅ Estudiante Encontrado',
@@ -255,7 +263,7 @@ buscarPorCedula: async function() {
         const { data: registrosDisc, error: errorDisc } = await window.supabaseClient
             .from('disc_registros')
             .select('*')
-            .ilike('cedula', `%${cedulaNormalizada}%`)
+            .eq('cedula', cedulaNormalizada)
             .order('id', { ascending: false })
             .limit(1);
 
@@ -308,7 +316,6 @@ buscarPorCedula: async function() {
         Swal.fire({ icon: 'error', title: 'Error', text: 'Error al buscar: ' + e.message });
     }
 },
-
     /**
      * Llenar formulario con datos de disc_registros (edición)
      */
