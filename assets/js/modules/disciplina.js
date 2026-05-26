@@ -171,123 +171,138 @@ window.modules.disciplina = {
         }
     },
 
-    buscarPorCedula: async function() {
-        const cedulaInput = document.getElementById('buscar-cedula').value.trim();
-        if (!cedulaInput) {
-            Swal.fire({ icon: 'warning', title: 'Atención', text: 'Ingrese una cédula', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
-            return;
+buscarPorCedula: async function() {
+    const cedulaInput = document.getElementById('buscar-cedula').value.trim();
+    if (!cedulaInput) {
+        Swal.fire({ icon: 'warning', title: 'Atención', text: 'Ingrese una cédula', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+        return;
+    }
+
+    // Normalizar: quitar V, E, puntos, guiones, espacios
+    const cedulaLimpia = cedulaInput.toString().replace(/[.\-VvEe]/g, '').trim();
+    
+    console.log('🔍 Buscando cédula:', cedulaLimpia);
+
+    try {
+        // PASO 1: Buscar en ESTUDIANTES (igual que gestion.js)
+        const { data: estudiantesData, error: errorEst } = await window.supabaseClient
+            .from('estudiantes')
+            .select('id, cedula, nombres, apellidos, genero, pnf_id, proceso, status')
+            .or(`cedula.ilike.%${cedulaLimpia}%,cedula.ilike.%V-${cedulaLimpia}%,cedula.ilike.%E-${cedulaLimpia}%`)
+            .limit(1);
+
+        if (errorEst) {
+            console.error('❌ Error en estudiantes:', errorEst);
         }
 
-        const cedulaNumeros = cedulaInput.toString().replace(/[^0-9]/g, '');
-        
-        if (!cedulaNumeros || cedulaNumeros.length < 6) {
-            Swal.fire({ icon: 'error', title: 'Cédula Inválida', text: 'Ingrese al menos 6 dígitos', toast: false });
-            return;
-        }
+        console.log('📊 Resultado estudiantes:', estudiantesData);
 
-        console.log('🔍 Buscando cédula normalizada:', cedulaNumeros);
+        let estudiante = estudiantesData && estudiantesData.length > 0 ? estudiantesData[0] : null;
 
-        try {
-            const { data: estudiantesData, error: errorEst } = await window.supabaseClient
-                .from('estudiantes')
-                .select('id, cedula, nombres, apellidos, genero, pnf_id, proceso, status')
-                .ilike('cedula', `%${cedulaNumeros}%`)
-                .limit(1);
-
-            if (errorEst) {
-                console.error('❌ Error en estudiantes:', errorEst);
-            }
-
-            let estudiante = estudiantesData && estudiantesData.length > 0 ? estudiantesData[0] : null;
-
-            if (estudiante) {
-                console.log('✅ Estudiante encontrado en tabla ESTUDIANTES:', estudiante);
-                
-                const { data: registrosDisc, error: errorDisc } = await window.supabaseClient
-                    .from('disc_registros')
-                    .select('*')
-                    .eq('cedula', estudiante.cedula)
-                    .order('id', { ascending: false });
-
-                if (errorDisc) console.warn('⚠️ Error buscando disciplina:', errorDisc);
-
-                this.llenarFormularioEstudiante(estudiante);
-                this.mostrarFiltroActivo(cedulaInput);
-                document.getElementById('datos-personales-panel').classList.remove('hidden');
-
-                if (registrosDisc && registrosDisc.length > 0) {
-                    document.getElementById('disc-pnf').value = registrosDisc[0].pnf || ''; 
-                    this.llenarFormulario(registrosDisc[0]); 
-
-                    Swal.fire({
-                        icon: 'success',
-                        title: '✅ Estudiante Encontrado',
-                        html: `<div class="text-left"><p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p><p class="text-sm text-blue-600 mt-2">📋 Tiene ${registrosDisc.length} registro(s) disciplinario(s)</p></div>`,
-                        toast: false,
-                        showConfirmButton: true,
-                        confirmButtonText: 'Ver Detalles',
-                        showCancelButton: true,
-                        cancelButtonText: 'Cerrar'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            this.abrirModalDetalle(estudiante.cedula);
-                        }
-                    });
-                } else {
-                    Swal.fire({
-                        icon: 'info',
-                        title: '📝 Sin Antecedentes',
-                        html: `<div class="text-left"><p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p><p class="text-sm text-gray-600 mt-1">No tiene registros disciplinarios.</p></div>`,
-                        toast: false,
-                        showConfirmButton: true
-                    });
-                }
-                return;
-            }
-
-            console.log('⚠️ No encontrado en ESTUDIANTES, buscando en DISC_REGISTROS...');
+        if (estudiante) {
+            console.log('✅ Estudiante encontrado en tabla ESTUDIANTES:', estudiante);
             
-            const { data: registrosDiscFallback } = await window.supabaseClient
+            // Buscar en DISC_REGISTROS
+            const { data: registrosDisc, error: errorDisc } = await window.supabaseClient
                 .from('disc_registros')
                 .select('*')
-                .ilike('cedula', `%${cedulaNumeros}%`)
-                .order('id', { ascending: false })
-                .limit(1);
+                .eq('cedula', estudiante.cedula)
+                .order('id', { ascending: false });
 
-            if (registrosDiscFallback && registrosDiscFallback.length > 0) {
-                const reg = registrosDiscFallback[0];
-                const estudianteFake = {
-                    cedula: reg.cedula,
-                    nombres: reg.nombres,
-                    apellidos: reg.apellidos,
-                    genero: reg.genero || 'SELECCIONAR',
-                    pnf: { nombre: reg.pnf },
-                    proceso: reg.proceso
-                };
-                
-                this.llenarFormularioEstudiante(estudianteFake);
-                this.llenarFormulario(reg);
-                this.mostrarFiltroActivo(cedulaInput);
-                document.getElementById('datos-personales-panel').classList.remove('hidden');
+            if (errorDisc) console.warn('⚠️ Error buscando disciplina:', errorDisc);
+
+            // Llenar formulario
+            this.llenarFormularioEstudiante(estudiante);
+            this.mostrarFiltroActivo(cedulaInput);
+            document.getElementById('datos-personales-panel').classList.remove('hidden');
+
+            if (registrosDisc && registrosDisc.length > 0) {
+                document.getElementById('disc-pnf').value = registrosDisc[0].pnf || ''; 
+                this.llenarFormulario(registrosDisc[0]); 
 
                 Swal.fire({
                     icon: 'success',
-                    title: '✅ Estudiante Encontrado (Solo Disciplina)',
-                    html: `<div class="text-left"><p><strong>${reg.nombres} ${reg.apellidos}</strong></p><p class="text-xs text-orange-600 mt-2">⚠️ Datos obtenidos de disc_registros</p></div>`,
+                    title: '✅ Estudiante Encontrado',
+                    html: `<div class="text-left"><p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p><p class="text-sm text-blue-600 mt-2">📋 Tiene ${registrosDisc.length} registro(s) disciplinario(s)</p></div>`,
+                    toast: false,
+                    showConfirmButton: true,
+                    confirmButtonText: 'Ver Detalles',
+                    showCancelButton: true,
+                    cancelButtonText: 'Cerrar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        this.abrirModalDetalle(estudiante.cedula);
+                    }
+                });
+            } else {
+                Swal.fire({
+                    icon: 'info',
+                    title: '📝 Sin Antecedentes',
+                    html: `<div class="text-left"><p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p><p class="text-sm text-gray-600 mt-1">No tiene registros disciplinarios.</p></div>`,
                     toast: false,
                     showConfirmButton: true
                 });
-            } else {
-                Swal.fire({ icon: 'error', title: 'No Encontrado', text: `Cédula ${cedulaInput} no existe en ninguna tabla.`, toast: false });
-                this.limpiarFormulario();
             }
-
-        } catch (e) {
-            console.error('❌ Error general:', e);
-            Swal.fire({ icon: 'error', title: 'Error', text: e.message });
+            return;
         }
-    },
 
+        // PASO 2: Si no está en ESTUDIANTES, buscar en DISC_REGISTROS
+        console.log('⚠️ No encontrado en ESTUDIANTES, buscando en DISC_REGISTROS...');
+        
+        const { data: registrosDiscFallback, error: errorFallback } = await window.supabaseClient
+            .from('disc_registros')
+            .select('*')
+            .or(`cedula.ilike.%${cedulaLimpia}%,cedula.ilike.%V-${cedulaLimpia}%,cedula.ilike.%E-${cedulaLimpia}%`)
+            .order('id', { ascending: false })
+            .limit(1);
+
+        if (errorFallback) {
+            console.error('❌ Error en fallback disc_registros:', errorFallback);
+        }
+
+        console.log('📊 Resultado disc_registros fallback:', registrosDiscFallback);
+
+        if (registrosDiscFallback && registrosDiscFallback.length > 0) {
+            const reg = registrosDiscFallback[0];
+            console.log('✅ Encontrado en disc_registros:', reg);
+            
+            const estudianteFake = {
+                cedula: reg.cedula,
+                nombres: reg.nombres,
+                apellidos: reg.apellidos,
+                genero: reg.genero || 'SELECCIONAR',
+                pnf: { nombre: reg.pnf },
+                proceso: reg.proceso
+            };
+            
+            this.llenarFormularioEstudiante(estudianteFake);
+            this.llenarFormulario(reg);
+            this.mostrarFiltroActivo(cedulaInput);
+            document.getElementById('datos-personales-panel').classList.remove('hidden');
+
+            Swal.fire({
+                icon: 'success',
+                title: '✅ Estudiante Encontrado (Solo Disciplina)',
+                html: `<div class="text-left"><p><strong>${reg.nombres} ${reg.apellidos}</strong></p><p class="text-xs text-orange-600 mt-2">⚠️ Datos obtenidos de disc_registros</p></div>`,
+                toast: false,
+                showConfirmButton: true
+            });
+        } else {
+            Swal.fire({ 
+                icon: 'error', 
+                title: 'No Encontrado', 
+                html: `Cédula <strong>${cedulaInput}</strong> no encontrada en ninguna tabla.<br><br><small class="text-gray-600">Cédula buscada: ${cedulaLimpia}</small>`,
+                toast: false 
+            });
+            this.limpiarFormulario();
+        }
+
+    } catch (e) {
+        console.error('❌ Error general:', e);
+        Swal.fire({ icon: 'error', title: 'Error', text: e.message });
+    }
+},
+    
     llenarFormulario: function(data) {
         this.registroActualId = data.id;
 
