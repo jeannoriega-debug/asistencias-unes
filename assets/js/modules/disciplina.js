@@ -1,19 +1,18 @@
 /**
  * MÓDULO CONSEJO DISCIPLINARIO 2026
- * Versión: 2.0 - Listas agrupadas + Modal detalle + Inactivación automática
+ * Versión: 3.0 - Búsqueda mejorada + Ordenamiento por gravedad
  */
 
 window.modules = window.modules || {};
 window.modules.disciplina = {
     registroActualId: null,
     filtroActual: 'TODOS',
-    datosCache: [], // Cache de datos para el modal
+    datosCache: [],
 
     init: async function() {
-        console.log('🚀 Iniciando módulo Disciplinario v2.0...');
+        console.log('🚀 Iniciando módulo Disciplinario v3.0...');
         await this.cargarLista();
         
-        // Escuchar Enter en el buscador
         const inputBusqueda = document.getElementById('buscar-cedula');
         if (inputBusqueda) {
             inputBusqueda.addEventListener('keypress', (e) => {
@@ -21,13 +20,11 @@ window.modules.disciplina = {
             });
         }
 
-        // Escuchar cambio en Tipo de Baja para inactivar automáticamente
         const selectTipoBaja = document.getElementById('disc-tipo-baja');
         if (selectTipoBaja) {
             selectTipoBaja.addEventListener('change', (e) => {
                 if (e.target.value !== 'SELECCIONAR') {
                     document.getElementById('disc-estatus-general').value = 'INACTIVO';
-                    // Auto-completar fecha de baja si está vacía
                     const fechaBaja = document.getElementById('disc-fecha-baja');
                     if (!fechaBaja.value) {
                         fechaBaja.value = new Date().toISOString().split('T')[0];
@@ -40,8 +37,8 @@ window.modules.disciplina = {
     },
 
     /**
-     * CARGAR LISTA AGRUPADA/CONSOLIDADA
-     * Agrupa por cédula y muestra totales acumulados
+     * CARGAR LISTA AGRUPADA CON ORDENAMIENTO POR GRAVEDAD
+     * Orden: Activos primero (gravísimas > graves > leves), luego Inactivos
      */
     cargarLista: async function() {
         const tbody = document.getElementById('lista-disciplina-body');
@@ -50,7 +47,6 @@ window.modules.disciplina = {
         tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8"><div class="animate-pulse text-blue-600 font-bold">⏳ Cargando registros disciplinarios...</div></td></tr>';
 
         try {
-            // Traemos TODOS los datos de disc_registros
             const { data, error } = await window.supabaseClient
                 .from('disc_registros')
                 .select('*')
@@ -59,14 +55,14 @@ window.modules.disciplina = {
             if (error) throw error;
 
             tbody.innerHTML = ''; 
-            this.datosCache = data || []; // Guardar en cache para el modal
+            this.datosCache = data || [];
 
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500 bg-gray-50 rounded-lg"> No hay registros disciplinarios</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500 bg-gray-50 rounded-lg">📭 No hay registros disciplinarios</td></tr>';
                 return;
             }
 
-            // 1. AGRUPAR DATOS POR CÉDULA (Consolidación)
+            // AGRUPAR POR CÉDULA
             const estudiantesUnicos = {};
 
             data.forEach(reg => {
@@ -82,17 +78,15 @@ window.modules.disciplina = {
                         _total_graves: 0,
                         _total_gravisimas: 0,
                         _ids_registros: [],
-                        _ultimo_id: reg.id // Para mostrar el ID más reciente
+                        _ultimo_id: reg.id
                     };
                 }
                 
-                // Sumar faltas
                 estudiantesUnicos[reg.cedula]._total_leves += (reg.faltas_leves_cant || 0);
                 estudiantesUnicos[reg.cedula]._total_graves += (reg.faltas_graves_cant || 0);
                 estudiantesUnicos[reg.cedula]._total_gravisimas += (reg.faltas_gravisimas_cant || 0);
                 estudiantesUnicos[reg.cedula]._ids_registros.push(reg.id);
                 
-                // Mantener el registro más reciente para nombre/pnf actualizados
                 if (reg.id > estudiantesUnicos[reg.cedula]._ultimo_id) {
                     estudiantesUnicos[reg.cedula].nombres = reg.nombres;
                     estudiantesUnicos[reg.cedula].apellidos = reg.apellidos;
@@ -100,7 +94,7 @@ window.modules.disciplina = {
                 }
             });
 
-            // 2. FILTRAR según selección
+            // FILTRAR
             let datosFiltrados = Object.values(estudiantesUnicos);
             if (this.filtroActual === 'ACTIVOS') {
                 datosFiltrados = datosFiltrados.filter(e => e.estatus_general === 'ACTIVO');
@@ -108,12 +102,34 @@ window.modules.disciplina = {
                 datosFiltrados = datosFiltrados.filter(e => e.estatus_general === 'INACTIVO');
             }
 
-            // 3. RENDERIZAR TABLA
+            // ORDENAR: Activos primero, luego por gravedad (gravísimas > graves > leves)
+            datosFiltrados.sort((a, b) => {
+                // Primero: Activos antes que Inactivos
+                if (a.estatus_general === 'ACTIVO' && b.estatus_general === 'INACTIVO') return -1;
+                if (a.estatus_general === 'INACTIVO' && b.estatus_general === 'ACTIVO') return 1;
+                
+                // Si ambos son activos o ambos inactivos, ordenar por gravedad
+                // 1. Por gravísimas (descendente)
+                if (b._total_gravisimas !== a._total_gravisimas) {
+                    return b._total_gravisimas - a._total_gravisimas;
+                }
+                // 2. Por graves (descendente)
+                if (b._total_graves !== a._total_graves) {
+                    return b._total_graves - a._total_graves;
+                }
+                // 3. Por leves (descendente)
+                if (b._total_leves !== a._total_leves) {
+                    return b._total_leves - a._total_leves;
+                }
+                // 4. Por apellidos (alfabético)
+                return a.apellidos.localeCompare(b.apellidos);
+            });
+
+            // RENDERIZAR
             datosFiltrados.forEach(est => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-blue-50 border-b border-gray-100 transition';
                 
-                // Estilos dinámicos para contadores
                 const leveClass = est._total_leves > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'bg-gray-100 text-gray-500';
                 const graveClass = est._total_graves > 0 ? 'bg-red-200 text-red-800 font-bold' : 'bg-gray-100 text-gray-500';
                 const gravisimaClass = est._total_gravisimas > 0 ? 'bg-gray-800 text-white font-bold' : 'bg-gray-100 text-gray-500';
@@ -138,7 +154,7 @@ window.modules.disciplina = {
                         <div class="flex justify-center gap-1">
                             <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" 
                                     class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" 
-                                    title="Ver Detalle">️</button>
+                                    title="Ver Detalle">👁️</button>
                             <button onclick="window.modules.disciplina.eliminarEstudiante('${est.cedula}')" 
                                     class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" 
                                     title="Eliminar">🗑️</button>
@@ -150,13 +166,15 @@ window.modules.disciplina = {
 
         } catch (e) {
             console.error('❌ Error cargando lista:', e);
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">️ Error al cargar datos. Verifica la conexión.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos. Verifica la conexión.</td></tr>';
         }
     },
 
     /**
-     * BUSCAR POR CÉDULA
-     * Busca en disc_registros y llena el formulario
+     * BUSCAR POR CÉDULA - NUEVA LÓGICA
+     * 1. Buscar en tabla ESTUDIANTES
+     * 2. Llenar formulario con datos del estudiante
+     * 3. Buscar en disc_registros y mostrar solo registros de ese estudiante
      */
     buscarPorCedula: async function() {
         const cedulaInput = document.getElementById('buscar-cedula').value.trim();
@@ -166,62 +184,86 @@ window.modules.disciplina = {
         }
 
         try {
-            // Buscar registros de esa cédula
-            const { data, error } = await window.supabaseClient
+            // PASO 1: Buscar en tabla ESTUDIANTES
+            const { data: estudiante, error: errorEst } = await window.supabaseClient
+                .from('estudiantes')
+                .select(`
+                    id, cedula, nombres, apellidos, genero, 
+                    pnf:pnf_id(nombre), proceso, ambiente, categoria, 
+                    trayecto:trayecto_id(nombre), status
+                `)
+                .eq('cedula', cedulaInput.toUpperCase())
+                .maybeSingle();
+
+            if (errorEst) throw errorEst;
+
+            if (!estudiante) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Estudiante No Encontrado',
+                    text: `Cédula ${cedulaInput} no encontrada en la base de datos de estudiantes.`,
+                    toast: false,
+                    showConfirmButton: true
+                });
+                this.limpiarFormulario();
+                return;
+            }
+
+            // PASO 2: Llenar formulario con datos del estudiante
+            this.llenarFormularioEstudiante(estudiante);
+            this.mostrarFiltroActivo(cedulaInput);
+
+            // PASO 3: Buscar registros disciplinarios de ese estudiante
+            const { data: registrosDisc, error: errorDisc } = await window.supabaseClient
                 .from('disc_registros')
                 .select('*')
                 .eq('cedula', cedulaInput.toUpperCase())
-                .order('id', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+                .order('id', { ascending: false });
 
-            if (error) throw error;
+            if (errorDisc) {
+                console.warn('⚠️ Error buscando registros disciplinarios:', errorDisc.message);
+            }
 
-            if (data) {
-                this.llenarFormulario(data);
-                this.mostrarFiltroActivo(cedulaInput);
+            if (registrosDisc && registrosDisc.length > 0) {
+                // Cargar el registro más reciente en el formulario
+                this.llenarFormulario(registrosDisc[0]);
+                
                 Swal.fire({
                     icon: 'success',
-                    title: 'Estudiante Encontrado',
-                    html: `<strong>${data.nombres} ${data.apellidos}</strong><br><span class="text-sm text-gray-500">${data.pnf} - ${data.proceso}</span>`,
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 3000
+                    title: '✅ Estudiante Encontrado',
+                    html: `
+                        <div class="text-left">
+                            <p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p>
+                            <p class="text-sm text-gray-600">${estudiante.pnf?.nombre || ''} - ${estudiante.proceso || ''}</p>
+                            <p class="text-sm text-blue-600 mt-2">📋 Tiene ${registrosDisc.length} registro(s) disciplinario(s)</p>
+                        </div>
+                    `,
+                    toast: false,
+                    showConfirmButton: true,
+                    confirmButtonText: 'Ver Detalles',
+                    showCancelButton: true,
+                    cancelButtonText: 'Cerrar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        this.abrirModalDetalle(cedulaInput.toUpperCase());
+                    }
                 });
             } else {
-                // Si no hay en disc_registros, intentar buscar en estudiantes
-                const { data: est } = await window.supabaseClient
-                    .from('estudiantes')
-                    .select('cedula, nombres, apellidos, genero, pnf:pnf_id(nombre), proceso')
-                    .eq('cedula', cedulaInput.toUpperCase())
-                    .maybeSingle();
-
-                if (est) {
-                    this.llenarFormularioEstudiante(est);
-                    this.mostrarFiltroActivo(cedulaInput);
-                    Swal.fire({
-                        icon: 'info',
-                        title: 'Estudiante Encontrado',
-                        text: 'Sin antecedentes disciplinarios. Puede registrar nueva falta.',
-                        toast: true,
-                        position: 'top-end',
-                        showConfirmButton: false,
-                        timer: 3000
-                    });
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'No Encontrado',
-                        text: 'Cédula no encontrada en la base de datos.',
-                        toast: true,
-                        position: 'top-end',
-                        showConfirmButton: false,
-                        timer: 3000
-                    });
-                    this.limpiarFormulario();
-                }
+                Swal.fire({
+                    icon: 'info',
+                    title: '📝 Sin Antecedentes',
+                    html: `
+                        <div class="text-left">
+                            <p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p>
+                            <p class="text-sm text-gray-600 mt-1">No tiene registros disciplinarios.</p>
+                            <p class="text-sm text-blue-600 mt-2">Puede registrar una nueva falta si es necesario.</p>
+                        </div>
+                    `,
+                    toast: false,
+                    showConfirmButton: true
+                });
             }
+
         } catch (e) {
             console.error('❌ Error búsqueda:', e);
             Swal.fire({ icon: 'error', title: 'Error', text: 'Error al buscar: ' + e.message });
@@ -236,7 +278,6 @@ window.modules.disciplina = {
 
         const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
 
-        // Datos personales
         setVal('disc-cedula', data.cedula);
         setVal('disc-nombres', data.nombres);
         setVal('disc-apellidos', data.apellidos);
@@ -246,7 +287,6 @@ window.modules.disciplina = {
         setVal('disc-nucleo', data.nucleo || 'NUEVA ESPARTA');
         setVal('disc-supervision', data.supervision_continua || 'NO APLICA');
 
-        // Fechas
         setVal('disc-tipo-baja', data.tipo_baja || 'SELECCIONAR');
         setVal('disc-fecha-baja', data.fecha_baja);
         setVal('disc-fecha-leve', data.faltas_leves_fecha);
@@ -258,21 +298,17 @@ window.modules.disciplina = {
         setVal('disc-fecha-incidencia', data.fecha_incidencia_estudiante);
         setVal('disc-fecha-consejo', data.consejo_disciplinario_fecha);
 
-        // Registro de faltas
         setVal('disc-leves-cant', data.faltas_leves_cant || 0);
         setVal('disc-graves-cant', data.faltas_graves_cant || 0);
         setVal('disc-gravisimas-cant', data.faltas_gravisimas_cant || 0);
 
-        // Textos largos
         setVal('disc-causal-graves', data.causal_faltas_graves_impuesta || '');
         setVal('disc-programa-supervision', data.programa_supervision_intensiva_aplicado_grave_impuesta || '');
         setVal('disc-acta-compromiso', data.acta_compromiso || '');
         setVal('disc-observaciones', data.observaciones_jefe || '');
 
-        // Estatus
         setVal('disc-estatus-general', data.estatus_general || 'ACTIVO');
 
-        // Scroll en móvil
         if(window.innerWidth < 1024) {
             document.querySelector('.lg\\:col-span-1')?.scrollIntoView({ behavior: 'smooth' });
         }
@@ -294,7 +330,6 @@ window.modules.disciplina = {
         setVal('disc-proceso', est.proceso || '');
         setVal('disc-nucleo', 'NUEVA ESPARTA');
         
-        // Limpiar campos disciplinarios
         setVal('disc-tipo-baja', 'SELECCIONAR');
         setVal('disc-estatus-general', 'ACTIVO');
         setVal('disc-leves-cant', 0);
@@ -305,7 +340,6 @@ window.modules.disciplina = {
         setVal('disc-acta-compromiso', '');
         setVal('disc-observaciones', '');
         
-        // Limpiar fechas
         ['disc-fecha-baja', 'disc-fecha-leve', 'disc-fecha-leve-recibida', 
          'disc-fecha-grave', 'disc-fecha-grave-recibida', 'disc-fecha-gravisima',
          'disc-fecha-gravisima-recibida', 'disc-fecha-incidencia', 'disc-fecha-consejo'].forEach(id => {
@@ -315,25 +349,21 @@ window.modules.disciplina = {
 
     /**
      * ABRIR MODAL DE DETALLE
-     * Muestra historial cronológico de faltas del estudiante
      */
     abrirModalDetalle: function(cedula) {
         const registros = this.datosCache.filter(r => r.cedula === cedula.toUpperCase());
         
         if (registros.length === 0) {
-            Swal.fire('Info', 'No se encontraron registros para esta cédula', 'info');
+            Swal.fire('ℹ️ Info', 'No se encontraron registros disciplinarios para esta cédula', 'info');
             return;
         }
 
-        // Llenar info del header del modal
         document.getElementById('modal-cedula').textContent = registros[0].cedula;
         document.getElementById('modal-estudiante').textContent = `${registros[0].nombres} ${registros[0].apellidos}`;
         document.getElementById('modal-total').textContent = registros.length;
 
-        // Ordenar cronológicamente (más reciente primero)
         const registrosOrdenados = [...registros].sort((a, b) => b.id - a.id);
 
-        // Llenar tabla del modal
         const tbody = document.getElementById('modal-body-faltas');
         tbody.innerHTML = '';
 
@@ -362,15 +392,10 @@ window.modules.disciplina = {
             tbody.appendChild(tr);
         });
 
-        // Mostrar modal
         document.getElementById('modal-detalle').classList.remove('hidden');
-        document.body.style.overflow = 'hidden'; // Evitar scroll del body
+        document.body.style.overflow = 'hidden';
     },
 
-    /**
-     * EDITAR DESDE MODAL
-     * Carga el registro en el formulario izquierdo
-     */
     editarDesdeModal: function(id) {
         const registro = this.datosCache.find(r => r.id === id);
         if (registro) {
@@ -390,19 +415,11 @@ window.modules.disciplina = {
         }
     },
 
-    /**
-     * CERRAR MODAL
-     */
     cerrarModal: function() {
         document.getElementById('modal-detalle').classList.add('hidden');
-        document.body.style.overflow = ''; // Restaurar scroll
+        document.body.style.overflow = '';
     },
 
-    /**
-     * GUARDAR REGISTRO
-     * Crea nuevo o actualiza existente
-     * + Actualiza estatus en tabla estudiantes si es baja
-     */
     guardarRegistro: async function() {
         const cedula = document.getElementById('disc-cedula').value.trim();
         
@@ -414,7 +431,6 @@ window.modules.disciplina = {
         const estatus = document.getElementById('disc-estatus-general').value;
         const tipoBaja = document.getElementById('disc-tipo-baja').value;
 
-        // Confirmar si se está inactivando
         if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
             const confirm = await Swal.fire({
                 icon: 'warning',
@@ -463,13 +479,11 @@ window.modules.disciplina = {
             let result;
             
             if (this.registroActualId) {
-                // ACTUALIZAR registro existente
                 result = await window.supabaseClient
                     .from('disc_registros')
                     .update(datos)
                     .eq('id', this.registroActualId);
             } else {
-                // INSERTAR nuevo registro
                 result = await window.supabaseClient
                     .from('disc_registros')
                     .insert([datos]);
@@ -477,7 +491,6 @@ window.modules.disciplina = {
 
             if (result.error) throw result.error;
 
-            // Si se marcó como INACTIVO con tipo de baja, actualizar tabla ESTUDIANTES
             if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
                 await this.actualizarEstatusEstudiante(cedula.toUpperCase(), 'Inactivo');
             }
@@ -490,7 +503,6 @@ window.modules.disciplina = {
                 showConfirmButton: false
             });
 
-            // Recargar lista y limpiar formulario
             await this.cargarLista();
             this.limpiarFormulario();
 
@@ -500,10 +512,6 @@ window.modules.disciplina = {
         }
     },
 
-    /**
-     * ACTUALIZAR ESTATUS EN TABLA ESTUDIANTES
-     * Se ejecuta cuando se registra una baja
-     */
     actualizarEstatusEstudiante: async function(cedula, nuevoEstatus) {
         try {
             const { error } = await window.supabaseClient
@@ -521,9 +529,6 @@ window.modules.disciplina = {
         }
     },
 
-    /**
-     * ELIMINAR TODOS LOS REGISTROS DE UN ESTUDIANTE
-     */
     eliminarEstudiante: async function(cedula) {
         const confirm = await Swal.fire({
             icon: 'warning',
@@ -553,40 +558,27 @@ window.modules.disciplina = {
         }
     },
 
-    /**
-     * FILTRAR REGISTROS
-     */
     filtrarRegistros: function(filtro) {
         this.filtroActual = filtro;
         this.cargarLista();
     },
 
-    /**
-     * MOSTRAR INDICADOR DE FILTRO ACTIVO
-     */
     mostrarFiltroActivo: function(cedula) {
         document.getElementById('filtro-activo').classList.remove('hidden');
         document.getElementById('cedula-filtrada').textContent = cedula;
     },
 
-    /**
-     * LIMPIAR BÚSQUEDA
-     */
     limpiarBusqueda: function() {
         document.getElementById('buscar-cedula').value = '';
         document.getElementById('filtro-activo').classList.add('hidden');
     },
 
-    /**
-     * LIMPIAR FORMULARIO
-     */
     limpiarFormulario: function() {
         this.registroActualId = null;
         
         document.querySelectorAll('#panel-left input, #panel-left select, #panel-left textarea').forEach(el => {
             if (el.id !== 'buscar-cedula') {
                 if (el.tagName === 'SELECT') {
-                    // Resetear selects a su opción por defecto
                     if (el.id === 'disc-genero') el.value = 'SELECCIONAR';
                     else if (el.id === 'disc-tipo-baja') el.value = 'SELECCIONAR';
                     else if (el.id === 'disc-supervision') el.value = 'NO APLICA';
@@ -597,7 +589,6 @@ window.modules.disciplina = {
             }
         });
 
-        // Resetear valores numéricos
         document.getElementById('disc-leves-cant').value = 0;
         document.getElementById('disc-graves-cant').value = 0;
         document.getElementById('disc-gravisimas-cant').value = 0;
@@ -607,16 +598,13 @@ window.modules.disciplina = {
     }
 };
 
-// ==========================================
-// EXPORTAR FUNCIONES AL SCOPE GLOBAL
-// ==========================================
-
+// EXPORTAR FUNCIONES
 window.buscarEstudiante = function() { window.modules.disciplina.buscarPorCedula(); };
 window.guardarRegistro = function() { window.modules.disciplina.guardarRegistro(); };
 window.limpiarFormulario = function() { window.modules.disciplina.limpiarFormulario(); };
 window.filtrarRegistros = function(filtro) { window.modules.disciplina.filtrarRegistros(filtro); };
-window.generarReporteProceso = function() { Swal.fire('Info', 'Generación de reporte de proceso en desarrollo', 'info'); };
-window.generarReporteBajas = function() { Swal.fire('Info', 'Generación de reporte de bajas en desarrollo', 'info'); };
+window.generarReporteProceso = function() { Swal.fire('ℹ️ Info', 'Generación de reporte de proceso en desarrollo', 'info'); };
+window.generarReporteBajas = function() { Swal.fire('ℹ️ Info', 'Generación de reporte de bajas en desarrollo', 'info'); };
 
 window.cerrarSesion = function() {
     if (window.supabaseClient) {
@@ -628,11 +616,10 @@ window.cerrarSesion = function() {
     }
 };
 
-// Inicializar al cargar
 document.addEventListener('DOMContentLoaded', () => {
     if (window.modules && window.modules.disciplina) {
         window.modules.disciplina.init();
     }
 });
 
-console.log('✅ Módulo Consejo Disciplinario v2.0 Cargado');
+console.log('✅ Módulo Consejo Disciplinario v3.0 Cargado');
