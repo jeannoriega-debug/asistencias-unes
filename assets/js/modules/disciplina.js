@@ -170,9 +170,8 @@ window.modules.disciplina = {
             tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos. Verifica la conexión.</td></tr>';
         }
     },
-
 /**
- * BUSCAR POR CÉDULA (CORREGIDO PARA PNF)
+ * BUSCAR POR CÉDULA (CON VISUALIZACIÓN COMPLETA)
  */
 buscarPorCedula: async function() {
     const cedulaInput = document.getElementById('buscar-cedula').value.trim();
@@ -185,10 +184,14 @@ buscarPorCedula: async function() {
     console.log('🔍 Buscando cédula:', cedulaNumeros);
 
     try {
-        // 1. Buscar en ESTUDIANTES
+        // Buscar en ESTUDIANTES con relación PNF
         const { data: estudiantesData, error: errorEst } = await window.supabaseClient
             .from('estudiantes')
-            .select('id, cedula, nombres, apellidos, genero, proceso, status, ambiente, categoria, trayecto_id')
+            .select(`
+                id, cedula, nombres, apellidos, genero, proceso, status, 
+                ambiente, categoria, trayecto_id, 
+                pnf:pnf_id(nombre)
+            `)
             .or(`cedula.ilike.%${cedulaNumeros}%,cedula.ilike.%V-${cedulaNumeros}%,cedula.ilike.%E-${cedulaNumeros}%`)
             .limit(1);
 
@@ -199,46 +202,128 @@ buscarPorCedula: async function() {
         if (estudiante) {
             console.log('✅ Estudiante encontrado:', estudiante);
             
-            // 2. OBTENER PNF DESDE DISC_REGISTROS (donde está el texto real)
-            const { data: discData } = await window.supabaseClient
-                .from('disc_registros')
-                .select('pnf')  // Columna de TEXTO con el nombre del PNF
-                .eq('cedula', estudiante.cedula)
-                .limit(1)
-                .maybeSingle();
+            // Buscar en DISC_REGISTROS para obtener el PNF (texto) si viene null
+            if (!estudiante.pnf || !estudiante.pnf.nombre) {
+                const { data: discData } = await window.supabaseClient
+                    .from('disc_registros')
+                    .select('pnf')
+                    .eq('cedula', estudiante.cedula)
+                    .limit(1)
+                    .maybeSingle();
+                
+                if (discData && discData.pnf) {
+                    estudiante.pnf = { nombre: discData.pnf };
+                }
+            }
             
-            // Asignar el PNF (texto) al objeto estudiante
-            estudiante.pnf = discData && discData.pnf ? discData.pnf : '';
-            console.log('📚 PNF obtenido:', estudiante.pnf);
-            
-            // 3. Llenar formulario
+            // Llenar formulario con datos de ESTUDIANTES
             this.llenarFormularioEstudiante(estudiante);
             this.mostrarFiltroActivo(cedulaInput);
             document.getElementById('datos-personales-panel').classList.remove('hidden');
 
-            // 4. Buscar historial disciplinario
+            // Buscar historial disciplinario
             const { data: registrosDisc } = await window.supabaseClient
                 .from('disc_registros')
                 .select('*')
                 .eq('cedula', estudiante.cedula)
                 .order('id', { ascending: false });
 
+            const totalRegistros = registrosDisc ? registrosDisc.length : 0;
+            
+            // Calcular totales de faltas
+            const totalLeves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_leves_cant || 0), 0) : 0;
+            const totalGraves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_graves_cant || 0), 0) : 0;
+            const totalGravisimas = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_gravisimas_cant || 0), 0) : 0;
+
+            // 🎯 MOSTRAR INFORMACIÓN COMPLETA EN SWAL.FIRE
+            Swal.fire({
+                title: `👤 ${estudiante.nombres} ${estudiante.apellidos}`,
+                html: `
+                    <div style="text-align: left; font-size: 14px; line-height: 1.8;">
+                        
+                        <!-- DATOS PERSONALES -->
+                        <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">
+                            📋 DATOS PERSONALES
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p>
+                            <p><strong>Género:</strong> ${estudiante.genero || 'N/A'}</p>
+                            <p><strong>Núcleo:</strong> ${estudiante.nucleo || 'NUEVA ESPARTA'}</p>
+                            <p><strong>Ambiente:</strong> ${estudiante.ambiente || 'N/A'}</p>
+                        </div>
+                        
+                        <!-- DATOS ACADÉMICOS -->
+                        <h3 style="border-bottom: 2px solid #10b981; padding-bottom: 5px; color: #10b981; margin-top: 15px; font-size: 16px;">
+                            🎓 DATOS ACADÉMICOS
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <p><strong>PNF:</strong> ${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
+                            <p><strong>Proceso:</strong> ${estudiante.proceso || 'N/A'}</p>
+                            <p><strong>Categoría:</strong> ${estudiante.categoria || 'N/A'}</p>
+                            <p><strong>Trayecto:</strong> ${estudiante.trayecto_id ? 'Asignado' : 'No asignado'}</p>
+                        </div>
+
+                        <!-- ESTADÍSTICAS DISCIPLINARIAS -->
+                        <h3 style="border-bottom: 2px solid #f59e0b; padding-bottom: 5px; color: #f59e0b; margin-top: 15px; font-size: 16px;">
+                            📊 ESTADÍSTICAS DISCIPLINARIAS
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+                            <div style="background: #fef3c7; padding: 8px; border-radius: 5px;">
+                                <strong style="color: #d97706;">${totalLeves}</strong><br>
+                                <span style="font-size: 12px;">Leves</span>
+                            </div>
+                            <div style="background: #fee2e2; padding: 8px; border-radius: 5px;">
+                                <strong style="color: #dc2626;">${totalGraves}</strong><br>
+                                <span style="font-size: 12px;">Graves</span>
+                            </div>
+                            <div style="background: #1f2937; color: white; padding: 8px; border-radius: 5px;">
+                                <strong style="color: white;">${totalGravisimas}</strong><br>
+                                <span style="font-size: 12px;">Gravísimas</span>
+                            </div>
+                        </div>
+                        <p style="margin-top: 10px; text-align: center;"><strong>Total Registros:</strong> ${totalRegistros}</p>
+                        
+                        <!-- ESTATUS GENERAL -->
+                        <h3 style="border-bottom: 2px solid ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; padding-bottom: 5px; color: ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; margin-top: 15px; font-size: 16px;">
+                             ESTATUS GENERAL
+                        </h3>
+                        <p style="text-align: center; font-size: 16px;">
+                            <strong>Estado:</strong> 
+                            <span style="padding: 5px 15px; border-radius: 20px; background: ${estudiante.status === 'Activo' ? '#d1fae5' : '#fee2e2'}; color: ${estudiante.status === 'Activo' ? '#065f46' : '#991b1b'}; font-weight: bold;">
+                                ${estudiante.status || 'ACTIVO'}
+                            </span>
+                        </p>
+                    </div>
+                `,
+                width: 700,
+                padding: '25px',
+                showCloseButton: true,
+                showCancelButton: false,
+                confirmButtonText: 'Aceptar',
+                confirmButtonColor: '#3b82f6',
+                focusConfirm: false,
+                customClass: {
+                    popup: 'rounded-xl shadow-2xl'
+                }
+            });
+
             if (registrosDisc && registrosDisc.length > 0) {
                 this.llenarDatosDisciplinarios(registrosDisc[0]);
                 await this.renderizarTablaFiltrada(registrosDisc);
-                Swal.fire('✅ Estudiante Encontrado', `${estudiante.nombres} ${estudiante.apellidos}\nPNF: ${estudiante.pnf || 'N/A'}`, 'success');
             } else {
-                document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros</td></tr>';
-                Swal.fire('📝 Sin Antecedentes', `PNF: ${estudiante.pnf || 'N/A'}`, 'info');
+                document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros disciplinarios</td></tr>';
             }
             return;
         }
 
-        // FALLBACK: Si no está en estudiantes, buscar solo en disc_registros
+        // Fallback: buscar en DISC_REGISTROS
+        console.log('⚠️ No encontrado en ESTUDIANTES, buscando en DISC_REGISTROS...');
+        
         const { data: registrosDiscFallback } = await window.supabaseClient
             .from('disc_registros')
             .select('*')
-            .ilike('cedula', `%${cedulaNumeros}%`)
+            .or(`cedula.ilike.%${cedulaNumeros}%`)
+            .order('id', { ascending: false })
             .limit(1);
 
         if (registrosDiscFallback && registrosDiscFallback.length > 0) {
@@ -248,7 +333,7 @@ buscarPorCedula: async function() {
                 nombres: reg.nombres, 
                 apellidos: reg.apellidos, 
                 genero: reg.genero || 'SELECCIONAR', 
-                pnf: reg.pnf,  // Ya viene el texto del PNF
+                pnf: reg.pnf, 
                 proceso: reg.proceso 
             };
             
@@ -256,15 +341,24 @@ buscarPorCedula: async function() {
             this.llenarFormulario(reg);
             this.mostrarFiltroActivo(cedulaInput);
             document.getElementById('datos-personales-panel').classList.remove('hidden');
+            
+            const { data: todos } = await window.supabaseClient.from('disc_registros').select('*').eq('cedula', reg.cedula).order('id', { ascending: false });
+            if (todos) await this.renderizarTablaFiltrada(todos);
+
             Swal.fire('⚠️ Solo en Disciplina', 'Datos obtenidos de registros históricos', 'warning');
         } else {
-            Swal.fire('❌ No Encontrado', 'Cédula no encontrada', 'error');
+            Swal.fire({ 
+                icon: 'error', 
+                title: 'No Encontrado', 
+                html: `Cédula <strong>${cedulaInput}</strong> no encontrada`,
+                toast: false 
+            });
             this.limpiarFormulario();
         }
 
     } catch (e) {
         console.error('❌ Error:', e);
-        Swal.fire('Error', e.message, 'error');
+        Swal.fire({ icon: 'error', title: 'Error', text: e.message });
     }
 },
     
