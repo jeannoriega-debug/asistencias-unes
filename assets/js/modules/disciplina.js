@@ -485,57 +485,67 @@ window.modules.disciplina = {
         }
     },
 
-    abrirModalDetalle: function(cedula) {
-        const registros = this.datosCache.filter(r => r.cedula === cedula.toUpperCase());
+abrirModalDetalle: function(cedula) {
+    const registros = this.datosCache.filter(r => r.cedula === cedula.toUpperCase());
+    
+    if (registros.length === 0) {
+        Swal.fire('ℹ️ Info', 'No se encontraron registros disciplinarios para esta cédula', 'info');
+        return;
+    }
+
+    // Llenar info del header
+    document.getElementById('modal-cedula').textContent = registros[0].cedula;
+    document.getElementById('modal-estudiante').textContent = `${registros[0].nombres} ${registros[0].apellidos}`;
+    document.getElementById('modal-total').textContent = registros.length;
+
+    // Ordenar cronológicamente (más reciente primero)
+    const registrosOrdenados = [...registros].sort((a, b) => b.id - a.id);
+
+    const tbody = document.getElementById('modal-body-faltas');
+    tbody.innerHTML = '';
+
+    registrosOrdenados.forEach(reg => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-blue-50 transition';
         
-        if (registros.length === 0) {
-            Swal.fire('ℹ️ Info', 'No se encontraron registros disciplinarios para esta cédula', 'info');
-            return;
+        // CORRECCIÓN: Mostrar la fecha específica según el tipo de falta
+        let fechaMostrar = '-';
+        if (reg.faltas_gravisimas_cant > 0 && reg.faltas_gravisima_fecha) {
+            fechaMostrar = this.formatearFecha(reg.faltas_gravisima_fecha);
+        } else if (reg.faltas_graves_cant > 0 && reg.faltas_graves_fecha) {
+            fechaMostrar = this.formatearFecha(reg.faltas_graves_fecha);
+        } else if (reg.faltas_leves_cant > 0 && reg.faltas_leves_fecha) {
+            fechaMostrar = this.formatearFecha(reg.faltas_leves_fecha);
+        } else if (reg.fecha_incidencia_estudiante) {
+            fechaMostrar = this.formatearFecha(reg.fecha_incidencia_estudiante);
         }
+        
+        // Estilos para contadores
+        const leveClass = reg.faltas_leves_cant > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'text-gray-400';
+        const graveClass = reg.faltas_graves_cant > 0 ? 'bg-red-200 text-red-800 font-bold' : 'text-gray-400';
+        const gravisimaClass = reg.faltas_gravisimas_cant > 0 ? 'bg-gray-800 text-white font-bold' : 'text-gray-400';
 
-        document.getElementById('modal-cedula').textContent = registros[0].cedula;
-        document.getElementById('modal-estudiante').textContent = `${registros[0].nombres} ${registros[0].apellidos}`;
-        document.getElementById('modal-total').textContent = registros.length;
+        tr.innerHTML = `
+            <td class="p-2 text-center font-mono text-gray-600">${reg.id}</td>
+            <td class="p-2 text-center font-medium text-gray-800">${fechaMostrar}</td>
+            <td class="p-2 text-center"><span class="${leveClass} px-1.5 py-0.5 rounded text-[10px]">${reg.faltas_leves_cant || 0}</span></td>
+            <td class="p-2 text-center"><span class="${graveClass} px-1.5 py-0.5 rounded text-[10px]">${reg.faltas_graves_cant || 0}</span></td>
+            <td class="p-2 text-center"><span class="${gravisimaClass} px-1.5 py-0.5 rounded text-[10px]">${reg.faltas_gravisimas_cant || 0}</span></td>
+            <td class="p-2 text-center">
+                <button onclick="window.modules.disciplina.editarDesdeModal(${reg.id})" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded transition" 
+                        title="Editar">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 
-        const registrosOrdenados = [...registros].sort((a, b) => b.id - a.id);
-
-        const tbody = document.getElementById('modal-body-faltas');
-        tbody.innerHTML = '';
-
-        registrosOrdenados.forEach(reg => {
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-blue-50 transition text-xs';
-            
-            let fechaMostrar = this.formatearFecha(reg.faltas_graves_fecha) || 
-                               this.formatearFecha(reg.faltas_leves_fecha) || 
-                               this.formatearFecha(reg.faltas_gravisima_fecha) || '-';
-            
-            const leveClass = reg.faltas_leves_cant > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'text-gray-400';
-            const graveClass = reg.faltas_graves_cant > 0 ? 'bg-red-200 text-red-800 font-bold' : 'text-gray-400';
-            const gravisimaClass = reg.faltas_gravisimas_cant > 0 ? 'bg-gray-800 text-white font-bold' : 'text-gray-400';
-
-            tr.innerHTML = `
-                <td class="p-1.5 font-mono text-gray-500 text-center w-10">${reg.id}</td>
-                <td class="p-1.5 text-center font-medium text-gray-700 w-20">${fechaMostrar}</td>
-                <td class="p-1.5 text-center text-gray-500 hidden md:table-cell w-24">${reg.cedula}</td>
-                <td class="p-1.5 font-semibold text-gray-800 truncate max-w-[150px]" title="${reg.nombres} ${reg.apellidos}">${reg.nombres.split(' ')[0]} ${reg.apellidos}</td>
-                <td class="p-1.5 text-center w-12"><span class="${leveClass} px-1.5 py-0.5 rounded text-xs">${reg.faltas_leves_cant || 0}</span></td>
-                <td class="p-1.5 text-center w-12"><span class="${graveClass} px-1.5 py-0.5 rounded text-xs">${reg.faltas_graves_cant || 0}</span></td>
-                <td class="p-1.5 text-center w-12"><span class="${gravisimaClass} px-1.5 py-0.5 rounded text-xs">${reg.faltas_gravisimas_cant || 0}</span></td>
-                <td class="p-1.5 text-center w-16">
-                    <button onclick="window.modules.disciplina.editarDesdeModal(${reg.id})" 
-                            class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded transition shadow-sm" 
-                            title="Editar">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                    </button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        document.getElementById('modal-detalle').classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-    },
+    // Mostrar modal
+    document.getElementById('modal-detalle').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+},
 
     editarDesdeModal: function(id) {
         const registro = this.datosCache.find(r => r.id === id);
