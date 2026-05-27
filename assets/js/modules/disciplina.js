@@ -185,10 +185,10 @@ buscarPorCedula: async function() {
     console.log('🔍 Buscando cédula:', cedulaNumeros);
 
     try {
-        // 1. BUSCAR EN ESTUDIANTES
+        // 1. Buscar en ESTUDIANTES
         const { data: estudiantesData, error: errorEst } = await window.supabaseClient
             .from('estudiantes')
-            .select('id, cedula, nombres, apellidos, genero, proceso, status, ambiente, categoria, trayecto_id, pnf_id')
+            .select('id, cedula, nombres, apellidos, genero, proceso, status, ambiente, categoria, trayecto_id')
             .or(`cedula.ilike.%${cedulaNumeros}%,cedula.ilike.%V-${cedulaNumeros}%,cedula.ilike.%E-${cedulaNumeros}%`)
             .limit(1);
 
@@ -199,34 +199,24 @@ buscarPorCedula: async function() {
         if (estudiante) {
             console.log('✅ Estudiante encontrado:', estudiante);
             
-            // 2. OBTENER EL NOMBRE DEL PNF (Si tenemos pnf_id)
-            if (estudiante.pnf_id) {
-                const { data: pnfData } = await window.supabaseClient
-                    .from('pnf')
-                    .select('nombre')
-                    .eq('id', estudiante.pnf_id)
-                    .single();
-                
-                // Guardamos el nombre del PNF dentro del objeto estudiante para pasarlo al formulario
-                estudiante.pnf = pnfData ? pnfData.nombre : '';
-            } else {
-                // Si no tiene pnf_id en estudiantes, buscamos en disc_registros (donde importaste el CSV con texto)
-                const { data: discData } = await window.supabaseClient
-                    .from('disc_registros')
-                    .select('pnf') // La columna 'pnf' en tu CSV tiene el texto
-                    .eq('cedula', estudiante.cedula)
-                    .limit(1)
-                    .single();
-                
-                estudiante.pnf = discData ? discData.pnf : '';
-            }
-
-            // 3. LLENAR FORMULARIO
+            // 2. OBTENER PNF DESDE DISC_REGISTROS (donde está el texto real)
+            const { data: discData } = await window.supabaseClient
+                .from('disc_registros')
+                .select('pnf')  // Columna de TEXTO con el nombre del PNF
+                .eq('cedula', estudiante.cedula)
+                .limit(1)
+                .maybeSingle();
+            
+            // Asignar el PNF (texto) al objeto estudiante
+            estudiante.pnf = discData && discData.pnf ? discData.pnf : '';
+            console.log('📚 PNF obtenido:', estudiante.pnf);
+            
+            // 3. Llenar formulario
             this.llenarFormularioEstudiante(estudiante);
             this.mostrarFiltroActivo(cedulaInput);
             document.getElementById('datos-personales-panel').classList.remove('hidden');
 
-            // 4. BUSCAR HISTORIAL DISCIPLINARIO
+            // 4. Buscar historial disciplinario
             const { data: registrosDisc } = await window.supabaseClient
                 .from('disc_registros')
                 .select('*')
@@ -236,10 +226,10 @@ buscarPorCedula: async function() {
             if (registrosDisc && registrosDisc.length > 0) {
                 this.llenarDatosDisciplinarios(registrosDisc[0]);
                 await this.renderizarTablaFiltrada(registrosDisc);
-                Swal.fire('✅ Estudiante Encontrado', `${estudiante.nombres} ${estudiante.apellidos}\nPNF: ${estudiante.pnf}`, 'success');
+                Swal.fire('✅ Estudiante Encontrado', `${estudiante.nombres} ${estudiante.apellidos}\nPNF: ${estudiante.pnf || 'N/A'}`, 'success');
             } else {
                 document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros</td></tr>';
-                Swal.fire('📝 Sin Antecedentes', `PNF Asignado: ${estudiante.pnf}`, 'info');
+                Swal.fire('📝 Sin Antecedentes', `PNF: ${estudiante.pnf || 'N/A'}`, 'info');
             }
             return;
         }
@@ -253,7 +243,14 @@ buscarPorCedula: async function() {
 
         if (registrosDiscFallback && registrosDiscFallback.length > 0) {
             const reg = registrosDiscFallback[0];
-            const estudianteFake = { cedula: reg.cedula, nombres: reg.nombres, apellidos: reg.apellidos, genero: reg.genero || 'SELECCIONAR', pnf: reg.pnf, proceso: reg.proceso };
+            const estudianteFake = { 
+                cedula: reg.cedula, 
+                nombres: reg.nombres, 
+                apellidos: reg.apellidos, 
+                genero: reg.genero || 'SELECCIONAR', 
+                pnf: reg.pnf,  // Ya viene el texto del PNF
+                proceso: reg.proceso 
+            };
             
             this.llenarFormularioEstudiante(estudianteFake);
             this.llenarFormulario(reg);
