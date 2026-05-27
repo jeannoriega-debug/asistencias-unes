@@ -182,7 +182,7 @@ buscarPorCedula: async function() {
     console.log('🔍 Buscando cédula:', cedulaNumeros);
 
     try {
-        // Buscar en ESTUDIANTES sin JOIN primero
+        // CONSULTA 1: Obtener estudiante con pnf_id
         const { data: estudiantesData, error: errorEst } = await window.supabaseClient
             .from('estudiantes')
             .select('id, cedula, nombres, apellidos, genero, proceso, status, ambiente, categoria, trayecto_id, pnf_id')
@@ -200,17 +200,21 @@ buscarPorCedula: async function() {
         if (estudiante) {
             console.log('✅ Estudiante encontrado:', estudiante);
             
-            // Si tenemos pnf_id, buscar el nombre del PNF
+            // CONSULTA 2: Obtener el NOMBRE del PNF usando el pnf_id
             if (estudiante.pnf_id) {
-                const { data: pnfData } = await window.supabaseClient
+                const { data: pnfData, error: errorPnf } = await window.supabaseClient
                     .from('pnf')
                     .select('nombre')
                     .eq('id', estudiante.pnf_id)
                     .single();
                 
-                // Agregar el nombre del PNF al objeto estudiante
-                estudiante.pnf = pnfData ? pnfData.nombre : '';
-                console.log('📚 PNF encontrado:', estudiante.pnf);
+                if (errorPnf) {
+                    console.error('❌ Error obteniendo PNF:', errorPnf);
+                } else {
+                    console.log('✅ PNF encontrado:', pnfData);
+                    // Agregar el nombre del PNF al objeto estudiante
+                    estudiante.pnf = pnfData ? pnfData.nombre : '';
+                }
             } else {
                 estudiante.pnf = '';
             }
@@ -237,7 +241,7 @@ buscarPorCedula: async function() {
                 Swal.fire({
                     icon: 'success',
                     title: '✅ Estudiante Encontrado',
-                    html: `<div class="text-left"><p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p><p class="text-sm text-blue-600 mt-2">📋 ${registrosDisc.length} registro(s) disciplinario(s)</p></div>`,
+                    html: `<div class="text-left"><p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p><p class="text-sm text-blue-600 mt-2">📋 ${registrosDisc.length} registro(s) disciplinario(s) | PNF: ${estudiante.pnf || 'N/A'}</p></div>`,
                     toast: false,
                     showConfirmButton: true,
                     confirmButtonText: 'Aceptar'
@@ -246,7 +250,7 @@ buscarPorCedula: async function() {
                 Swal.fire({
                     icon: 'info',
                     title: '📝 Sin Antecedentes',
-                    html: `<div class="text-left"><p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p></div>`,
+                    html: `<div class="text-left"><p><strong>${estudiante.nombres} ${estudiante.apellidos}</strong></p><p class="text-sm text-gray-600">PNF: ${estudiante.pnf || 'N/A'}</p></div>`,
                     toast: false,
                     showConfirmButton: true
                 });
