@@ -1,6 +1,6 @@
 /**
  * MÓDULO CONSEJO DISCIPLINARIO 2026
- * Versión: 3.1 - Corregido PNF y botón Limpiar
+ * Versión: 3.2 - Búsqueda con Swal visual + PNF corregido
  */
 
 window.modules = window.modules || {};
@@ -10,7 +10,7 @@ window.modules.disciplina = {
     datosCache: [],
 
     init: async function() {
-        console.log('🚀 Iniciando módulo Disciplinario v3.1...');
+        console.log('🚀 Iniciando módulo Disciplinario v3.2...');
         await this.cargarLista();
         
         const inputBusqueda = document.getElementById('buscar-cedula');
@@ -170,197 +170,198 @@ window.modules.disciplina = {
             tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos. Verifica la conexión.</td></tr>';
         }
     },
-/**
- * BUSCAR POR CÉDULA (CON VISUALIZACIÓN COMPLETA)
- */
-buscarPorCedula: async function() {
-    const cedulaInput = document.getElementById('buscar-cedula').value.trim();
-    if (!cedulaInput) {
-        Swal.fire({ icon: 'warning', title: 'Atención', text: 'Ingrese una cédula', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
-        return;
-    }
 
-    const cedulaNumeros = cedulaInput.replace(/[^0-9]/g, '');
-    console.log('🔍 Buscando cédula:', cedulaNumeros);
-
-    try {
-        // Buscar en ESTUDIANTES con relación PNF
-        const { data: estudiantesData, error: errorEst } = await window.supabaseClient
-            .from('estudiantes')
-            .select(`
-                id, cedula, nombres, apellidos, genero, proceso, status, 
-                ambiente, categoria, trayecto_id, 
-                pnf:pnf_id(nombre)
-            `)
-            .or(`cedula.ilike.%${cedulaNumeros}%,cedula.ilike.%V-${cedulaNumeros}%,cedula.ilike.%E-${cedulaNumeros}%`)
-            .limit(1);
-
-        if (errorEst) throw errorEst;
-        
-        let estudiante = estudiantesData && estudiantesData.length > 0 ? estudiantesData[0] : null;
-
-        if (estudiante) {
-            console.log('✅ Estudiante encontrado:', estudiante);
-            
-            // Buscar en DISC_REGISTROS para obtener el PNF (texto) si viene null
-            if (!estudiante.pnf || !estudiante.pnf.nombre) {
-                const { data: discData } = await window.supabaseClient
-                    .from('disc_registros')
-                    .select('pnf')
-                    .eq('cedula', estudiante.cedula)
-                    .limit(1)
-                    .maybeSingle();
-                
-                if (discData && discData.pnf) {
-                    estudiante.pnf = { nombre: discData.pnf };
-                }
-            }
-            
-            // Llenar formulario con datos de ESTUDIANTES
-            this.llenarFormularioEstudiante(estudiante);
-            this.mostrarFiltroActivo(cedulaInput);
-            document.getElementById('datos-personales-panel').classList.remove('hidden');
-
-            // Buscar historial disciplinario
-            const { data: registrosDisc } = await window.supabaseClient
-                .from('disc_registros')
-                .select('*')
-                .eq('cedula', estudiante.cedula)
-                .order('id', { ascending: false });
-
-            const totalRegistros = registrosDisc ? registrosDisc.length : 0;
-            
-            // Calcular totales de faltas
-            const totalLeves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_leves_cant || 0), 0) : 0;
-            const totalGraves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_graves_cant || 0), 0) : 0;
-            const totalGravisimas = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_gravisimas_cant || 0), 0) : 0;
-
-            // 🎯 MOSTRAR INFORMACIÓN COMPLETA EN SWAL.FIRE
-            Swal.fire({
-                title: `👤 ${estudiante.nombres} ${estudiante.apellidos}`,
-                html: `
-                    <div style="text-align: left; font-size: 14px; line-height: 1.8;">
-                        
-                        <!-- DATOS PERSONALES -->
-                        <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">
-                            📋 DATOS PERSONALES
-                        </h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p>
-                            <p><strong>Género:</strong> ${estudiante.genero || 'N/A'}</p>
-                            <p><strong>Núcleo:</strong> ${estudiante.nucleo || 'NUEVA ESPARTA'}</p>
-                            <p><strong>Ambiente:</strong> ${estudiante.ambiente || 'N/A'}</p>
-                        </div>
-                        
-                        <!-- DATOS ACADÉMICOS -->
-                        <h3 style="border-bottom: 2px solid #10b981; padding-bottom: 5px; color: #10b981; margin-top: 15px; font-size: 16px;">
-                            🎓 DATOS ACADÉMICOS
-                        </h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <p><strong>PNF:</strong> ${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
-                            <p><strong>Proceso:</strong> ${estudiante.proceso || 'N/A'}</p>
-                            <p><strong>Categoría:</strong> ${estudiante.categoria || 'N/A'}</p>
-                            <p><strong>Trayecto:</strong> ${estudiante.trayecto_id ? 'Asignado' : 'No asignado'}</p>
-                        </div>
-
-                        <!-- ESTADÍSTICAS DISCIPLINARIAS -->
-                        <h3 style="border-bottom: 2px solid #f59e0b; padding-bottom: 5px; color: #f59e0b; margin-top: 15px; font-size: 16px;">
-                            📊 ESTADÍSTICAS DISCIPLINARIAS
-                        </h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
-                            <div style="background: #fef3c7; padding: 8px; border-radius: 5px;">
-                                <strong style="color: #d97706;">${totalLeves}</strong><br>
-                                <span style="font-size: 12px;">Leves</span>
-                            </div>
-                            <div style="background: #fee2e2; padding: 8px; border-radius: 5px;">
-                                <strong style="color: #dc2626;">${totalGraves}</strong><br>
-                                <span style="font-size: 12px;">Graves</span>
-                            </div>
-                            <div style="background: #1f2937; color: white; padding: 8px; border-radius: 5px;">
-                                <strong style="color: white;">${totalGravisimas}</strong><br>
-                                <span style="font-size: 12px;">Gravísimas</span>
-                            </div>
-                        </div>
-                        <p style="margin-top: 10px; text-align: center;"><strong>Total Registros:</strong> ${totalRegistros}</p>
-                        
-                        <!-- ESTATUS GENERAL -->
-                        <h3 style="border-bottom: 2px solid ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; padding-bottom: 5px; color: ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; margin-top: 15px; font-size: 16px;">
-                             ESTATUS GENERAL
-                        </h3>
-                        <p style="text-align: center; font-size: 16px;">
-                            <strong>Estado:</strong> 
-                            <span style="padding: 5px 15px; border-radius: 20px; background: ${estudiante.status === 'Activo' ? '#d1fae5' : '#fee2e2'}; color: ${estudiante.status === 'Activo' ? '#065f46' : '#991b1b'}; font-weight: bold;">
-                                ${estudiante.status || 'ACTIVO'}
-                            </span>
-                        </p>
-                    </div>
-                `,
-                width: 700,
-                padding: '25px',
-                showCloseButton: true,
-                showCancelButton: false,
-                confirmButtonText: 'Aceptar',
-                confirmButtonColor: '#3b82f6',
-                focusConfirm: false,
-                customClass: {
-                    popup: 'rounded-xl shadow-2xl'
-                }
-            });
-
-            if (registrosDisc && registrosDisc.length > 0) {
-                this.llenarDatosDisciplinarios(registrosDisc[0]);
-                await this.renderizarTablaFiltrada(registrosDisc);
-            } else {
-                document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros disciplinarios</td></tr>';
-            }
+    /**
+     * 🔍 BUSCAR POR CÉDULA (CON VISUALIZACIÓN COMPLETA EN SWAL)
+     */
+    buscarPorCedula: async function() {
+        const cedulaInput = document.getElementById('buscar-cedula').value.trim();
+        if (!cedulaInput) {
+            Swal.fire({ icon: 'warning', title: 'Atención', text: 'Ingrese una cédula', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
             return;
         }
 
-        // Fallback: buscar en DISC_REGISTROS
-        console.log('⚠️ No encontrado en ESTUDIANTES, buscando en DISC_REGISTROS...');
-        
-        const { data: registrosDiscFallback } = await window.supabaseClient
-            .from('disc_registros')
-            .select('*')
-            .or(`cedula.ilike.%${cedulaNumeros}%`)
-            .order('id', { ascending: false })
-            .limit(1);
+        const cedulaNumeros = cedulaInput.replace(/[^0-9]/g, '');
+        console.log('🔍 Buscando cédula:', cedulaNumeros);
 
-        if (registrosDiscFallback && registrosDiscFallback.length > 0) {
-            const reg = registrosDiscFallback[0];
-            const estudianteFake = { 
-                cedula: reg.cedula, 
-                nombres: reg.nombres, 
-                apellidos: reg.apellidos, 
-                genero: reg.genero || 'SELECCIONAR', 
-                pnf: reg.pnf, 
-                proceso: reg.proceso 
-            };
-            
-            this.llenarFormularioEstudiante(estudianteFake);
-            this.llenarFormulario(reg);
-            this.mostrarFiltroActivo(cedulaInput);
-            document.getElementById('datos-personales-panel').classList.remove('hidden');
-            
-            const { data: todos } = await window.supabaseClient.from('disc_registros').select('*').eq('cedula', reg.cedula).order('id', { ascending: false });
-            if (todos) await this.renderizarTablaFiltrada(todos);
+        try {
+            // Buscar en ESTUDIANTES con relación PNF
+            const { data: estudiantesData, error: errorEst } = await window.supabaseClient
+                .from('estudiantes')
+                .select(`
+                    id, cedula, nombres, apellidos, genero, proceso, status, 
+                    ambiente, categoria, trayecto_id, 
+                    pnf:pnf_id(nombre)
+                `)
+                .or(`cedula.ilike.%${cedulaNumeros}%,cedula.ilike.%V-${cedulaNumeros}%,cedula.ilike.%E-${cedulaNumeros}%`)
+                .limit(1);
 
-            Swal.fire('⚠️ Solo en Disciplina', 'Datos obtenidos de registros históricos', 'warning');
-        } else {
-            Swal.fire({ 
-                icon: 'error', 
-                title: 'No Encontrado', 
-                html: `Cédula <strong>${cedulaInput}</strong> no encontrada`,
-                toast: false 
-            });
-            this.limpiarFormulario();
+            if (errorEst) throw errorEst;
+            
+            let estudiante = estudiantesData && estudiantesData.length > 0 ? estudiantesData[0] : null;
+
+            if (estudiante) {
+                console.log('✅ Estudiante encontrado:', estudiante);
+                
+                // Buscar en DISC_REGISTROS para obtener el PNF (texto) si viene null
+                if (!estudiante.pnf || !estudiante.pnf.nombre) {
+                    const { data: discData } = await window.supabaseClient
+                        .from('disc_registros')
+                        .select('pnf')
+                        .eq('cedula', estudiante.cedula)
+                        .limit(1)
+                        .maybeSingle();
+                    
+                    if (discData && discData.pnf) {
+                        estudiante.pnf = { nombre: discData.pnf };
+                    }
+                }
+                
+                // Llenar formulario con datos de ESTUDIANTES
+                this.llenarFormularioEstudiante(estudiante);
+                this.mostrarFiltroActivo(cedulaInput);
+                document.getElementById('datos-personales-panel').classList.remove('hidden');
+
+                // Buscar historial disciplinario
+                const { data: registrosDisc } = await window.supabaseClient
+                    .from('disc_registros')
+                    .select('*')
+                    .eq('cedula', estudiante.cedula)
+                    .order('id', { ascending: false });
+
+                const totalRegistros = registrosDisc ? registrosDisc.length : 0;
+                
+                // Calcular totales de faltas
+                const totalLeves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_leves_cant || 0), 0) : 0;
+                const totalGraves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_graves_cant || 0), 0) : 0;
+                const totalGravisimas = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_gravisimas_cant || 0), 0) : 0;
+
+                // 🎯 MOSTRAR INFORMACIÓN COMPLETA EN SWAL.FIRE
+                Swal.fire({
+                    title: `👤 ${estudiante.nombres} ${estudiante.apellidos}`,
+                    html: `
+                        <div style="text-align: left; font-size: 14px; line-height: 1.8;">
+                            
+                            <!-- DATOS PERSONALES -->
+                            <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">
+                                📋 DATOS PERSONALES
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p>
+                                <p><strong>Género:</strong> ${estudiante.genero || 'N/A'}</p>
+                                <p><strong>Núcleo:</strong> ${estudiante.nucleo || 'NUEVA ESPARTA'}</p>
+                                <p><strong>Ambiente:</strong> ${estudiante.ambiente || 'N/A'}</p>
+                            </div>
+                            
+                            <!-- DATOS ACADÉMICOS -->
+                            <h3 style="border-bottom: 2px solid #10b981; padding-bottom: 5px; color: #10b981; margin-top: 15px; font-size: 16px;">
+                                🎓 DATOS ACADÉMICOS
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <p><strong>PNF:</strong> ${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
+                                <p><strong>Proceso:</strong> ${estudiante.proceso || 'N/A'}</p>
+                                <p><strong>Categoría:</strong> ${estudiante.categoria || 'N/A'}</p>
+                                <p><strong>Trayecto:</strong> ${estudiante.trayecto_id ? 'Asignado' : 'No asignado'}</p>
+                            </div>
+
+                            <!-- ESTADÍSTICAS DISCIPLINARIAS -->
+                            <h3 style="border-bottom: 2px solid #f59e0b; padding-bottom: 5px; color: #f59e0b; margin-top: 15px; font-size: 16px;">
+                                📊 ESTADÍSTICAS DISCIPLINARIAS
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+                                <div style="background: #fef3c7; padding: 8px; border-radius: 5px;">
+                                    <strong style="color: #d97706;">${totalLeves}</strong><br>
+                                    <span style="font-size: 12px;">Leves</span>
+                                </div>
+                                <div style="background: #fee2e2; padding: 8px; border-radius: 5px;">
+                                    <strong style="color: #dc2626;">${totalGraves}</strong><br>
+                                    <span style="font-size: 12px;">Graves</span>
+                                </div>
+                                <div style="background: #1f2937; color: white; padding: 8px; border-radius: 5px;">
+                                    <strong style="color: white;">${totalGravisimas}</strong><br>
+                                    <span style="font-size: 12px;">Gravísimas</span>
+                                </div>
+                            </div>
+                            <p style="margin-top: 10px; text-align: center;"><strong>Total Registros:</strong> ${totalRegistros}</p>
+                            
+                            <!-- ESTATUS GENERAL -->
+                            <h3 style="border-bottom: 2px solid ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; padding-bottom: 5px; color: ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; margin-top: 15px; font-size: 16px;">
+                                 ESTATUS GENERAL
+                            </h3>
+                            <p style="text-align: center; font-size: 16px;">
+                                <strong>Estado:</strong> 
+                                <span style="padding: 5px 15px; border-radius: 20px; background: ${estudiante.status === 'Activo' ? '#d1fae5' : '#fee2e2'}; color: ${estudiante.status === 'Activo' ? '#065f46' : '#991b1b'}; font-weight: bold;">
+                                    ${estudiante.status || 'ACTIVO'}
+                                </span>
+                            </p>
+                        </div>
+                    `,
+                    width: 700,
+                    padding: '25px',
+                    showCloseButton: true,
+                    showCancelButton: false,
+                    confirmButtonText: 'Aceptar',
+                    confirmButtonColor: '#3b82f6',
+                    focusConfirm: false,
+                    customClass: {
+                        popup: 'rounded-xl shadow-2xl'
+                    }
+                });
+
+                if (registrosDisc && registrosDisc.length > 0) {
+                    this.llenarDatosDisciplinarios(registrosDisc[0]);
+                    await this.renderizarTablaFiltrada(registrosDisc);
+                } else {
+                    document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros disciplinarios</td></tr>';
+                }
+                return;
+            }
+
+            // Fallback: buscar en DISC_REGISTROS
+            console.log('⚠️ No encontrado en ESTUDIANTES, buscando en DISC_REGISTROS...');
+            
+            const { data: registrosDiscFallback } = await window.supabaseClient
+                .from('disc_registros')
+                .select('*')
+                .or(`cedula.ilike.%${cedulaNumeros}%`)
+                .order('id', { ascending: false })
+                .limit(1);
+
+            if (registrosDiscFallback && registrosDiscFallback.length > 0) {
+                const reg = registrosDiscFallback[0];
+                const estudianteFake = { 
+                    cedula: reg.cedula, 
+                    nombres: reg.nombres, 
+                    apellidos: reg.apellidos, 
+                    genero: reg.genero || 'SELECCIONAR', 
+                    pnf: reg.pnf, 
+                    proceso: reg.proceso 
+                };
+                
+                this.llenarFormularioEstudiante(estudianteFake);
+                this.llenarFormulario(reg);
+                this.mostrarFiltroActivo(cedulaInput);
+                document.getElementById('datos-personales-panel').classList.remove('hidden');
+                
+                const { data: todos } = await window.supabaseClient.from('disc_registros').select('*').eq('cedula', reg.cedula).order('id', { ascending: false });
+                if (todos) await this.renderizarTablaFiltrada(todos);
+
+                Swal.fire('⚠️ Solo en Disciplina', 'Datos obtenidos de registros históricos', 'warning');
+            } else {
+                Swal.fire({ 
+                    icon: 'error', 
+                    title: 'No Encontrado', 
+                    html: `Cédula <strong>${cedulaInput}</strong> no encontrada`,
+                    toast: false 
+                });
+                this.limpiarFormulario();
+            }
+
+        } catch (e) {
+            console.error('❌ Error:', e);
+            Swal.fire({ icon: 'error', title: 'Error', text: e.message });
         }
-
-    } catch (e) {
-        console.error('❌ Error:', e);
-        Swal.fire({ icon: 'error', title: 'Error', text: e.message });
-    }
-},
+    },
     
     llenarFormularioEstudiante: function(est) {
         this.registroActualId = null;
@@ -639,111 +640,110 @@ buscarPorCedula: async function() {
         });
     },
 
-guardarRegistro: async function() {
-    const cedula = document.getElementById('disc-cedula').value.trim();
-    
-    if (!cedula) {
-        Swal.fire({ icon: 'warning', title: 'Atención', text: 'Primero busque un estudiante', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
-        return;
-    }
-
-    const estatus = document.getElementById('disc-estatus-general').value;
-    const tipoBaja = document.getElementById('disc-tipo-baja').value;
-
-    if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
-        const confirm = await Swal.fire({
-            icon: 'warning',
-            title: '¿Confirmar Baja?',
-            html: `Se marcará al estudiante como <strong>INACTIVO</strong> con tipo de baja: <strong>${tipoBaja}</strong><br>Esto también actualizará su estatus en la tabla ESTUDIANTES.`,
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'Sí, guardar baja',
-            cancelButtonText: 'Cancelar'
-        });
-
-        if (!confirm.isConfirmed) return;
-    }
-
-    // Obtener valor de supervisión y asegurar que sea 'SI' o 'NO'
-    let supervisionValor = document.getElementById('disc-supervision')?.value || 'NO APLICA';
-    if (supervisionValor === 'NO APLICA' || supervisionValor === '' || supervisionValor === null) {
-        supervisionValor = 'NO';
-    } else if (supervisionValor === 'SI') {
-        supervisionValor = 'SI';
-    } else {
-        supervisionValor = 'NO';
-    }
-
-    const datos = {
-        cedula: cedula.toUpperCase(),
-        nombres: document.getElementById('disc-nombres').value.trim().toUpperCase(),
-        apellidos: document.getElementById('disc-apellidos').value.trim().toUpperCase(),
-        genero: document.getElementById('disc-genero').value !== 'SELECCIONAR' ? document.getElementById('disc-genero').value : null,
-        nucleo: document.getElementById('disc-nucleo').value.trim().toUpperCase() || 'NUEVA ESPARTA',
-        pnf: document.getElementById('disc-pnf').value.trim().toUpperCase(),
-        proceso: document.getElementById('disc-proceso').value.trim().toUpperCase(),
-        supervision_continua: supervisionValor, // ✅ Valor válido: 'SI' o 'NO'
-        tipo_baja: tipoBaja !== 'SELECCIONAR' ? tipoBaja : null,
-        fecha_baja: document.getElementById('disc-fecha-baja').value || null,
-        faltas_leves_fecha: document.getElementById('disc-fecha-leve').value || null,
-        fecha_falta_leve_recibida: document.getElementById('disc-fecha-leve-recibida').value || null,
-        faltas_graves_fecha: document.getElementById('disc-fecha-grave').value || null,
-        faltas_graves_fecha_recibida: document.getElementById('disc-fecha-grave-recibida').value || null,
-        faltas_gravisima_fecha: document.getElementById('disc-fecha-gravisima').value || null,
-        faltas_gravisima_fecha_recibida: document.getElementById('disc-fecha-gravisima-recibida').value || null,
-        fecha_incidencia_estudiante: document.getElementById('disc-fecha-incidencia').value || null,
-        consejo_disciplinario_fecha: document.getElementById('disc-fecha-consejo').value || null,
-        causal_faltas_graves_impuesta: document.getElementById('disc-causal-graves').value.trim() || null,
-        programa_supervision_intensiva_aplicado_grave_impuesta: document.getElementById('disc-programa-supervision').value.trim() || null,
-        acta_compromiso: document.getElementById('disc-acta-compromiso').value.trim() || null,
-        observaciones_jefe: document.getElementById('disc-observaciones').value.trim() || null,
-        estatus_general: estatus,
-        faltas_leves_cant: parseInt(document.getElementById('disc-leves-cant').value) || 0,
-        faltas_graves_cant: parseInt(document.getElementById('disc-graves-cant').value) || 0,
-        faltas_gravisimas_cant: parseInt(document.getElementById('disc-gravisimas-cant').value) || 0,
-        creado_por: window.appState.usuarioActualId || null
-    };
-
-    console.log('💾 Datos a guardar:', datos);
-
-    try {
-        let result;
+    guardarRegistro: async function() {
+        const cedula = document.getElementById('disc-cedula').value.trim();
         
-        if (this.registroActualId) {
-            result = await window.supabaseClient
-                .from('disc_registros')
-                .update(datos)
-                .eq('id', this.registroActualId);
-        } else {
-            result = await window.supabaseClient
-                .from('disc_registros')
-                .insert([datos]);
+        if (!cedula) {
+            Swal.fire({ icon: 'warning', title: 'Atención', text: 'Primero busque un estudiante', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+            return;
         }
 
-        if (result.error) throw result.error;
+        const estatus = document.getElementById('disc-estatus-general').value;
+        const tipoBaja = document.getElementById('disc-tipo-baja').value;
 
         if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
-            await this.actualizarEstatusEstudiante(cedula.toUpperCase(), 'Inactivo');
+            const confirm = await Swal.fire({
+                icon: 'warning',
+                title: '¿Confirmar Baja?',
+                html: `Se marcará al estudiante como <strong>INACTIVO</strong> con tipo de baja: <strong>${tipoBaja}</strong><br>Esto también actualizará su estatus en la tabla ESTUDIANTES.`,
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Sí, guardar baja',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (!confirm.isConfirmed) return;
         }
 
-        Swal.fire({
-            icon: 'success',
-            title: this.registroActualId ? '✅ Registro Actualizado' : '✅ Registro Creado',
-            text: 'La información ha sido guardada correctamente',
-            timer: 2500,
-            showConfirmButton: false
-        });
+        // Obtener valor de supervisión y asegurar que sea 'SI' o 'NO'
+        let supervisionValor = document.getElementById('disc-supervision')?.value || 'NO APLICA';
+        if (supervisionValor === 'NO APLICA' || supervisionValor === '' || supervisionValor === null) {
+            supervisionValor = 'NO';
+        } else if (supervisionValor === 'SI') {
+            supervisionValor = 'SI';
+        } else {
+            supervisionValor = 'NO';
+        }
 
-        await this.cargarLista();
-        this.limpiarFormulario();
+        const datos = {
+            cedula: cedula.toUpperCase(),
+            nombres: document.getElementById('disc-nombres').value.trim().toUpperCase(),
+            apellidos: document.getElementById('disc-apellidos').value.trim().toUpperCase(),
+            genero: document.getElementById('disc-genero').value !== 'SELECCIONAR' ? document.getElementById('disc-genero').value : null,
+            nucleo: document.getElementById('disc-nucleo').value.trim().toUpperCase() || 'NUEVA ESPARTA',
+            pnf: document.getElementById('disc-pnf').value.trim().toUpperCase(),
+            proceso: document.getElementById('disc-proceso').value.trim().toUpperCase(),
+            supervision_continua: supervisionValor,
+            tipo_baja: tipoBaja !== 'SELECCIONAR' ? tipoBaja : null,
+            fecha_baja: document.getElementById('disc-fecha-baja').value || null,
+            faltas_leves_fecha: document.getElementById('disc-fecha-leve').value || null,
+            fecha_falta_leve_recibida: document.getElementById('disc-fecha-leve-recibida').value || null,
+            faltas_graves_fecha: document.getElementById('disc-fecha-grave').value || null,
+            faltas_graves_fecha_recibida: document.getElementById('disc-fecha-grave-recibida').value || null,
+            faltas_gravisima_fecha: document.getElementById('disc-fecha-gravisima').value || null,
+            faltas_gravisima_fecha_recibida: document.getElementById('disc-fecha-gravisima-recibida').value || null,
+            fecha_incidencia_estudiante: document.getElementById('disc-fecha-incidencia').value || null,
+            consejo_disciplinario_fecha: document.getElementById('disc-fecha-consejo').value || null,
+            causal_faltas_graves_impuesta: document.getElementById('disc-causal-graves').value.trim() || null,
+            programa_supervision_intensiva_aplicado_grave_impuesta: document.getElementById('disc-programa-supervision').value.trim() || null,
+            acta_compromiso: document.getElementById('disc-acta-compromiso').value.trim() || null,
+            observaciones_jefe: document.getElementById('disc-observaciones').value.trim() || null,
+            estatus_general: estatus,
+            faltas_leves_cant: parseInt(document.getElementById('disc-leves-cant').value) || 0,
+            faltas_graves_cant: parseInt(document.getElementById('disc-graves-cant').value) || 0,
+            faltas_gravisimas_cant: parseInt(document.getElementById('disc-gravisimas-cant').value) || 0,
+            creado_por: window.appState.usuarioActualId || null
+        };
 
-    } catch (e) {
-        console.error('❌ Error al guardar:', e);
-        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar: ' + e.message });
-    }
-},
+        console.log('💾 Datos a guardar:', datos);
 
-    
+        try {
+            let result;
+            
+            if (this.registroActualId) {
+                result = await window.supabaseClient
+                    .from('disc_registros')
+                    .update(datos)
+                    .eq('id', this.registroActualId);
+            } else {
+                result = await window.supabaseClient
+                    .from('disc_registros')
+                    .insert([datos]);
+            }
+
+            if (result.error) throw result.error;
+
+            if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
+                await this.actualizarEstatusEstudiante(cedula.toUpperCase(), 'Inactivo');
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: this.registroActualId ? '✅ Registro Actualizado' : '✅ Registro Creado',
+                text: 'La información ha sido guardada correctamente',
+                timer: 2500,
+                showConfirmButton: false
+            });
+
+            await this.cargarLista();
+            this.limpiarFormulario();
+
+        } catch (e) {
+            console.error('❌ Error al guardar:', e);
+            Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar: ' + e.message });
+        }
+    },
+
     actualizarEstatusEstudiante: async function(cedula, nuevoEstatus) {
         try {
             const { error } = await window.supabaseClient
@@ -805,18 +805,12 @@ guardarRegistro: async function() {
         document.getElementById('filtro-activo').classList.add('hidden');
     },
 
-    /**
-     * LIMPIAR FORMULARIO COMPLETO
-     * Limpia TODOS los inputs, selects, textareas y date inputs
-     */
     limpiarFormulario: function() {
         this.registroActualId = null;
         
-        // Limpiar TODOS los elementos del formulario
         document.querySelectorAll('input, select, textarea').forEach(el => {
             if (el.id !== 'buscar-cedula') {
                 if (el.tagName === 'SELECT') {
-                    // Resetear selects a su opción por defecto
                     if (el.id === 'disc-genero') el.value = 'SELECCIONAR';
                     else if (el.id === 'disc-tipo-baja') el.value = 'SELECCIONAR';
                     else if (el.id === 'disc-supervision') el.value = 'NO APLICA';
@@ -830,16 +824,12 @@ guardarRegistro: async function() {
             }
         });
 
-        // Resetear valores numéricos específicos
         document.getElementById('disc-leves-cant').value = 0;
         document.getElementById('disc-graves-cant').value = 0;
         document.getElementById('disc-gravisimas-cant').value = 0;
         document.getElementById('disc-nucleo').value = 'NUEVA ESPARTA';
-        
-        // Ocultar panel de datos personales
         document.getElementById('datos-personales-panel').classList.add('hidden');
 
-        // Limpiar búsqueda
         this.limpiarBusqueda();
         
         console.log('🧹 Formulario limpiado completamente');
@@ -870,4 +860,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('✅ Módulo Consejo Disciplinario v3.1 Cargado');
+console.log('✅ Módulo Consejo Disciplinario v3.2 Cargado');
