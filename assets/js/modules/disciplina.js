@@ -508,15 +508,22 @@ abrirModalDetalle: function(cedula) {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-blue-50 transition';
         
-        // CORRECCIÓN: Mostrar la fecha específica según el tipo de falta
+        // CORRECCIÓN: Mostrar TODAS las fechas disponibles según el tipo de falta
         let fechaMostrar = '-';
+        
+        // Prioridad: Fecha de la falta según su tipo
+        if (reg.faltas_leves_cant > 0 && reg.faltas_leves_fecha) {
+            fechaMostrar = this.formatearFecha(reg.faltas_leves_fecha);
+        }
+        if (reg.faltas_graves_cant > 0 && reg.faltas_graves_fecha) {
+            fechaMostrar = this.formatearFecha(reg.faltas_graves_fecha);
+        }
         if (reg.faltas_gravisimas_cant > 0 && reg.faltas_gravisima_fecha) {
             fechaMostrar = this.formatearFecha(reg.faltas_gravisima_fecha);
-        } else if (reg.faltas_graves_cant > 0 && reg.faltas_graves_fecha) {
-            fechaMostrar = this.formatearFecha(reg.faltas_graves_fecha);
-        } else if (reg.faltas_leves_cant > 0 && reg.faltas_leves_fecha) {
-            fechaMostrar = this.formatearFecha(reg.faltas_leves_fecha);
-        } else if (reg.fecha_incidencia_estudiante) {
+        }
+        
+        // Si no hay fecha de falta específica, usar fecha de incidencia
+        if (fechaMostrar === '-' && reg.fecha_incidencia_estudiante) {
             fechaMostrar = this.formatearFecha(reg.fecha_incidencia_estudiante);
         }
         
@@ -526,23 +533,23 @@ abrirModalDetalle: function(cedula) {
         const gravisimaClass = reg.faltas_gravisimas_cant > 0 ? 'bg-gray-800 text-white font-bold' : 'text-gray-400';
 
         tr.innerHTML = `
-            <td class="p-2 text-center font-mono text-gray-600">${reg.id}</td>
-            <td class="p-2 text-center font-medium text-gray-800">${fechaMostrar}</td>
-            <td class="p-2 text-center"><span class="${leveClass} px-1.5 py-0.5 rounded text-[10px]">${reg.faltas_leves_cant || 0}</span></td>
-            <td class="p-2 text-center"><span class="${graveClass} px-1.5 py-0.5 rounded text-[10px]">${reg.faltas_graves_cant || 0}</span></td>
-            <td class="p-2 text-center"><span class="${gravisimaClass} px-1.5 py-0.5 rounded text-[10px]">${reg.faltas_gravisimas_cant || 0}</span></td>
+            <td class="p-2 text-center font-mono text-gray-600 font-semibold">${reg.id}</td>
+            <td class="p-2 text-left font-medium text-gray-800">${fechaMostrar}</td>
+            <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_leves_cant || 0}</span></td>
+            <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_graves_cant || 0}</span></td>
+            <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_gravisimas_cant || 0}</span></td>
             <td class="p-2 text-center">
                 <button onclick="window.modules.disciplina.editarDesdeModal(${reg.id})" 
-                        class="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded transition" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded transition shadow-sm" 
                         title="Editar">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
             </td>
         `;
         tbody.appendChild(tr);
     });
 
-    // Mostrar modal
+    // Mostrar modal centrado
     document.getElementById('modal-detalle').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 },
