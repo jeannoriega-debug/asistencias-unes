@@ -905,4 +905,335 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// ============================================================================
+// 📄 GENERAR REPORTE PDF POR PROCESO
+// ============================================================================
+window.generarReporteProceso = async function() {
+    const btn = document.querySelector('button[onclick="generarReporteProceso()"]');
+    const textoOriginal = btn?.textContent || '📊 REPORTE PROCESO';
+    if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+
+    try {
+        // 1. Obtener datos de Supabase
+        const { data, error } = await window.supabaseClient
+            .from('disc_registros')
+            .select(`
+                id, cedula, nombres, apellidos, pnf, proceso, estatus_general,
+                faltas_leves_cant, faltas_graves_cant, faltas_gravisimas_cant,
+                faltas_leves_fecha, faltas_graves_fecha, faltas_gravisima_fecha
+            `)
+            .eq('estatus_general', 'ACTIVO')
+            .order('proceso', { ascending: true });
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            Swal.fire('ℹ️ Info', 'No hay registros activos para generar el reporte', 'info');
+            return;
+        }
+
+        // 2. Procesar datos (igual que Apps Script)
+        const estudiantes = data.map(reg => {
+            const fechas = [];
+            if (reg.faltas_leves_fecha) fechas.push(`L: ${window.modules.disciplina.formatearFecha(reg.faltas_leves_fecha)}`);
+            if (reg.faltas_graves_fecha) fechas.push(`G: ${window.modules.disciplina.formatearFecha(reg.faltas_graves_fecha)}`);
+            if (reg.faltas_gravisima_fecha) fechas.push(`GG: ${window.modules.disciplina.formatearFecha(reg.faltas_gravisima_fecha)}`);
+            
+            return {
+                cedula: reg.cedula,
+                nombres: reg.nombres,
+                apellidos: reg.apellidos,
+                pnf: reg.pnf || 'SIN PNF',
+                proceso: reg.proceso || 'SIN PROCESO',
+                fechas_faltas: fechas.join(' | ') || 'SIN FECHAS',
+                faltas_leves: reg.faltas_leves_cant || 0,
+                faltas_graves: reg.faltas_graves_cant || 0,
+                faltas_gravisimas: reg.faltas_gravisimas_cant || 0,
+                total_faltas: (reg.faltas_leves_cant||0) + (reg.faltas_graves_cant||0) + (reg.faltas_gravisimas_cant||0)
+            };
+        });
+
+        // 3. Agrupar por proceso + pnf
+        const agrupado = {};
+        estudiantes.forEach(est => {
+            const clave = `${est.proceso}|${est.pnf}`;
+            if (!agrupado[clave]) {
+                agrupado[clave] = { proceso: est.proceso, pnf: est.pnf, estudiantes: [] };
+            }
+            agrupado[clave].estudiantes.push(est);
+        });
+
+        // 4. Calcular totales
+        const totales = {
+            total_estudiantes: estudiantes.length,
+            total_leves: estudiantes.reduce((s,e) => s + e.faltas_leves, 0),
+            total_graves: estudiantes.reduce((s,e) => s + e.faltas_graves, 0),
+            total_gravisimas: estudiantes.reduce((s,e) => s + e.faltas_gravisimas, 0),
+            total_faltas: estudiantes.reduce((s,e) => s + e.total_faltas, 0)
+        };
+
+        // 5. Generar PDF con jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        
+        // Header
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('REPORTE DISCIPLINARIO POR PROCESO - 2026', 14, 20);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Generado: ${new Date().toLocaleDateString('es-VE', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}`, 14, 28);
+        
+        // Totales
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Total Estudiantes: ${totales.total_estudiantes} | Total Faltas: ${totales.total_faltas}`, 14, 40);
+        doc.text(`Leves: ${totales.total_leves} | Graves: ${totales.total_graves} | Gravísimas: ${totales.total_gravisimas}`, 14, 46);
+        
+        // Tabla por grupo
+        let yPos = 55;
+        Object.values(agrupado).forEach(grupo => {
+            // Título del grupo
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`📌 ${grupo.proceso} - ${grupo.pnf}`, 14, yPos);
+            yPos += 8;
+            
+            // Cabeceras de tabla
+            const tableColumn = ["Cédula", "Estudiante", "Fechas Faltas", "Leves", "Graves", "Grav.", "Total"];
+            const tableRows = [];
+            
+            grupo.estudiantes.forEach(est => {
+                tableRows.push([
+                    est.cedula,
+                    `${est.nombres} ${est.apellidos}`,
+                    est.fechas_faltas,
+                    est.faltas_leves,
+                    est.faltas_graves,
+                    est.faltas_gravisimas,
+                    est.total_faltas
+                ]);
+            });
+            
+            // Dibujar tabla
+            doc.autoTable({
+                head: [tableColumn],
+                body: tableRows,
+                startY: yPos,
+                theme: 'grid',
+                fontSize: 8,
+                headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
+                styles: { cellPadding: 2, overflow: 'linebreak' },
+                columnStyles: {
+                    0: { cellWidth: 25 },
+                    1: { cellWidth: 50 },
+                    2: { cellWidth: 45 },
+                    3: { cellWidth: 12, halign: 'center' },
+                    4: { cellWidth: 12, halign: 'center' },
+                    5: { cellWidth: 12, halign: 'center' },
+                    6: { cellWidth: 12, halign: 'center', fontStyle: 'bold' }
+                }
+            });
+            
+            yPos = doc.lastAutoTable.finalY + 10;
+            
+            // Nueva página si es necesario
+            if (yPos > 250) {
+                doc.addPage();
+                yPos = 20;
+            }
+        });
+
+        // Guardar PDF
+        const nombreArchivo = `reporte_proceso_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(nombreArchivo);
+        
+        Swal.fire('✅ Reporte Generado', `Se exportaron <strong>${estudiantes.length}</strong> estudiantes`, 'success');
+
+    } catch (e) {
+        console.error('❌ Error generando reporte:', e);
+        Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
+    } finally {
+        if (btn) { btn.textContent = textoOriginal; btn.disabled = false; }
+    }
+};
+
+// ============================================================================
+// 📄 GENERAR REPORTE PDF DE BAJAS
+// ============================================================================
+window.generarReporteBajas = async function() {
+    // Preguntar rango de fechas
+    const { value: fechas } = await Swal.fire({
+        title: '📅 Rango de Fechas para Bajas',
+        html: `
+            <div style="text-align: left;">
+                <label style="display:block; margin-bottom:5px; font-weight:bold;">Fecha Inicial:</label>
+                <input type="date" id="fecha-inicial" class="swal2-input" style="width:100%; margin-bottom:15px;">
+                <label style="display:block; margin-bottom:5px; font-weight:bold;">Fecha Final:</label>
+                <input type="date" id="fecha-final" class="swal2-input" style="width:100%;">
+            </div>
+        `,
+        focusConfirm: false,
+        preConfirm: () => {
+            const inicial = document.getElementById('fecha-inicial').value;
+            const final = document.getElementById('fecha-final').value;
+            if (!inicial || !final) {
+                Swal.showValidationMessage('Por favor selecciona ambas fechas');
+                return false;
+            }
+            return { inicial, final };
+        },
+        showCancelButton: true,
+        confirmButtonText: 'Generar Reporte',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (!fechas) return;
+
+    const btn = document.querySelector('button[onclick="generarReporteBajas()"]');
+    const textoOriginal = btn?.textContent || '📄 PDF BAJAS';
+    if (btn) { btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+
+    try {
+        // 1. Obtener datos de Supabase
+        const { data, error } = await window.supabaseClient
+            .from('disc_registros')
+            .select(`
+                id, cedula, nombres, apellidos, pnf, tipo_baja, fecha_baja, estatus_general
+            `)
+            .eq('estatus_general', 'INACTIVO')
+            .not('tipo_baja', 'is', null)
+            .gte('fecha_baja', fechas.inicial)
+            .lte('fecha_baja', fechas.final)
+            .order('fecha_baja', { ascending: true });
+
+        if (error) throw error;
+
+        // 2. Procesar datos
+        const bajas = (data || []).map(reg => ({
+            cedula: reg.cedula,
+            nombres: reg.nombres,
+            apellidos: reg.apellidos,
+            pnf: reg.pnf || 'SIN PNF',
+            tipo_baja: reg.tipo_baja || 'SIN TIPO',
+            fecha_baja: window.modules.disciplina.formatearFecha(reg.fecha_baja)
+        }));
+
+        // 3. Generar tabla dinámica: PNF vs Tipo de Baja
+        const tiposBajas = ['BAJA_VOLUNTARIA', 'BAJA_POR_INASISTENCIA', 'BAJA_ACADEMICA', 'BAJA_MEDICA'];
+        const tablaDinamica = {};
+        const totalesPorTipo = {};
+        tiposBajas.forEach(t => totalesPorTipo[t] = 0);
+        
+        bajas.forEach(baja => {
+            if (!tablaDinamica[baja.pnf]) {
+                tablaDinamica[baja.pnf] = {};
+                tiposBajas.forEach(t => tablaDinamica[baja.pnf][t] = 0);
+            }
+            if (tablaDinamica[baja.pnf][baja.tipo_baja] !== undefined) {
+                tablaDinamica[baja.pnf][baja.tipo_baja]++;
+                totalesPorTipo[baja.tipo_baja]++;
+            }
+        });
+
+        // 4. Generar PDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        
+        // Header
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('REPORTE DE BAJAS DISCIPLINARIAS', 14, 20);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Período: ${fechas.inicial} al ${fechas.final}`, 14, 28);
+        doc.text(`Generado: ${new Date().toLocaleDateString('es-VE', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}`, 14, 34);
+        
+        // Totales generales
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Total Bajas: ${bajas.length}`, 14, 46);
+        let xPos = 50;
+        tiposBajas.forEach(tipo => {
+            const label = tipo.replace('BAJA_', '').replace('_', ' ');
+            doc.text(`${label}: ${totalesPorTipo[tipo]}`, xPos, 46);
+            xPos += 35;
+        });
+        
+        // Tabla dinámica (PNF vs Tipos de Baja)
+        doc.setFontSize(11);
+        doc.text('📊 Distribución por PNF y Tipo de Baja', 14, 60);
+        
+        const tableColumn = ['PNF', ...tiposBajas.map(t => t.replace('BAJA_', '').replace('_', ' ')), 'Total'];
+        const tableRows = [];
+        
+        Object.keys(tablaDinamica).forEach(pnf => {
+            const fila = [pnf];
+            let totalPnf = 0;
+            tiposBajas.forEach(tipo => {
+                const valor = tablaDinamica[pnf][tipo] || 0;
+                fila.push(valor);
+                totalPnf += valor;
+            });
+            fila.push(totalPnf);
+            tableRows.push(fila);
+        });
+        
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 65,
+            theme: 'grid',
+            fontSize: 8,
+            headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold' },
+            styles: { cellPadding: 2, halign: 'center' },
+            columnStyles: { 0: { cellWidth: 40, halign: 'left', fontStyle: 'bold' } }
+        });
+        
+        // Listado detallado de bajas
+        if (bajas.length > 0) {
+            doc.addPage();
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('📋 Listado Detallado de Bajas', 14, 20);
+            
+            const detalleColumn = ["Fecha", "Cédula", "Estudiante", "PNF", "Tipo de Baja"];
+            const detalleRows = bajas.map(b => [
+                b.fecha_baja,
+                b.cedula,
+                `${b.nombres} ${b.apellidos}`,
+                b.pnf,
+                b.tipo_baja.replace('BAJA_', '').replace('_', ' ')
+            ]);
+            
+            doc.autoTable({
+                head: [detalleColumn],
+                body: detalleRows,
+                startY: 28,
+                theme: 'striped',
+                fontSize: 8,
+                headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+                styles: { cellPadding: 2, overflow: 'linebreak' },
+                columnStyles: {
+                    0: { cellWidth: 25 },
+                    1: { cellWidth: 25 },
+                    2: { cellWidth: 50 },
+                    3: { cellWidth: 40 },
+                    4: { cellWidth: 40 }
+                }
+            });
+        }
+
+        // Guardar PDF
+        const nombreArchivo = `reporte_bajas_${fechas.inicial}_a_${fechas.final}.pdf`;
+        doc.save(nombreArchivo);
+        
+        Swal.fire('✅ Reporte Generado', `Se exportaron <strong>${bajas.length}</strong> bajas`, 'success');
+
+    } catch (e) {
+        console.error('❌ Error generando reporte de bajas:', e);
+        Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
+    } finally {
+        if (btn) { btn.textContent = textoOriginal; btn.disabled = false; }
+    }
+};
+
+
 console.log('✅ Módulo Consejo Disciplinario v3.3 Cargado');
