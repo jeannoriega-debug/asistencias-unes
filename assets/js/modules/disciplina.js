@@ -1,6 +1,6 @@
 /**
  * MÓDULO CONSEJO DISCIPLINARIO 2026
- * Versión: 3.2 - Búsqueda con Swal visual + PNF corregido
+ * Versión: 3.3 - Limpieza completa + Foco automático
  */
 
 window.modules = window.modules || {};
@@ -10,7 +10,7 @@ window.modules.disciplina = {
     datosCache: [],
 
     init: async function() {
-        console.log('🚀 Iniciando módulo Disciplinario v3.2...');
+        console.log('🚀 Iniciando módulo Disciplinario v3.3...');
         await this.cargarLista();
         
         const inputBusqueda = document.getElementById('buscar-cedula');
@@ -485,74 +485,74 @@ window.modules.disciplina = {
         }
     },
 
-abrirModalDetalle: function(cedula) {
-    const registros = this.datosCache.filter(r => r.cedula === cedula.toUpperCase());
-    
-    if (registros.length === 0) {
-        Swal.fire('ℹ️ Info', 'No se encontraron registros disciplinarios para esta cédula', 'info');
-        return;
-    }
-
-    // Llenar info del header
-    document.getElementById('modal-cedula').textContent = registros[0].cedula;
-    document.getElementById('modal-estudiante').textContent = `${registros[0].nombres} ${registros[0].apellidos}`;
-    document.getElementById('modal-total').textContent = registros.length;
-
-    // Ordenar cronológicamente (más reciente primero)
-    const registrosOrdenados = [...registros].sort((a, b) => b.id - a.id);
-
-    const tbody = document.getElementById('modal-body-faltas');
-    tbody.innerHTML = '';
-
-    registrosOrdenados.forEach(reg => {
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-blue-50 transition';
+    abrirModalDetalle: function(cedula) {
+        const registros = this.datosCache.filter(r => r.cedula === cedula.toUpperCase());
         
-        // CORRECCIÓN: Mostrar TODAS las fechas disponibles según el tipo de falta
-        let fechaMostrar = '-';
-        
-        // Prioridad: Fecha de la falta según su tipo
-        if (reg.faltas_leves_cant > 0 && reg.faltas_leves_fecha) {
-            fechaMostrar = this.formatearFecha(reg.faltas_leves_fecha);
+        if (registros.length === 0) {
+            Swal.fire('ℹ️ Info', 'No se encontraron registros disciplinarios para esta cédula', 'info');
+            return;
         }
-        if (reg.faltas_graves_cant > 0 && reg.faltas_graves_fecha) {
-            fechaMostrar = this.formatearFecha(reg.faltas_graves_fecha);
-        }
-        if (reg.faltas_gravisimas_cant > 0 && reg.faltas_gravisima_fecha) {
-            fechaMostrar = this.formatearFecha(reg.faltas_gravisima_fecha);
-        }
-        
-        // Si no hay fecha de falta específica, usar fecha de incidencia
-        if (fechaMostrar === '-' && reg.fecha_incidencia_estudiante) {
-            fechaMostrar = this.formatearFecha(reg.fecha_incidencia_estudiante);
-        }
-        
-        // Estilos para contadores
-        const leveClass = reg.faltas_leves_cant > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'text-gray-400';
-        const graveClass = reg.faltas_graves_cant > 0 ? 'bg-red-200 text-red-800 font-bold' : 'text-gray-400';
-        const gravisimaClass = reg.faltas_gravisimas_cant > 0 ? 'bg-gray-800 text-white font-bold' : 'text-gray-400';
 
-        tr.innerHTML = `
-            <td class="p-2 text-center font-mono text-gray-600 font-semibold">${reg.id}</td>
-            <td class="p-2 text-left font-medium text-gray-800">${fechaMostrar}</td>
-            <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_leves_cant || 0}</span></td>
-            <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_graves_cant || 0}</span></td>
-            <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_gravisimas_cant || 0}</span></td>
-            <td class="p-2 text-center">
-                <button onclick="window.modules.disciplina.editarDesdeModal(${reg.id})" 
-                        class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded transition shadow-sm" 
-                        title="Editar">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                </button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
+        // Llenar info del header
+        document.getElementById('modal-cedula').textContent = registros[0].cedula;
+        document.getElementById('modal-estudiante').textContent = `${registros[0].nombres} ${registros[0].apellidos}`;
+        document.getElementById('modal-total').textContent = registros.length;
 
-    // Mostrar modal centrado
-    document.getElementById('modal-detalle').classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-},
+        // Ordenar cronológicamente (más reciente primero)
+        const registrosOrdenados = [...registros].sort((a, b) => b.id - a.id);
+
+        const tbody = document.getElementById('modal-body-faltas');
+        tbody.innerHTML = '';
+
+        registrosOrdenados.forEach(reg => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-blue-50 transition';
+            
+            // CORRECCIÓN: Mostrar TODAS las fechas disponibles según el tipo de falta
+            let fechaMostrar = '-';
+            
+            // Prioridad: Fecha de la falta según su tipo
+            if (reg.faltas_leves_cant > 0 && reg.faltas_leves_fecha) {
+                fechaMostrar = this.formatearFecha(reg.faltas_leves_fecha);
+            }
+            if (reg.faltas_graves_cant > 0 && reg.faltas_graves_fecha) {
+                fechaMostrar = this.formatearFecha(reg.faltas_graves_fecha);
+            }
+            if (reg.faltas_gravisimas_cant > 0 && reg.faltas_gravisima_fecha) {
+                fechaMostrar = this.formatearFecha(reg.faltas_gravisima_fecha);
+            }
+            
+            // Si no hay fecha de falta específica, usar fecha de incidencia
+            if (fechaMostrar === '-' && reg.fecha_incidencia_estudiante) {
+                fechaMostrar = this.formatearFecha(reg.fecha_incidencia_estudiante);
+            }
+            
+            // Estilos para contadores
+            const leveClass = reg.faltas_leves_cant > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'text-gray-400';
+            const graveClass = reg.faltas_graves_cant > 0 ? 'bg-red-200 text-red-800 font-bold' : 'text-gray-400';
+            const gravisimaClass = reg.faltas_gravisimas_cant > 0 ? 'bg-gray-800 text-white font-bold' : 'text-gray-400';
+
+            tr.innerHTML = `
+                <td class="p-2 text-center font-mono text-gray-600 font-semibold">${reg.id}</td>
+                <td class="p-2 text-left font-medium text-gray-800">${fechaMostrar}</td>
+                <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_leves_cant || 0}</span></td>
+                <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_graves_cant || 0}</span></td>
+                <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_gravisimas_cant || 0}</span></td>
+                <td class="p-2 text-center">
+                    <button onclick="window.modules.disciplina.editarDesdeModal(${reg.id})" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded transition shadow-sm" 
+                            title="Editar">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Mostrar modal centrado
+        document.getElementById('modal-detalle').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    },
 
     editarDesdeModal: function(id) {
         const registro = this.datosCache.find(r => r.id === id);
@@ -822,9 +822,20 @@ abrirModalDetalle: function(cedula) {
         document.getElementById('filtro-activo').classList.add('hidden');
     },
 
+    /**
+     * LIMPIAR TODO (Formulario + Lista + Búsqueda + Foco)
+     */
+    limpiarTodo: function() {
+        this.limpiarFormulario();
+    },
+
+    /**
+     * LIMPIAR FORMULARIO COMPLETO
+     */
     limpiarFormulario: function() {
         this.registroActualId = null;
         
+        // Limpiar TODOS los elementos del formulario
         document.querySelectorAll('input, select, textarea').forEach(el => {
             if (el.id !== 'buscar-cedula') {
                 if (el.tagName === 'SELECT') {
@@ -841,15 +852,31 @@ abrirModalDetalle: function(cedula) {
             }
         });
 
+        // Resetear valores numéricos específicos
         document.getElementById('disc-leves-cant').value = 0;
         document.getElementById('disc-graves-cant').value = 0;
         document.getElementById('disc-gravisimas-cant').value = 0;
         document.getElementById('disc-nucleo').value = 'NUEVA ESPARTA';
+        
+        // Ocultar panel de datos personales
         document.getElementById('datos-personales-panel').classList.add('hidden');
 
+        // Limpiar búsqueda
         this.limpiarBusqueda();
         
-        console.log('🧹 Formulario limpiado completamente');
+        // Restablecer lista derecha a estado inicial
+        this.cargarLista();
+        
+        // Poner foco en el input de búsqueda
+        setTimeout(() => {
+            const inputBusqueda = document.getElementById('buscar-cedula');
+            if (inputBusqueda) {
+                inputBusqueda.value = '';
+                inputBusqueda.focus();
+            }
+        }, 100);
+        
+        console.log('🧹 Todo limpiado completamente');
     }
 };
 
@@ -857,6 +884,7 @@ abrirModalDetalle: function(cedula) {
 window.buscarEstudiante = function() { window.modules.disciplina.buscarPorCedula(); };
 window.guardarRegistro = function() { window.modules.disciplina.guardarRegistro(); };
 window.limpiarFormulario = function() { window.modules.disciplina.limpiarFormulario(); };
+window.limpiarTodo = function() { window.modules.disciplina.limpiarTodo(); };
 window.filtrarRegistros = function(filtro) { window.modules.disciplina.filtrarRegistros(filtro); };
 window.generarReporteProceso = function() { Swal.fire('ℹ️ Info', 'Generación de reporte de proceso en desarrollo', 'info'); };
 window.generarReporteBajas = function() { Swal.fire('ℹ️ Info', 'Generación de reporte de bajas en desarrollo', 'info'); };
@@ -877,4 +905,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-console.log('✅ Módulo Consejo Disciplinario v3.2 Cargado');
+console.log('✅ Módulo Consejo Disciplinario v3.3 Cargado');
