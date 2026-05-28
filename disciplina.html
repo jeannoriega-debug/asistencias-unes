@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Consejo Disciplinario 2026</title>
-
-    
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -279,7 +276,7 @@
 
                 <!-- INFO -->
                 <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-800 space-y-1">
-                    <p class="font-bold">️ Información:</p>
+                    <p class="font-bold">ℹ️ Información:</p>
                     <ul class="list-disc pl-4 space-y-1">
                         <li>Busca cédula en la matrícula (Tabla Estudiantes).</li>
                         <li>Los datos personales se cargan automáticamente.</li>
@@ -331,182 +328,180 @@
         </div>
     </main>
 
-<!-- Modal DETALLE DE FALTAS - Versión Centrada y Corregida -->
-<div id="modal-detalle" class="fixed inset-0 z-50 hidden flex items-center justify-center">
-    <!-- Backdrop oscuro -->
-    <div class="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onclick="window.modules.disciplina.cerrarModal()"></div>
-    
-    <!-- Contenido del modal (CENTRADO y ancho adaptable) -->
-    <div class="relative bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh] w-[95%] md:w-[850px] lg:w-[900px]">
+    <!-- Modal DETALLE DE FALTAS - Versión Centrada y Corregida -->
+    <div id="modal-detalle" class="fixed inset-0 z-50 hidden flex items-center justify-center">
+        <!-- Backdrop oscuro -->
+        <div class="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onclick="window.modules.disciplina.cerrarModal()"></div>
         
-        <!-- Header del modal -->
-        <div class="bg-blue-700 text-white p-3 flex justify-between items-center shrink-0">
-            <h3 class="font-bold text-base flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                DETALLE DE FALTAS
-            </h3>
-            <button onclick="window.modules.disciplina.cerrarModal()" class="text-white hover:text-gray-200 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-        </div>
-
-        <!-- Info del estudiante (Compacta) -->
-        <div class="bg-blue-50 border-b border-blue-200 px-4 py-2 flex flex-wrap gap-4 text-xs shrink-0">
-            <div>
-                <span class="block text-blue-600 font-bold uppercase text-[10px]">Cédula</span>
-                <span id="modal-cedula" class="font-mono text-gray-800 text-sm font-semibold"></span>
-            </div>
-            <div class="flex-1 min-w-[200px]">
-                <span class="block text-blue-600 font-bold uppercase text-[10px]">Estudiante</span>
-                <span id="modal-estudiante" class="font-semibold text-gray-800 text-sm"></span>
-            </div>
-            <div>
-                <span class="block text-blue-600 font-bold uppercase text-[10px]">Total Registros</span>
-                <span id="modal-total" class="font-bold text-blue-600 text-sm"></span>
-            </div>
-        </div>
-
-        <!-- Cuerpo del modal con scroll -->
-        <div class="flex-1 overflow-y-auto p-3 bg-gray-50 modal-body">
-            <div class="overflow-x-auto">
-                <table class="w-full text-xs bg-white rounded-lg shadow-sm border border-gray-200">
-                    <thead class="bg-gray-100 sticky top-0 z-10">
-                        <tr>
-                            <th class="p-2 text-center border-b font-bold text-gray-600 w-12">ID</th>
-                            <th class="p-2 text-left border-b font-bold text-gray-600 w-28">FECHA</th>
-                            <th class="p-2 text-center border-b font-bold text-gray-600 w-16 bg-yellow-50">LEVES</th>
-                            <th class="p-2 text-center border-b font-bold text-gray-600 w-16 bg-red-50">GRAVES</th>
-                            <th class="p-2 text-center border-b font-bold text-gray-600 w-20 bg-gray-100">GRAVISIMAS</th>
-                            <th class="p-2 text-center border-b font-bold text-gray-600 w-16">ACCIONES</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modal-body-faltas" class="divide-y divide-gray-100">
-                        <!-- Se llena dinámicamente -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Footer del modal -->
-        <div class="bg-gray-100 border-t border-gray-200 p-3 flex justify-end shrink-0">
-            <button onclick="window.modules.disciplina.cerrarModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-5 py-2 rounded-lg text-xs font-bold transition">
-                Cerrar
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Reporte de Bajas -->
-<div id="modal-reporte-bajas" class="fixed inset-0 z-50 hidden">
-    <div class="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onclick="cerrarModalBajas()"></div>
-    
-    <div class="absolute inset-y-0 right-0 w-full md:w-[900px] bg-white shadow-2xl flex flex-col overflow-hidden">
-        
-        <!-- Header -->
-        <div class="bg-blue-600 text-white p-4 flex justify-between items-center shrink-0">
-            <h3 class="font-bold text-lg flex items-center gap-2">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                Reporte de Bajas
-            </h3>
-            <button onclick="cerrarModalBajas()" class="text-white hover:text-gray-200 transition">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-        </div>
-
-        <!-- Body con scroll -->
-        <div class="flex-1 overflow-y-auto p-6 bg-gray-50">
+        <!-- Contenido del modal (CENTRADO y ancho adaptable) -->
+        <div class="relative bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh] w-[95%] md:w-[850px] lg:w-[900px]">
             
-            <!-- Selector de Fechas -->
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-2">FECHA INICIAL</label>
-                        <input type="date" id="bajas-fecha-inicial" class="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-2">FECHA FINAL</label>
-                        <input type="date" id="bajas-fecha-final" class="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                </div>
-                
-                <button onclick="generarReporteBajasConFechas()" class="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 shadow-md">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                    GENERAR REPORTE
+            <!-- Header del modal -->
+            <div class="bg-blue-700 text-white p-3 flex justify-between items-center shrink-0">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    DETALLE DE FALTAS
+                </h3>
+                <button onclick="window.modules.disciplina.cerrarModal()" class="text-white hover:text-gray-200 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
 
-            <!-- Estadísticas (ocultas inicialmente) -->
-            <div id="bajas-estadisticas" class="hidden mb-6">
-                <div class="grid grid-cols-3 gap-4 mb-6">
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
-                        <div class="text-3xl font-bold text-blue-600" id="stat-total-bajas">0</div>
-                        <div class="text-xs text-gray-600 mt-1">Total Bajas</div>
+            <!-- Info del estudiante (Compacta) -->
+            <div class="bg-blue-50 border-b border-blue-200 px-4 py-2 flex flex-wrap gap-4 text-xs shrink-0">
+                <div>
+                    <span class="block text-blue-600 font-bold uppercase text-[10px]">Cédula</span>
+                    <span id="modal-cedula" class="font-mono text-gray-800 text-sm font-semibold"></span>
+                </div>
+                <div class="flex-1 min-w-[200px]">
+                    <span class="block text-blue-600 font-bold uppercase text-[10px]">Estudiante</span>
+                    <span id="modal-estudiante" class="font-semibold text-gray-800 text-sm"></span>
+                </div>
+                <div>
+                    <span class="block text-blue-600 font-bold uppercase text-[10px]">Total Registros</span>
+                    <span id="modal-total" class="font-bold text-blue-600 text-sm"></span>
+                </div>
+            </div>
+
+            <!-- Cuerpo del modal con scroll -->
+            <div class="flex-1 overflow-y-auto p-3 bg-gray-50 modal-body">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs bg-white rounded-lg shadow-sm border border-gray-200">
+                        <thead class="bg-gray-100 sticky top-0 z-10">
+                            <tr>
+                                <th class="p-2 text-center border-b font-bold text-gray-600 w-12">ID</th>
+                                <th class="p-2 text-left border-b font-bold text-gray-600 w-28">FECHA</th>
+                                <th class="p-2 text-center border-b font-bold text-gray-600 w-16 bg-yellow-50">LEVES</th>
+                                <th class="p-2 text-center border-b font-bold text-gray-600 w-16 bg-red-50">GRAVES</th>
+                                <th class="p-2 text-center border-b font-bold text-gray-600 w-20 bg-gray-100">GRAVISIMAS</th>
+                                <th class="p-2 text-center border-b font-bold text-gray-600 w-16">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-body-faltas" class="divide-y divide-gray-100">
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Footer del modal -->
+            <div class="bg-gray-100 border-t border-gray-200 p-3 flex justify-end shrink-0">
+                <button onclick="window.modules.disciplina.cerrarModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-5 py-2 rounded-lg text-xs font-bold transition">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Reporte de Bajas - Centrado y Adaptable -->
+    <div id="modal-reporte-bajas" class="fixed inset-0 z-50 hidden flex items-center justify-center">
+        <!-- Backdrop oscuro -->
+        <div class="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onclick="cerrarModalBajas()"></div>
+        
+        <!-- Contenido del modal (Centrado y ancho adaptable) -->
+        <div class="relative bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh] w-[95%] md:w-[850px] lg:w-[950px]">
+            
+            <!-- Header -->
+            <div class="bg-blue-600 text-white p-4 flex justify-between items-center shrink-0">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Reporte de Bajas
+                </h3>
+                <button onclick="cerrarModalBajas()" class="text-white hover:text-gray-200 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Body con scroll -->
+            <div class="flex-1 overflow-y-auto p-6 bg-gray-50 modal-body">
+                
+                <!-- Selector de Fechas -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Fecha Inicial</label>
+                            <input type="date" id="bajas-fecha-inicial" class="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Fecha Final</label>
+                            <input type="date" id="bajas-fecha-final" class="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                        </div>
                     </div>
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
-                        <div class="text-3xl font-bold text-green-600" id="stat-total-pnf">0</div>
-                        <div class="text-xs text-gray-600 mt-1">PNF</div>
-                    </div>
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
-                        <div class="text-3xl font-bold text-red-600" id="stat-total-general">0</div>
-                        <div class="text-xs text-gray-600 mt-1">Total General</div>
-                    </div>
+                    
+                    <button onclick="generarReporteBajasConFechas()" class="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 shadow-md">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        GENERAR REPORTE
+                    </button>
                 </div>
 
-                <!-- Tabla Dinámica -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="bg-blue-600 text-white px-4 py-3">
-                        <h4 class="font-bold text-sm flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                            TABLA DINÁMICA: BAJAS POR PNF Y TIPO
-                        </h4>
+                <!-- Estadísticas (ocultas inicialmente) -->
+                <div id="bajas-estadisticas" class="hidden">
+                    <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center hover:shadow-md transition">
+                            <div class="text-3xl font-bold text-blue-600" id="stat-total-bajas">0</div>
+                            <div class="text-xs text-gray-600 mt-1 font-semibold uppercase tracking-wide">Total Bajas</div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center hover:shadow-md transition">
+                            <div class="text-3xl font-bold text-green-600" id="stat-total-pnf">0</div>
+                            <div class="text-xs text-gray-600 mt-1 font-semibold uppercase tracking-wide">PNF</div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center hover:shadow-md transition">
+                            <div class="text-3xl font-bold text-red-600" id="stat-total-general">0</div>
+                            <div class="text-xs text-gray-600 mt-1 font-semibold uppercase tracking-wide">Total General</div>
+                        </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-blue-50 border-b border-blue-200">
-                                <tr>
-                                    <th class="p-3 text-left font-bold text-blue-800">PNF</th>
-                                    <th class="p-3 text-center font-bold text-blue-800">BAJA VOLUNTARIA</th>
-                                    <th class="p-3 text-center font-bold text-blue-800">BAJA POR INASISTENCIA</th>
-                                    <th class="p-3 text-center font-bold text-blue-800">BAJA ACADÉMICA</th>
-                                    <th class="p-3 text-center font-bold text-blue-800">BAJA MÉDICA</th>
-                                    <th class="p-3 text-center font-bold text-blue-800">TOTAL</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabla-dinamica-bajas" class="divide-y divide-gray-100">
-                                <!-- Se llena dinámicamente -->
-                            </tbody>
-                            <tfoot class="bg-blue-50 font-bold">
-                                <tr class="border-t-2 border-blue-200">
-                                    <td class="p-3 text-blue-800">TOTAL GENERAL</td>
-                                    <td class="p-3 text-center text-blue-800" id="total-voluntaria">0</td>
-                                    <td class="p-3 text-center text-blue-800" id="total-inasistencia">0</td>
-                                    <td class="p-3 text-center text-blue-800" id="total-academica">0</td>
-                                    <td class="p-3 text-center text-blue-800" id="total-medica">0</td>
-                                    <td class="p-3 text-center text-blue-800" id="total-final">0</td>
-                                </tr>
-                            </tfoot>
-                        </table>
+
+                    <!-- Tabla Dinámica -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="bg-blue-600 text-white px-4 py-3">
+                            <h4 class="font-bold text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                TABLA DINÁMICA: BAJAS POR PNF Y TIPO
+                            </h4>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-blue-50 border-b border-blue-200">
+                                    <tr>
+                                        <th class="p-3 text-left font-bold text-blue-800 text-xs uppercase tracking-wide">PNF</th>
+                                        <th class="p-3 text-center font-bold text-blue-800 text-xs uppercase tracking-wide">Baja Voluntaria</th>
+                                        <th class="p-3 text-center font-bold text-blue-800 text-xs uppercase tracking-wide">Inasistencia</th>
+                                        <th class="p-3 text-center font-bold text-blue-800 text-xs uppercase tracking-wide">Académica</th>
+                                        <th class="p-3 text-center font-bold text-blue-800 text-xs uppercase tracking-wide">Médica</th>
+                                        <th class="p-3 text-center font-bold text-blue-800 text-xs uppercase tracking-wide">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-dinamica-bajas" class="divide-y divide-gray-100">
+                                    <!-- Se llena dinámicamente -->
+                                </tbody>
+                                <tfoot class="bg-blue-50 font-bold border-t-2 border-blue-200">
+                                    <tr>
+                                        <td class="p-3 text-blue-800 text-xs uppercase tracking-wide">Total General</td>
+                                        <td class="p-3 text-center text-blue-800" id="total-voluntaria">0</td>
+                                        <td class="p-3 text-center text-blue-800" id="total-inasistencia">0</td>
+                                        <td class="p-3 text-center text-blue-800" id="total-academica">0</td>
+                                        <td class="p-3 text-center text-blue-800" id="total-medica">0</td>
+                                        <td class="p-3 text-center text-blue-800" id="total-final">0</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Footer -->
-        <div class="bg-gray-100 border-t border-gray-200 p-4 flex justify-end gap-3 shrink-0">
-            <button onclick="cerrarModalBajas()" class="px-6 py-2.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold text-sm transition">
-                Cerrar
-            </button>
-            <button onclick="descargarPDFBajas()" id="btn-descargar-pdf" class="hidden px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition flex items-center gap-2 shadow-md">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                DESCARGAR PDF
-            </button>
+            <!-- Footer -->
+            <div class="bg-gray-100 border-t border-gray-200 p-4 flex justify-end gap-3 shrink-0">
+                <button onclick="cerrarModalBajas()" class="px-5 py-2.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold text-sm transition">
+                    Cerrar
+                </button>
+                <button onclick="descargarPDFBajas()" id="btn-descargar-pdf" class="hidden px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition flex items-center gap-2 shadow-md">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    DESCARGAR PDF
+                </button>
+            </div>
         </div>
     </div>
-</div>
-    
-    
-
-    
 
     <!-- SCRIPTS PARA PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
