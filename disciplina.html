@@ -396,6 +396,117 @@
     </div>
 </div>
 
+<!-- Modal Reporte de Bajas -->
+<div id="modal-reporte-bajas" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onclick="cerrarModalBajas()"></div>
+    
+    <div class="absolute inset-y-0 right-0 w-full md:w-[900px] bg-white shadow-2xl flex flex-col overflow-hidden">
+        
+        <!-- Header -->
+        <div class="bg-blue-600 text-white p-4 flex justify-between items-center shrink-0">
+            <h3 class="font-bold text-lg flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                Reporte de Bajas
+            </h3>
+            <button onclick="cerrarModalBajas()" class="text-white hover:text-gray-200 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <!-- Body con scroll -->
+        <div class="flex-1 overflow-y-auto p-6 bg-gray-50">
+            
+            <!-- Selector de Fechas -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-2">FECHA INICIAL</label>
+                        <input type="date" id="bajas-fecha-inicial" class="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-2">FECHA FINAL</label>
+                        <input type="date" id="bajas-fecha-final" class="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                
+                <button onclick="generarReporteBajasConFechas()" class="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 shadow-md">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    GENERAR REPORTE
+                </button>
+            </div>
+
+            <!-- Estadísticas (ocultas inicialmente) -->
+            <div id="bajas-estadisticas" class="hidden mb-6">
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+                        <div class="text-3xl font-bold text-blue-600" id="stat-total-bajas">0</div>
+                        <div class="text-xs text-gray-600 mt-1">Total Bajas</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+                        <div class="text-3xl font-bold text-green-600" id="stat-total-pnf">0</div>
+                        <div class="text-xs text-gray-600 mt-1">PNF</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 text-center">
+                        <div class="text-3xl font-bold text-red-600" id="stat-total-general">0</div>
+                        <div class="text-xs text-gray-600 mt-1">Total General</div>
+                    </div>
+                </div>
+
+                <!-- Tabla Dinámica -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="bg-blue-600 text-white px-4 py-3">
+                        <h4 class="font-bold text-sm flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            TABLA DINÁMICA: BAJAS POR PNF Y TIPO
+                        </h4>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-blue-50 border-b border-blue-200">
+                                <tr>
+                                    <th class="p-3 text-left font-bold text-blue-800">PNF</th>
+                                    <th class="p-3 text-center font-bold text-blue-800">BAJA VOLUNTARIA</th>
+                                    <th class="p-3 text-center font-bold text-blue-800">BAJA POR INASISTENCIA</th>
+                                    <th class="p-3 text-center font-bold text-blue-800">BAJA ACADÉMICA</th>
+                                    <th class="p-3 text-center font-bold text-blue-800">BAJA MÉDICA</th>
+                                    <th class="p-3 text-center font-bold text-blue-800">TOTAL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-dinamica-bajas" class="divide-y divide-gray-100">
+                                <!-- Se llena dinámicamente -->
+                            </tbody>
+                            <tfoot class="bg-blue-50 font-bold">
+                                <tr class="border-t-2 border-blue-200">
+                                    <td class="p-3 text-blue-800">TOTAL GENERAL</td>
+                                    <td class="p-3 text-center text-blue-800" id="total-voluntaria">0</td>
+                                    <td class="p-3 text-center text-blue-800" id="total-inasistencia">0</td>
+                                    <td class="p-3 text-center text-blue-800" id="total-academica">0</td>
+                                    <td class="p-3 text-center text-blue-800" id="total-medica">0</td>
+                                    <td class="p-3 text-center text-blue-800" id="total-final">0</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-gray-100 border-t border-gray-200 p-4 flex justify-end gap-3 shrink-0">
+            <button onclick="cerrarModalBajas()" class="px-6 py-2.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold text-sm transition">
+                Cerrar
+            </button>
+            <button onclick="descargarPDFBajas()" id="btn-descargar-pdf" class="hidden px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition flex items-center gap-2 shadow-md">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                DESCARGAR PDF
+            </button>
+        </div>
+    </div>
+</div>
+    
+    
+
+    
 
     <!-- SCRIPTS PARA PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
