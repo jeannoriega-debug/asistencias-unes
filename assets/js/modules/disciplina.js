@@ -1054,88 +1054,161 @@ async function descargarPDFBajas() {
     
     try {
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        // CAMBIO 1: Formato vertical (portrait) en lugar de horizontal
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
         
-        // Header
-        doc.setFontSize(16);
+        // Función para formatear fecha DD/MM/AAAA
+        const formatearFecha = (fechaStr) => {
+            if (!fechaStr) return '';
+            const partes = fechaStr.split('-');
+            if (partes.length === 3) {
+                return `${partes[2]}/${partes[1]}/${partes[0]}`;
+            }
+            return fechaStr;
+        };
+        
+        const fechaIniFormateada = formatearFecha(fechaInicial);
+        const fechaFinFormateada = formatearFecha(fechaFinal);
+        const fechaGeneracion = new Date().toLocaleDateString('es-VE', { 
+            weekday:'long', year:'numeric', month:'long', day:'numeric' 
+        });
+        
+        // CAMBIO 2: Header centrado
+        doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
-        doc.text('REPORTE DE BAJAS DISCIPLINARIAS', 14, 20);
-        doc.setFontSize(10);
+        doc.text('REPORTE DE BAJAS DISCIPLINARIAS', 105, 15, { align: 'center' });
+        
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Período: ${fechaInicial} al ${fechaFinal}`, 14, 28);
-        doc.text(`Generado: ${new Date().toLocaleDateString('es-VE', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}`, 14, 34);
+        doc.text(`Período: ${fechaIniFormateada} al ${fechaFinFormateada}`, 105, 22, { align: 'center' });
+        doc.text(`Generado: ${fechaGeneracion}`, 105, 27, { align: 'center' });
         
         // Estadísticas
         doc.setFont('helvetica', 'bold');
-        doc.text(`Total Bajas: ${totalBajas} | PNF: ${totalPnf}`, 14, 46);
+        doc.setFontSize(10);
+        doc.text(`Total Bajas: ${totalBajas} | PNF: ${totalPnf}`, 105, 35, { align: 'center' });
         
-        // Tabla dinámica
-        doc.setFontSize(11);
-        doc.text('TABLA DINAMICA: BAJAS POR PNF Y TIPO', 14, 60);
+        // CAMBIO 3: Tabla dinámica con colores (más compacta)
+        doc.setFontSize(10);
+        doc.text('TABLA DINAMICA: BAJAS POR PNF Y TIPO', 14, 45);
         
         const tiposBajas = ['BAJA_VOLUNTARIA', 'BAJA_POR_INASISTENCIA', 'BAJA_ACADEMICA', 'BAJA_MEDICA'];
-        const tableColumn = ['PNF', 'Baja Voluntaria', 'Baja por Inasistencia', 'Baja Académica', 'Baja Médica', 'Total'];
+        const labelsTipos = ['Baja Voluntaria', 'Baja por Inasistencia', 'Baja Académica', 'Baja Médica'];
+        
+        // Crear tabla dinámica
+        const tableColumn = ['PNF', ...labelsTipos, 'Total'];
         const tableRows = [];
         
         Object.keys(tablaDinamica).sort().forEach(pnf => {
-            const fila = [
-                pnf,
-                tablaDinamica[pnf]['BAJA_VOLUNTARIA'] || 0,
-                tablaDinamica[pnf]['BAJA_POR_INASISTENCIA'] || 0,
-                tablaDinamica[pnf]['BAJA_ACADEMICA'] || 0,
-                tablaDinamica[pnf]['BAJA_MEDICA'] || 0,
-                Object.values(tablaDinamica[pnf]).reduce((a,b) => a+b, 0)
-            ];
+            const fila = [pnf];
+            let totalPnf = 0;
+            tiposBajas.forEach(tipo => {
+                const valor = tablaDinamica[pnf][tipo] || 0;
+                fila.push(valor);
+                totalPnf += valor;
+            });
+            fila.push(totalPnf);
             tableRows.push(fila);
         });
         
         // Totales
         const totales = ['TOTAL GENERAL'];
+        let totalGeneral = 0;
         tiposBajas.forEach(tipo => {
-            totales.push(totalesPorTipo[tipo] || 0);
+            const total = totalesPorTipo[tipo] || 0;
+            totales.push(total);
+            totalGeneral += total;
         });
-        totales.push(totalBajas);
+        totales.push(totalGeneral);
         tableRows.push(totales);
         
+        // Dibujar tabla dinámica con colores
         doc.autoTable({
             head: [tableColumn],
             body: tableRows,
-            startY: 65,
+            startY: 48,
             theme: 'grid',
-            fontSize: 8,
-            headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
-            styles: { cellPadding: 2, halign: 'center' },
-            columnStyles: { 
-                0: { cellWidth: 50, halign: 'left', fontStyle: 'bold' },
-                5: { fontStyle: 'bold' }
+            fontSize: 7,
+            headStyles: { 
+                fillColor: [37, 99, 235], // Azul
+                textColor: 255, 
+                fontStyle: 'bold',
+                halign: 'center'
             },
-            footStyles: { fillColor: [219, 234, 254], textColor: [30, 58, 138], fontStyle: 'bold' }
+            styles: { 
+                cellPadding: 1.5, 
+                halign: 'center',
+                fontSize: 7
+            },
+            columnStyles: { 
+                0: { cellWidth: 35, halign: 'left', fontStyle: 'bold', fillColor: [240, 240, 240] },
+                5: { fontStyle: 'bold', fillColor: [220, 230, 250] }
+            },
+            footStyles: { 
+                fillColor: [219, 234, 254], 
+                textColor: [30, 58, 138], 
+                fontStyle: 'bold' 
+            }
         });
         
-        // Listado detallado
+        // CAMBIO 4: Listado detallado más pequeño y numerado
         if (bajas.length > 0) {
-            doc.addPage();
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            doc.text('LISTADO DETALLADO DE BAJAS', 14, 20);
+            let startYListado = doc.lastAutoTable.finalY + 8;
             
-            const detalleColumn = ["Fecha", "Cédula", "Estudiante", "PNF", "Tipo de Baja"];
-            const detalleRows = bajas.map(b => [
-                b.fecha_baja,
+            // Verificar si necesitamos nueva página
+            if (startYListado > 200) {
+                doc.addPage();
+                startYListado = 15;
+            }
+            
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('LISTADO DETALLADO DE BAJAS', 14, startYListado);
+            
+            const detalleColumn = ["#", "Fecha", "Cédula", "Estudiante", "PNF", "Tipo"];
+            const detalleRows = bajas.map((b, index) => [
+                (index + 1).toString(),
+                formatearFecha(b.fecha_baja),
                 b.cedula,
                 `${b.nombres} ${b.apellidos}`,
                 b.pnf,
                 b.tipo_baja.replace('BAJA_', '').replace('_', ' ')
             ]);
             
+            // CAMBIO 5: Tabla más compacta para que quepan 35-40 registros
             doc.autoTable({
                 head: [detalleColumn],
                 body: detalleRows,
-                startY: 28,
+                startY: startYListado + 3,
                 theme: 'striped',
-                fontSize: 8,
-                headStyles: { fillColor: [37, 99, 235], textColor: 255 },
-                styles: { cellPadding: 2, overflow: 'linebreak' }
+                fontSize: 6.5, // Tamaño más pequeño
+                headStyles: { 
+                    fillColor: [37, 99, 235], 
+                    textColor: 255,
+                    fontStyle: 'bold',
+                    halign: 'center'
+                },
+                styles: { 
+                    cellPadding: 1, 
+                    overflow: 'linebreak',
+                    fontSize: 6.5,
+                    valign: 'middle'
+                },
+                columnStyles: {
+                    0: { cellWidth: 8, halign: 'center', fontStyle: 'bold' }, // Número
+                    1: { cellWidth: 18, halign: 'center' }, // Fecha
+                    2: { cellWidth: 18, halign: 'center' }, // Cédula
+                    3: { cellWidth: 45 }, // Estudiante (más ancho para nombres largos)
+                    4: { cellWidth: 35 }, // PNF
+                    5: { cellWidth: 28, halign: 'center' } // Tipo
+                },
+                // CAMBIO 6: Repetir header en cada página
+                didParseCell: function(data) {
+                    if (data.section === 'head') {
+                        data.cell.styles.fontStyle = 'bold';
+                    }
+                },
+                margin: { top: startYListado + 3 }
             });
         }
         
