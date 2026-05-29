@@ -657,109 +657,124 @@ window.modules.disciplina = {
         });
     },
 
-    guardarRegistro: async function() {
-        const cedula = document.getElementById('disc-cedula').value.trim();
+guardarRegistro: async function() {
+    const cedula = document.getElementById('disc-cedula').value.trim();
+    
+    if (!cedula) {
+        Swal.fire({ icon: 'warning', title: 'Atención', text: 'Primero busque un estudiante', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+        return;
+    }
+
+    const estatus = document.getElementById('disc-estatus-general').value;
+    const tipoBaja = document.getElementById('disc-tipo-baja').value;
+
+    if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
+        const confirm = await Swal.fire({
+            icon: 'warning',
+            title: '¿Confirmar Baja?',
+            html: `Se marcará al estudiante como <strong>INACTIVO</strong> con tipo de baja: <strong>${tipoBaja}</strong><br>Esto también actualizará su estatus en la tabla ESTUDIANTES.`,
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Sí, guardar baja',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (!confirm.isConfirmed) return;
+    }
+
+    // Obtener valor de supervisión y asegurar que sea 'SI' o 'NO'
+    let supervisionValor = document.getElementById('disc-supervision')?.value || 'NO APLICA';
+    if (supervisionValor === 'NO APLICA' || supervisionValor === '' || supervisionValor === null) {
+        supervisionValor = 'NO';
+    } else if (supervisionValor === 'SI') {
+        supervisionValor = 'SI';
+    } else {
+        supervisionValor = 'NO';
+    }
+
+    const datos = {
+        cedula: cedula.toUpperCase(),
+        nombres: document.getElementById('disc-nombres').value.trim().toUpperCase(),
+        apellidos: document.getElementById('disc-apellidos').value.trim().toUpperCase(),
+        genero: document.getElementById('disc-genero').value !== 'SELECCIONAR' ? document.getElementById('disc-genero').value : null,
+        nucleo: document.getElementById('disc-nucleo').value.trim().toUpperCase() || 'NUEVA ESPARTA',
+        pnf: document.getElementById('disc-pnf').value.trim().toUpperCase(),
+        proceso: document.getElementById('disc-proceso').value.trim().toUpperCase(),
+        supervision_continua: supervisionValor,
+        tipo_baja: tipoBaja !== 'SELECCIONAR' ? tipoBaja : null,
+        fecha_baja: document.getElementById('disc-fecha-baja').value || null,
         
-        if (!cedula) {
-            Swal.fire({ icon: 'warning', title: 'Atención', text: 'Primero busque un estudiante', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
-            return;
-        }
+        // FECHAS DE FALTAS LEVES
+        faltas_leves_fecha: document.getElementById('disc-fecha-leve').value || null,
+        fecha_falta_leve_recibida: document.getElementById('disc-fecha-leve-recibida').value || null,
+        
+        // FECHAS DE FALTAS GRAVES
+        faltas_graves_fecha: document.getElementById('disc-fecha-grave').value || null,
+        faltas_graves_fecha_recibida: document.getElementById('disc-fecha-grave-recibida').value || null,
+        
+        // FECHAS DE FALTAS GRAVISIMAS
+        faltas_gravisima_fecha: document.getElementById('disc-fecha-gravisima').value || null,
+        faltas_gravisima_fecha_recibida: document.getElementById('disc-fecha-gravisima-recibida').value || null,
+        
+        // OTRAS FECHAS
+        fecha_incidencia_estudiante: document.getElementById('disc-fecha-incidencia').value || null,
+        consejo_disciplinario_fecha: document.getElementById('disc-fecha-consejo').value || null,
+        
+        // CAMPOS DE TEXTO
+        causal_faltas_graves_impuesta: document.getElementById('disc-causal-graves').value.trim() || null,
+        programa_supervision_intensiva_aplicado_grave_impuesta: document.getElementById('disc-programa-supervision').value.trim() || null,
+        acta_compromiso: document.getElementById('disc-acta-compromiso').value.trim() || null,
+        observaciones_jefe: document.getElementById('disc-observaciones').value.trim() || null,
+        
+        // ESTATUS Y CONTADORES
+        estatus_general: estatus,
+        faltas_leves_cant: parseInt(document.getElementById('disc-leves-cant').value) || 0,
+        faltas_graves_cant: parseInt(document.getElementById('disc-graves-cant').value) || 0,
+        faltas_gravisimas_cant: parseInt(document.getElementById('disc-gravisimas-cant').value) || 0,
+        creado_por: window.appState.usuarioActualId || null
+    };
 
-        const estatus = document.getElementById('disc-estatus-general').value;
-        const tipoBaja = document.getElementById('disc-tipo-baja').value;
+    console.log('💾 Datos a guardar:', datos);
 
-        if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
-            const confirm = await Swal.fire({
-                icon: 'warning',
-                title: '¿Confirmar Baja?',
-                html: `Se marcará al estudiante como <strong>INACTIVO</strong> con tipo de baja: <strong>${tipoBaja}</strong><br>Esto también actualizará su estatus en la tabla ESTUDIANTES.`,
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                confirmButtonText: 'Sí, guardar baja',
-                cancelButtonText: 'Cancelar'
-            });
-
-            if (!confirm.isConfirmed) return;
-        }
-
-        // Obtener valor de supervisión y asegurar que sea 'SI' o 'NO'
-        let supervisionValor = document.getElementById('disc-supervision')?.value || 'NO APLICA';
-        if (supervisionValor === 'NO APLICA' || supervisionValor === '' || supervisionValor === null) {
-            supervisionValor = 'NO';
-        } else if (supervisionValor === 'SI') {
-            supervisionValor = 'SI';
+    try {
+        let result;
+        
+        if (this.registroActualId) {
+            // ACTUALIZAR registro existente
+            result = await window.supabaseClient
+                .from('disc_registros')
+                .update(datos)
+                .eq('id', this.registroActualId);
         } else {
-            supervisionValor = 'NO';
+            // INSERTAR nuevo registro
+            result = await window.supabaseClient
+                .from('disc_registros')
+                .insert([datos]);
         }
 
-        const datos = {
-            cedula: cedula.toUpperCase(),
-            nombres: document.getElementById('disc-nombres').value.trim().toUpperCase(),
-            apellidos: document.getElementById('disc-apellidos').value.trim().toUpperCase(),
-            genero: document.getElementById('disc-genero').value !== 'SELECCIONAR' ? document.getElementById('disc-genero').value : null,
-            nucleo: document.getElementById('disc-nucleo').value.trim().toUpperCase() || 'NUEVA ESPARTA',
-            pnf: document.getElementById('disc-pnf').value.trim().toUpperCase(),
-            proceso: document.getElementById('disc-proceso').value.trim().toUpperCase(),
-            supervision_continua: supervisionValor,
-            tipo_baja: tipoBaja !== 'SELECCIONAR' ? tipoBaja : null,
-            fecha_baja: document.getElementById('disc-fecha-baja').value || null,
-            faltas_leves_fecha: document.getElementById('disc-fecha-leve').value || null,
-            fecha_falta_leve_recibida: document.getElementById('disc-fecha-leve-recibida').value || null,
-            faltas_graves_fecha: document.getElementById('disc-fecha-grave').value || null,
-            faltas_graves_fecha_recibida: document.getElementById('disc-fecha-grave-recibida').value || null,
-            faltas_gravisima_fecha: document.getElementById('disc-fecha-gravisima').value || null,
-            faltas_gravisima_fecha_recibida: document.getElementById('disc-fecha-gravisima-recibida').value || null,
-            fecha_incidencia_estudiante: document.getElementById('disc-fecha-incidencia').value || null,
-            consejo_disciplinario_fecha: document.getElementById('disc-fecha-consejo').value || null,
-            causal_faltas_graves_impuesta: document.getElementById('disc-causal-graves').value.trim() || null,
-            programa_supervision_intensiva_aplicado_grave_impuesta: document.getElementById('disc-programa-supervision').value.trim() || null,
-            acta_compromiso: document.getElementById('disc-acta-compromiso').value.trim() || null,
-            observaciones_jefe: document.getElementById('disc-observaciones').value.trim() || null,
-            estatus_general: estatus,
-            faltas_leves_cant: parseInt(document.getElementById('disc-leves-cant').value) || 0,
-            faltas_graves_cant: parseInt(document.getElementById('disc-graves-cant').value) || 0,
-            faltas_gravisimas_cant: parseInt(document.getElementById('disc-gravisimas-cant').value) || 0,
-            creado_por: window.appState.usuarioActualId || null
-        };
+        if (result.error) throw result.error;
 
-        console.log('💾 Datos a guardar:', datos);
-
-        try {
-            let result;
-            
-            if (this.registroActualId) {
-                result = await window.supabaseClient
-                    .from('disc_registros')
-                    .update(datos)
-                    .eq('id', this.registroActualId);
-            } else {
-                result = await window.supabaseClient
-                    .from('disc_registros')
-                    .insert([datos]);
-            }
-
-            if (result.error) throw result.error;
-
-            if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
-                await this.actualizarEstatusEstudiante(cedula.toUpperCase(), 'Inactivo');
-            }
-
-            Swal.fire({
-                icon: 'success',
-                title: this.registroActualId ? '✅ Registro Actualizado' : '✅ Registro Creado',
-                text: 'La información ha sido guardada correctamente',
-                timer: 2500,
-                showConfirmButton: false
-            });
-
-            await this.cargarLista();
-            this.limpiarFormulario();
-
-        } catch (e) {
-            console.error('❌ Error al guardar:', e);
-            Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar: ' + e.message });
+        // Si se marcó como INACTIVO con tipo de baja, actualizar tabla ESTUDIANTES
+        if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
+            await this.actualizarEstatusEstudiante(cedula.toUpperCase(), 'Inactivo');
         }
-    },
+
+        Swal.fire({
+            icon: 'success',
+            title: this.registroActualId ? '✅ Registro Actualizado' : '✅ Registro Creado',
+            text: 'La información ha sido guardada correctamente',
+            timer: 2500,
+            showConfirmButton: false
+        });
+
+        await this.cargarLista();
+        this.limpiarFormulario();
+
+    } catch (e) {
+        console.error('❌ Error al guardar:', e);
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar: ' + e.message });
+    }
+},
 
     actualizarEstatusEstudiante: async function(cedula, nuevoEstatus) {
         try {
