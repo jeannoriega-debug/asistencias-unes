@@ -170,78 +170,77 @@ window.modules.disciplina = {
             tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos. Verifica la conexión.</td></tr>';
         }
     },
+/**
+ * 🔍 BUSCAR POR CÉDULA (CON VISUALIZACIÓN COMPLETA EN SWAL)
+ */
+buscarPorCedula: async function() {
+    const cedulaInput = document.getElementById('buscar-cedula').value.trim();
+    if (!cedulaInput) {
+        Swal.fire({ icon: 'warning', title: 'Atención', text: 'Ingrese una cédula', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+        return;
+    }
 
-    /**
-     * 🔍 BUSCAR POR CÉDULA (CON VISUALIZACIÓN COMPLETA EN SWAL)
-     */
-    buscarPorCedula: async function() {
-        const cedulaInput = document.getElementById('buscar-cedula').value.trim();
-        if (!cedulaInput) {
-            Swal.fire({ icon: 'warning', title: 'Atención', text: 'Ingrese una cédula', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
-            return;
-        }
+    const cedulaNumeros = cedulaInput.replace(/[^0-9]/g, '');
+    console.log('🔍 Buscando cédula:', cedulaNumeros);
 
-        const cedulaNumeros = cedulaInput.replace(/[^0-9]/g, '');
-        console.log('🔍 Buscando cédula:', cedulaNumeros);
+    try {
+        // Buscar en ESTUDIANTES con relación PNF
+        const { data: estudiantesData, error: errorEst } = await window.supabaseClient
+            .from('estudiantes')
+            .select(`
+                id, cedula, nombres, apellidos, genero, proceso, status, 
+                ambiente, categoria, trayecto_id, 
+                pnf:pnf_id(nombre)
+            `)
+            .or(`cedula.ilike.%${cedulaNumeros}%,cedula.ilike.%V-${cedulaNumeros}%,cedula.ilike.%E-${cedulaNumeros}%`)
+            .limit(1);
 
-        try {
-            // Buscar en ESTUDIANTES con relación PNF
-            const { data: estudiantesData, error: errorEst } = await window.supabaseClient
-                .from('estudiantes')
-                .select(`
-                    id, cedula, nombres, apellidos, genero, proceso, status, 
-                    ambiente, categoria, trayecto_id, 
-                    pnf:pnf_id(nombre)
-                `)
-                .or(`cedula.ilike.%${cedulaNumeros}%,cedula.ilike.%V-${cedulaNumeros}%,cedula.ilike.%E-${cedulaNumeros}%`)
-                .limit(1);
+        if (errorEst) throw errorEst;
+        
+        let estudiante = estudiantesData && estudiantesData.length > 0 ? estudiantesData[0] : null;
 
-            if (errorEst) throw errorEst;
+        if (estudiante) {
+            console.log('✅ Estudiante encontrado:', estudiante);
             
-            let estudiante = estudiantesData && estudiantesData.length > 0 ? estudiantesData[0] : null;
-
-            if (estudiante) {
-                console.log('✅ Estudiante encontrado:', estudiante);
-                
-                // Buscar en DISC_REGISTROS para obtener el PNF (texto) si viene null
-                if (!estudiante.pnf || !estudiante.pnf.nombre) {
-                    const { data: discData } = await window.supabaseClient
-                        .from('disc_registros')
-                        .select('pnf')
-                        .eq('cedula', estudiante.cedula)
-                        .limit(1)
-                        .maybeSingle();
-                    
-                    if (discData && discData.pnf) {
-                        estudiante.pnf = { nombre: discData.pnf };
-                    }
-                }
-                
-                // Llenar formulario con datos de ESTUDIANTES
-                this.llenarFormularioEstudiante(estudiante);
-                this.mostrarFiltroActivo(cedulaInput);
-                document.getElementById('datos-personales-panel').classList.remove('hidden');
-
-                // Buscar historial disciplinario
-                const { data: registrosDisc } = await window.supabaseClient
+            // Buscar en DISC_REGISTROS para obtener el PNF (texto) si viene null
+            if (!estudiante.pnf || !estudiante.pnf.nombre) {
+                const { data: discData } = await window.supabaseClient
                     .from('disc_registros')
-                    .select('*')
+                    .select('pnf')
                     .eq('cedula', estudiante.cedula)
-                    .order('id', { ascending: false });
-
-                const totalRegistros = registrosDisc ? registrosDisc.length : 0;
+                    .limit(1)
+                    .maybeSingle();
                 
-                // Calcular totales de faltas
-                const totalLeves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_leves_cant || 0), 0) : 0;
-                const totalGraves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_graves_cant || 0), 0) : 0;
-                const totalGravisimas = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_gravisimas_cant || 0), 0) : 0;
+                if (discData && discData.pnf) {
+                    estudiante.pnf = { nombre: discData.pnf };
+                }
+            }
+            
+            // Llenar formulario con datos de ESTUDIANTES
+            this.llenarFormularioEstudiante(estudiante);
+            this.mostrarFiltroActivo(cedulaInput);
+            document.getElementById('datos-personales-panel').classList.remove('hidden');
 
-                // 🎯 MOSTRAR INFORMACIÓN COMPLETA EN SWAL.FIRE
-                Swal.fire({
-                    title: `👤 ${estudiante.nombres} ${estudiante.apellidos}`,
-                    html: `
-                        <div style="text-align: left; font-size: 14px; line-height: 1.8;">
-                            
+            // Buscar historial disciplinario
+            const { data: registrosDisc } = await window.supabaseClient
+                .from('disc_registros')
+                .select('*')
+                .eq('cedula', estudiante.cedula)
+                .order('id', { ascending: false });
+
+            const totalRegistros = registrosDisc ? registrosDisc.length : 0;
+            
+            // Calcular totales de faltas
+            const totalLeves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_leves_cant || 0), 0) : 0;
+            const totalGraves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_graves_cant || 0), 0) : 0;
+            const totalGravisimas = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_gravisimas_cant || 0), 0) : 0;
+
+            // 🎯 MOSTRAR INFORMACIÓN COMPLETA EN SWAL.FIRE
+            Swal.fire({
+                title: `👤 ${estudiante.nombres} ${estudiante.apellidos}`,
+                html: `
+                    <div style="text-align: left; font-size: 14px; line-height: 1.8;">
+                        
                             <!-- DATOS PERSONALES -->
                             <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">
                                 📋 DATOS PERSONALES
@@ -308,9 +307,10 @@ window.modules.disciplina = {
                     }
                 });
 
+                // ✅ CAMBIO: Solo renderizar la tabla, NO llenar los formularios de fechas/faltas
                 if (registrosDisc && registrosDisc.length > 0) {
-                    this.llenarDatosDisciplinarios(registrosDisc[0]);
                     await this.renderizarTablaFiltrada(registrosDisc);
+                    // ❌ ELIMINADA ESTA LÍNEA: this.llenarDatosDisciplinarios(registrosDisc[0]);
                 } else {
                     document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros disciplinarios</td></tr>';
                 }
@@ -339,7 +339,6 @@ window.modules.disciplina = {
                 };
                 
                 this.llenarFormularioEstudiante(estudianteFake);
-                this.llenarFormulario(reg);
                 this.mostrarFiltroActivo(cedulaInput);
                 document.getElementById('datos-personales-panel').classList.remove('hidden');
                 
@@ -362,6 +361,7 @@ window.modules.disciplina = {
             Swal.fire({ icon: 'error', title: 'Error', text: e.message });
         }
     },
+    
     
     llenarFormularioEstudiante: function(est) {
         this.registroActualId = null;
