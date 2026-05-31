@@ -1,6 +1,6 @@
 /**
  * MÓDULO CONSEJO DISCIPLINARIO 2026
- * Versión: 3.4 - Guardado inteligente + Limpieza selectiva
+ * Versión: 3.5 - Guardado inteligente + Resaltado visual dinámico
  */
 
 window.modules = window.modules || {};
@@ -10,7 +10,7 @@ window.modules.disciplina = {
     datosCache: [],
 
     init: async function() {
-        console.log('🚀 Iniciando módulo Disciplinario v3.4...');
+        console.log('🚀 Iniciando módulo Disciplinario v3.5...');
         await this.cargarLista();
         
         const inputBusqueda = document.getElementById('buscar-cedula');
@@ -166,7 +166,7 @@ window.modules.disciplina = {
             });
 
         } catch (e) {
-            console.error('❌ Error cargando lista:', e);
+            console.error(' Error cargando lista:', e);
             tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos. Verifica la conexión.</td></tr>';
         }
     },
@@ -244,7 +244,7 @@ window.modules.disciplina = {
                             
                             <!-- DATOS PERSONALES -->
                             <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">
-                                📋 DATOS PERSONALES
+                                 DATOS PERSONALES
                             </h3>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                                 <p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p>
@@ -311,7 +311,7 @@ window.modules.disciplina = {
                 // ✅ CAMBIO: Solo renderizar la tabla, NO llenar los formularios de fechas/faltas
                 if (registrosDisc && registrosDisc.length > 0) {
                     await this.renderizarTablaFiltrada(registrosDisc);
-                    // ❌ ELIMINADA ESTA LÍNEA: this.llenarDatosDisciplinarios(registrosDisc[0]);
+                    //  ELIMINADA ESTA LÍNEA: this.llenarDatosDisciplinarios(registrosDisc[0]);
                 } else {
                     document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros disciplinarios</td></tr>';
                 }
@@ -766,8 +766,13 @@ window.modules.disciplina = {
                 showConfirmButton: false
             });
 
-            // Recargar lista de la derecha
+            //  ACTUALIZAR TABLA Y RESALTAR ESTUDIANTE
             await this.cargarLista();
+            
+            // Esperar un momento a que la tabla se renderice
+            setTimeout(() => {
+                this.resaltarEstudianteEnTabla(cedula.toUpperCase());
+            }, 300);
             
             // Limpiar SOLO los campos de registro para permitir nueva entrada rápida
             this.limpiarCamposDisciplinarios(); 
@@ -815,6 +820,30 @@ window.modules.disciplina = {
         ].forEach(id => setVal(id, ''));
         
         console.log('🧹 Formularios de registro limpiados. Estudiante mantiene sus datos.');
+    },
+
+    /**
+     * 🎯 Resalta visualmente al estudiante recién guardado en la tabla
+     */
+    resaltarEstudianteEnTabla: function(cedula) {
+        const tbody = document.getElementById('lista-disciplina-body');
+        if (!tbody) return;
+        
+        const filas = tbody.querySelectorAll('tr');
+        
+        filas.forEach(fila => {
+            const celdaCedula = fila.querySelector('td:nth-child(2)');
+            if (celdaCedula && celdaCedula.textContent.trim() === cedula) {
+                // Efecto de resaltado
+                fila.classList.add('bg-blue-100', 'transition', 'duration-500');
+                fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Quitar el resaltado después de 3 segundos
+                setTimeout(() => {
+                    fila.classList.remove('bg-blue-100', 'transition', 'duration-500');
+                }, 3000);
+            }
+        });
     },
 
     actualizarEstatusEstudiante: async function(cedula, nuevoEstatus) {
@@ -962,7 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================================================
-// 📄 FUNCIONES PARA MODAL DE REPORTES
+//  FUNCIONES PARA MODAL DE REPORTES
 // ============================================================================
 
 function abrirModalBajas() {
@@ -1286,7 +1315,7 @@ async function descargarPDFBajas() {
         Swal.fire('✅ PDF Descargado', 'El reporte se ha descargado correctamente', 'success');
         
     } catch (e) {
-        console.error('❌ Error generando PDF:', e);
+        console.error(' Error generando PDF:', e);
         Swal.fire('Error', 'No se pudo generar el PDF: ' + e.message, 'error');
     }
 }
@@ -1296,4 +1325,4 @@ window.generarReporteBajas = function() {
     abrirModalBajas();
 };
 
-console.log('✅ Módulo Consejo Disciplinario v3.4 Cargado');
+console.log('✅ Módulo Consejo Disciplinario v3.5 Cargado');
