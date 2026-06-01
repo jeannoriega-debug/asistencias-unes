@@ -371,7 +371,7 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
             // Fallback: usar pnf_id directo en unidades_curriculares
             const { data: u } = await window.supabaseClient
                 .from('unidades_curriculares')
-                .select('id, nombre')  // ✅ Sin codigo
+                .select('id, nombre')
                 .eq('pnf_id', pnfId)
                 .order('nombre');
             
@@ -379,7 +379,7 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
             (u || []).forEach(x => {
                 const o = document.createElement('option');
                 o.value = x.id;
-                o.textContent = x.nombre;  // ✅ Solo nombre
+                o.textContent = x.nombre;
                 sU.appendChild(o);
             });
             return;
@@ -391,7 +391,7 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
             
             const { data: unidades, error: errorUnid } = await window.supabaseClient
                 .from('unidades_curriculares')
-                .select('id, nombre')  // ✅ Sin codigo
+                .select('id, nombre')
                 .in('id', unidadIds)
                 .order('nombre');
 
@@ -401,7 +401,7 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
             (unidades || []).forEach(x => {
                 const o = document.createElement('option');
                 o.value = x.id;
-                o.textContent = x.nombre;  // ✅ Solo nombre
+                o.textContent = x.nombre;
                 sU.appendChild(o);
             });
         } else {
@@ -413,7 +413,6 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
         sU.innerHTML = '<option value="">Error al cargar</option>';
     }
 };
-
 
 /**
  * Cargar categorías disponibles por PNF
@@ -740,32 +739,55 @@ window.modules.gestionUnidadesPNF = {
         const container = document.getElementById('unidades-todas-container');
         if (!container) return;
 
-        const { data, error } = await window.supabaseClient
-            .from('unidades_curriculares')
-            .select('id, nombre, codigo')
-            .order('nombre');
+        try {
+            // Consultar SIN la columna 'codigo' que no existe
+            const { data, error } = await window.supabaseClient
+                .from('unidades_curriculares')
+                .select('id, nombre')
+                .order('nombre');
 
-        if (error) {
-            console.error('Error cargando unidades:', error);
-            container.innerHTML = '<p class="text-red-500 text-center">Error al cargar unidades</p>';
-            return;
-        }
+            if (error) throw error;
 
-        container.innerHTML = '';
-        (data || []).forEach(unidad => {
-            const div = document.createElement('div');
-            div.className = 'flex items-center p-2 bg-gray-50 rounded mb-2';
-            div.innerHTML = `
-                <input type="checkbox" 
-                       id="unidad-check-${unidad.id}" 
-                       value="${unidad.id}"
-                       class="unidad-checkbox w-4 h-4 mr-2">
-                <label for="unidad-check-${unidad.id}" class="flex-1 cursor-pointer text-sm">
-                    ${unidad.nombre} ${unidad.codigo ? `(${unidad.codigo})` : ''}
-                </label>
+            container.innerHTML = '';
+            
+            if (!data || data.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                        <p>No hay unidades curriculares registradas</p>
+                    </div>
+                `;
+                return;
+            }
+
+            (data || []).forEach(unidad => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center p-2 bg-gray-50 rounded mb-2 hover:bg-gray-100 transition';
+                div.innerHTML = `
+                    <input type="checkbox" 
+                           id="unidad-check-${unidad.id}" 
+                           value="${unidad.id}"
+                           class="unidad-checkbox w-4 h-4 mr-2 cursor-pointer">
+                    <label for="unidad-check-${unidad.id}" class="flex-1 cursor-pointer text-sm font-medium text-gray-700">
+                        ${unidad.nombre}
+                    </label>
+                `;
+                container.appendChild(div);
+            });
+
+            this.actualizarContadores();
+
+        } catch (err) {
+            console.error('Error cargando unidades:', err);
+            container.innerHTML = `
+                <div class="text-center py-8 text-red-500">
+                    <p class="font-semibold">Error al cargar unidades</p>
+                    <p class="text-sm mt-1">${err.message}</p>
+                </div>
             `;
-            container.appendChild(div);
-        });
+        }
     },
 
     /**
@@ -794,6 +816,8 @@ window.modules.gestionUnidadesPNF = {
                 cb.checked = true;
             }
         });
+        
+        this.actualizarContadores();
     },
 
     /**
@@ -852,6 +876,66 @@ window.modules.gestionUnidadesPNF = {
         } finally {
             btn.textContent = '💾 Guardar Asignación';
             btn.disabled = false;
+        }
+    },
+
+    /**
+     * Función de filtrado para buscar unidades
+     */
+    filtrarUnidades: function(termino) {
+        const unidades = document.querySelectorAll('#unidades-todas-container > div');
+        const terminoLower = termino.toLowerCase();
+        
+        unidades.forEach(div => {
+            const label = div.querySelector('label');
+            if (label) {
+                const texto = label.textContent.toLowerCase();
+                div.style.display = texto.includes(terminoLower) ? 'flex' : 'none';
+            }
+        });
+    },
+
+    /**
+     * Seleccionar todas las unidades visibles
+     */
+    seleccionarTodas: function() {
+        const checkboxes = document.querySelectorAll('#unidades-todas-container .unidad-checkbox:not([style*="display: none"])');
+        checkboxes.forEach(cb => cb.checked = true);
+        this.actualizarContadores();
+    },
+
+    /**
+     * Deseleccionar todas las unidades
+     */
+    deseleccionarTodas: function() {
+        const checkboxes = document.querySelectorAll('#unidades-todas-container .unidad-checkbox');
+        checkboxes.forEach(cb => cb.checked = false);
+        this.actualizarContadores();
+    },
+
+    /**
+     * Actualizar contadores de unidades
+     */
+    actualizarContadores: function() {
+        const total = document.querySelectorAll('#unidades-todas-container .unidad-checkbox').length;
+        const seleccionadas = document.querySelectorAll('#unidades-todas-container .unidad-checkbox:checked').length;
+        
+        const totalDisplay = document.getElementById('total-unidades-display');
+        const seleccionadasDisplay = document.getElementById('seleccionadas-display');
+        const resumenDiv = document.getElementById('resumen-asignacion');
+        const unidadesCount = document.getElementById('unidades-asignadas-count');
+        
+        if (totalDisplay) totalDisplay.textContent = total;
+        if (seleccionadasDisplay) seleccionadasDisplay.textContent = seleccionadas;
+        
+        // Actualizar resumen
+        if (resumenDiv && unidadesCount) {
+            if (seleccionadas > 0) {
+                resumenDiv.classList.remove('hidden');
+                unidadesCount.textContent = seleccionadas;
+            } else {
+                resumenDiv.classList.add('hidden');
+            }
         }
     }
 };
