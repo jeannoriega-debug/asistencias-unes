@@ -410,6 +410,69 @@
     <script src="assets/js/modules/admin.js"></script>
     <script src="assets/js/modules/reportes.js"></script>
 
+    <!-- Script para filtrar unidades (agregar al final del archivo o en un script separado) -->
+<script>
+// Función de filtrado para el módulo
+if (!window.modules.gestionUnidadesPNF.filtrarUnidades) {
+    window.modules.gestionUnidadesPNF.filtrarUnidades = function(termino) {
+        const unidades = document.querySelectorAll('#unidades-todas-container > div');
+        const terminoLower = termino.toLowerCase();
+        
+        unidades.forEach(div => {
+            const label = div.querySelector('label');
+            if (label) {
+                const texto = label.textContent.toLowerCase();
+                if (texto.includes(terminoLower)) {
+                    div.style.display = 'flex';
+                } else {
+                    div.style.display = 'none';
+                }
+            }
+        });
+    };
+
+    window.modules.gestionUnidadesPNF.seleccionarTodas = function() {
+        const checkboxes = document.querySelectorAll('#unidades-todas-container .unidad-checkbox');
+        checkboxes.forEach(cb => cb.checked = true);
+        this.actualizarContadores();
+    };
+
+    window.modules.gestionUnidadesPNF.deseleccionarTodas = function() {
+        const checkboxes = document.querySelectorAll('#unidades-todas-container .unidad-checkbox');
+        checkboxes.forEach(cb => cb.checked = false);
+        this.actualizarContadores();
+    };
+
+    window.modules.gestionUnidadesPNF.actualizarContadores = function() {
+        const total = document.querySelectorAll('#unidades-todas-container .unidad-checkbox').length;
+        const seleccionadas = document.querySelectorAll('#unidades-todas-container .unidad-checkbox:checked').length;
+        
+        document.getElementById('total-unidades-display').textContent = total;
+        document.getElementById('seleccionadas-display').textContent = seleccionadas;
+        
+        // Actualizar resumen
+        const resumenDiv = document.getElementById('resumen-asignacion');
+        if (seleccionadas > 0) {
+            resumenDiv.classList.remove('hidden');
+            document.getElementById('unidades-asignadas-count').textContent = seleccionadas;
+        } else {
+            resumenDiv.classList.add('hidden');
+        }
+    };
+}
+
+// Agregar event listeners a checkboxes dinámicamente
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('unidad-checkbox')) {
+        if (window.modules.gestionUnidadesPNF.actualizarContadores) {
+            window.modules.gestionUnidadesPNF.actualizarContadores();
+        }
+    }
+});
+</script>
+
+
+    
 </body>
 
 </html>
