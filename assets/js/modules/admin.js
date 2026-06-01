@@ -371,7 +371,7 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
             // Fallback: usar pnf_id directo en unidades_curriculares
             const { data: u } = await window.supabaseClient
                 .from('unidades_curriculares')
-                .select('id, nombre, codigo')
+                .select('id, nombre')  // ✅ Sin codigo
                 .eq('pnf_id', pnfId)
                 .order('nombre');
             
@@ -379,7 +379,7 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
             (u || []).forEach(x => {
                 const o = document.createElement('option');
                 o.value = x.id;
-                o.textContent = `${x.nombre} ${x.codigo ? `(${x.codigo})` : ''}`;
+                o.textContent = x.nombre;  // ✅ Solo nombre
                 sU.appendChild(o);
             });
             return;
@@ -391,7 +391,7 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
             
             const { data: unidades, error: errorUnid } = await window.supabaseClient
                 .from('unidades_curriculares')
-                .select('id, nombre, codigo')
+                .select('id, nombre')  // ✅ Sin codigo
                 .in('id', unidadIds)
                 .order('nombre');
 
@@ -401,7 +401,7 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
             (unidades || []).forEach(x => {
                 const o = document.createElement('option');
                 o.value = x.id;
-                o.textContent = `${x.nombre} ${x.codigo ? `(${x.codigo})` : ''}`;
+                o.textContent = x.nombre;  // ✅ Solo nombre
                 sU.appendChild(o);
             });
         } else {
@@ -413,6 +413,7 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
         sU.innerHTML = '<option value="">Error al cargar</option>';
     }
 };
+
 
 /**
  * Cargar categorías disponibles por PNF
