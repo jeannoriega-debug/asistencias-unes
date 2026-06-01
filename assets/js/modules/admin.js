@@ -2,6 +2,7 @@
  * MÓDULO DE ADMINISTRACIÓN
  * Gestión de profesores, asignaciones y promociones
  * ✅ Incluye: carga de trayectos, categoría en asignaciones, activación masiva
+ * ✅ ACTUALIZADO: Relación PNF-Unidades Curriculares mediante tabla intermedia
  */
 
 window.modules = window.modules || {};
@@ -18,7 +19,12 @@ window.modules.admin.init = async function () {
     await window.modules.admin.cargarProfesoresParaSelect();
     await window.modules.admin.cargarPNFParaAsignacion();
     await window.modules.admin.cargarTrayectosParaAsignacion();
-    await window.modules.admin.cargarProcesosParaAsignacion(); // ✅ NUEVO: Cargar procesos dinámicos
+    await window.modules.admin.cargarProcesosParaAsignacion();
+    
+    // Inicializar módulo de gestión de unidades por PNF
+    if (window.modules.gestionUnidadesPNF) {
+        await window.modules.gestionUnidadesPNF.init();
+    }
 
     console.log('✅ Panel de administración inicializado');
 };
@@ -342,7 +348,7 @@ window.modules.admin.cargarPNFParaAsignacion = async function () {
 };
 
 /**
- * Cargar unidades curriculares por PNF
+ * ✅ ACTUALIZADO: Cargar unidades curriculares por PNF usando tabla de relación
  */
 window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
     const sU = document.getElementById('asign-unidad');
@@ -353,19 +359,59 @@ window.modules.admin.cargarUnidadesPorPNF = async function (pnfId) {
 
     sU.innerHTML = '<option value="">Cargando...</option>';
 
-    const { data: u } = await window.supabaseClient
-        .from('unidades_curriculares')
-        .select('id, nombre')
-        .eq('pnf_id', pnfId)
-        .order('nombre');
+    try {
+        // Usar tabla de relación pnf_unidades_relacion
+        const { data: relaciones, error: errorRel } = await window.supabaseClient
+            .from('pnf_unidades_relacion')
+            .select('unidad_curricular_id')
+            .eq('pnf_id', pnfId);
 
-    sU.innerHTML = '<option value="">Unidad Curricular</option>';
-    (u || []).forEach(x => {
-        const o = document.createElement('option');
-        o.value = x.id;
-        o.textContent = x.nombre;
-        sU.appendChild(o);
-    });
+        if (errorRel) {
+            console.error('Error cargando relaciones:', errorRel);
+            // Fallback: usar pnf_id directo en unidades_curriculares
+            const { data: u } = await window.supabaseClient
+                .from('unidades_curriculares')
+                .select('id, nombre, codigo')
+                .eq('pnf_id', pnfId)
+                .order('nombre');
+            
+            sU.innerHTML = '<option value="">Unidad Curricular</option>';
+            (u || []).forEach(x => {
+                const o = document.createElement('option');
+                o.value = x.id;
+                o.textContent = `${x.nombre} ${x.codigo ? `(${x.codigo})` : ''}`;
+                sU.appendChild(o);
+            });
+            return;
+        }
+
+        // Si hay relaciones, obtener las unidades
+        if (relaciones && relaciones.length > 0) {
+            const unidadIds = relaciones.map(r => r.unidad_curricular_id);
+            
+            const { data: unidades, error: errorUnid } = await window.supabaseClient
+                .from('unidades_curriculares')
+                .select('id, nombre, codigo')
+                .in('id', unidadIds)
+                .order('nombre');
+
+            if (errorUnid) throw errorUnid;
+
+            sU.innerHTML = '<option value="">Unidad Curricular</option>';
+            (unidades || []).forEach(x => {
+                const o = document.createElement('option');
+                o.value = x.id;
+                o.textContent = `${x.nombre} ${x.codigo ? `(${x.codigo})` : ''}`;
+                sU.appendChild(o);
+            });
+        } else {
+            sU.innerHTML = '<option value="">No hay unidades asignadas a este PNF</option>';
+        }
+
+    } catch (err) {
+        console.error('Error cargando unidades:', err);
+        sU.innerHTML = '<option value="">Error al cargar</option>';
+    }
 };
 
 /**
@@ -642,6 +688,173 @@ async function activarTodosPendientes() {
     await activarProfesoresSeleccionados();
 }
 
+// ================= MÓDULO: GESTIÓN DE UNIDADES POR PNF =================
+
+window.modules.gestionUnidadesPNF = {
+    
+    /**
+     * Inicializar módulo
+     */
+    init: async function() {
+        console.log('🔗 Iniciando módulo Gestión Unidades por PNF...');
+        await this.cargarPNFs();
+        await this.cargarUnidadesDisponibles();
+    },
+
+    /**
+     * Cargar PNFs en el select
+     */
+    cargarPNFs: async function() {
+        const select = document.getElementById('gestion-unidades-pnf-select');
+        if (!select) return;
+
+        const { data, error } = await window.supabaseClient
+            .from('pnf')
+            .select('id, nombre')
+            .order('nombre');
+
+        if (error) {
+            console.error('Error cargando PNFs:', error);
+            return;
+        }
+
+        select.innerHTML = '<option value="">Seleccione un PNF</option>';
+        (data || []).forEach(pnf => {
+            const option = document.createElement('option');
+            option.value = pnf.id;
+            option.textContent = pnf.nombre;
+            select.appendChild(option);
+        });
+
+        // Evento para cargar unidades asignadas
+        select.addEventListener('change', () => {
+            this.cargarUnidadesAsignadas(select.value);
+        });
+    },
+
+    /**
+     * Cargar todas las unidades curriculares disponibles
+     */
+    cargarUnidadesDisponibles: async function() {
+        const container = document.getElementById('unidades-todas-container');
+        if (!container) return;
+
+        const { data, error } = await window.supabaseClient
+            .from('unidades_curriculares')
+            .select('id, nombre, codigo')
+            .order('nombre');
+
+        if (error) {
+            console.error('Error cargando unidades:', error);
+            container.innerHTML = '<p class="text-red-500 text-center">Error al cargar unidades</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+        (data || []).forEach(unidad => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center p-2 bg-gray-50 rounded mb-2';
+            div.innerHTML = `
+                <input type="checkbox" 
+                       id="unidad-check-${unidad.id}" 
+                       value="${unidad.id}"
+                       class="unidad-checkbox w-4 h-4 mr-2">
+                <label for="unidad-check-${unidad.id}" class="flex-1 cursor-pointer text-sm">
+                    ${unidad.nombre} ${unidad.codigo ? `(${unidad.codigo})` : ''}
+                </label>
+            `;
+            container.appendChild(div);
+        });
+    },
+
+    /**
+     * Cargar unidades asignadas a un PNF específico
+     */
+    cargarUnidadesAsignadas: async function(pnfId) {
+        if (!pnfId) return;
+
+        const { data, error } = await window.supabaseClient
+            .from('pnf_unidades_relacion')
+            .select('unidad_curricular_id')
+            .eq('pnf_id', pnfId);
+
+        if (error) {
+            console.error('Error cargando unidades asignadas:', error);
+            return;
+        }
+
+        // Desmarcar todas primero
+        document.querySelectorAll('.unidad-checkbox').forEach(cb => cb.checked = false);
+
+        // Marcar las asignadas
+        (data || []).forEach(rel => {
+            const cb = document.getElementById(`unidad-check-${rel.unidad_curricular_id}`);
+            if (cb) {
+                cb.checked = true;
+            }
+        });
+    },
+
+    /**
+     * Guardar asignación de unidades a un PNF
+     */
+    guardarAsignacion: async function() {
+        const pnfId = document.getElementById('gestion-unidades-pnf-select').value;
+        
+        if (!pnfId) {
+            return Swal.fire('Atención', 'Seleccione un PNF', 'warning');
+        }
+
+        const checkboxes = document.querySelectorAll('.unidad-checkbox:checked');
+        const unidadesIds = Array.from(checkboxes).map(cb => cb.value);
+
+        if (unidadesIds.length === 0) {
+            return Swal.fire('Atención', 'Seleccione al menos una unidad curricular', 'warning');
+        }
+
+        const btn = document.getElementById('btn-guardar-unidades-pnf');
+        const textoOriginal = btn.textContent;
+        btn.textContent = '⏳ Guardando...';
+        btn.disabled = true;
+
+        try {
+            // 1. Eliminar asignaciones anteriores para este PNF
+            await window.supabaseClient
+                .from('pnf_unidades_relacion')
+                .delete()
+                .eq('pnf_id', pnfId);
+
+            // 2. Insertar nuevas relaciones
+            const relaciones = unidadesIds.map(uid => ({
+                pnf_id: pnfId,
+                unidad_curricular_id: uid,
+                creado_por: window.appState.usuarioActualId
+            }));
+
+            const { error } = await window.supabaseClient
+                .from('pnf_unidades_relacion')
+                .insert(relaciones);
+
+            if (error) throw error;
+
+            Swal.fire('Éxito', `Se asignaron ${unidadesIds.length} unidad(es) curricular(es) al PNF seleccionado`, 'success');
+            
+            // Recargar unidades en el formulario de asignación si está seleccionado este PNF
+            const asignPnfSelect = document.getElementById('asign-pnf');
+            if (asignPnfSelect && asignPnfSelect.value === pnfId) {
+                await window.modules.admin.cargarUnidadesPorPNF(pnfId);
+            }
+
+        } catch (err) {
+            console.error('Error guardando asignación:', err);
+            Swal.fire('Error', 'No se pudieron guardar las relaciones: ' + err.message, 'error');
+        } finally {
+            btn.textContent = '💾 Guardar Asignación';
+            btn.disabled = false;
+        }
+    }
+};
+
 // ================= EXPORTAR FUNCIONES AL SCOPE GLOBAL =================
 window.crearProfesor = window.modules.admin.crearProfesor;
 
@@ -671,7 +884,7 @@ window.cargarListaProfesores = window.modules.admin.cargarListaProfesores;
 window.cargarProfesoresParaSelect = window.modules.admin.cargarProfesoresParaSelect;
 window.cargarPNFParaAsignacion = window.modules.admin.cargarPNFParaAsignacion;
 
-// ✅ Nuevas funciones exportadas
+// ✅ Funciones exportadas
 window.cargarUnidadesPorPNF = window.modules.admin.cargarUnidadesPorPNF;
 window.cargarCategoriasPorPNF = window.modules.admin.cargarCategoriasPorPNF;
 window.cargarTrayectosParaAsignacion = window.modules.admin.cargarTrayectosParaAsignacion;
@@ -681,4 +894,8 @@ window.toggleSelectAll = toggleSelectAll;
 window.activarProfesoresSeleccionados = activarProfesoresSeleccionados;
 window.activarTodosPendientes = activarTodosPendientes;
 
-console.log('✅ Módulo de administración cargado con mejoras');
+// ✅ Funciones del módulo Gestión Unidades por PNF
+window.gestionarUnidadesPNF = window.modules.gestionUnidadesPNF;
+window.guardarUnidadesPNF = () => window.modules.gestionUnidadesPNF.guardarAsignacion();
+
+console.log('✅ Módulo de administración cargado con mejoras - Relación PNF-Unidades activada');
