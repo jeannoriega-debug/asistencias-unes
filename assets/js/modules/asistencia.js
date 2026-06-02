@@ -1,6 +1,7 @@
 /**
  * MÓDULO DE ASISTENCIA - VERSIÓN FINAL
  * Orden: PNF → CATEGORÍA → UNIDAD CURRICULAR → PROCESO → TRAYECTO → AMBIENTE → ESTATUS → GÉNERO
+ * ✅ ACTUALIZADO: Usa tabla pnf_unidades_relacion para cargar unidades por PNF
  */
 window.modules = window.modules || {};
 window.modules.asistencia = {};
@@ -72,7 +73,7 @@ window.modules.asistencia.onPnfChangeAsistencia = async function () {
 	} catch (e) { console.error('Error cat:', e); }
 };
 
-// 2. CATEGORÍA → CARGA UNIDAD CURRICULAR (MATERIA)
+// 2. CATEGORÍA → CARGA UNIDAD CURRICULAR (MATERIA) ✅ ACTUALIZADO
 window.modules.asistencia.onCategoriaChangeAsistencia = async function () {
 	const pnfId = document.getElementById('select-pnf').value;
 	const cat = this.value;
@@ -82,19 +83,62 @@ window.modules.asistencia.onCategoriaChangeAsistencia = async function () {
 
 	try {
 		let mats = [];
+		
 		if (window.appState.rolUsuarioActual === 'super_usuario') {
-			const { data } = await window.supabaseClient.from('unidades_curriculares').select('id, nombre').eq('pnf_id', pnfId).order('nombre');
-			mats = data || [];
+			// ✅ USAR tabla intermedia pnf_unidades_relacion
+			const { data: relaciones, error } = await window.supabaseClient
+				.from('pnf_unidades_relacion')
+				.select('unidad_curricular_id')
+				.eq('pnf_id', pnfId);
+
+			if (error) {
+				console.error('Error cargando relaciones PNF-Unidades:', error);
+				// Fallback: consultar directamente si no existe la tabla
+				const { data: fallback } = await window.supabaseClient
+					.from('unidades_curriculares')
+					.select('id, nombre')
+					.eq('pnf_id', pnfId)
+					.order('nombre');
+				mats = fallback || [];
+			} else if (relaciones && relaciones.length > 0) {
+				// Obtener los IDs de unidades
+				const unidadIds = relaciones.map(r => r.unidad_curricular_id);
+				
+				// Consultar las unidades con esos IDs
+				const { data: unidades } = await window.supabaseClient
+					.from('unidades_curriculares')
+					.select('id, nombre')
+					.in('id', unidadIds)
+					.order('nombre');
+				
+				mats = unidades || [];
+			}
 		} else {
-			let q = window.supabaseClient.from('asignaciones_profesor').select('unidad:unidad_curricular_id(id, nombre)').eq('profesor_id', window.appState.usuarioActualId).eq('pnf_id', pnfId);
+			// Para profesores, usar asignaciones_profesor
+			let q = window.supabaseClient
+				.from('asignaciones_profesor')
+				.select('unidad:unidad_curricular_id(id, nombre)')
+				.eq('profesor_id', window.appState.usuarioActualId)
+				.eq('pnf_id', pnfId);
+			
 			if (cat) q = q.eq('categoria', cat);
+			
 			const { data } = await q;
 			mats = [...new Map((data || []).map(a => [a.unidad?.id, a.unidad]).filter(u => u[0] && u[1])).values()];
 		}
+		
 		selMat.innerHTML = '<option value="">Seleccione Unidad Curricular</option>';
-		mats.forEach(m => { const o = document.createElement('option'); o.value = m.id; o.textContent = m.nombre; selMat.appendChild(o); });
+		mats.forEach(m => { 
+			const o = document.createElement('option'); 
+			o.value = m.id; 
+			o.textContent = m.nombre; 
+			selMat.appendChild(o); 
+		});
 		selMat.addEventListener('change', window.modules.asistencia.onMateriaChangeAsistencia);
-	} catch (e) { console.error('Error mat:', e); }
+	} catch (e) { 
+		console.error('Error cargando unidades:', e); 
+		selMat.innerHTML = '<option value="">Error al cargar</option>';
+	}
 };
 
 // 3. UNIDAD CURRICULAR → CARGA PROCESO
@@ -259,10 +303,8 @@ window.modules.asistencia.marcarAsistencia = async function(estId, estado, btn) 
     const matId = document.getElementById('select-materia')?.value;
     const amb = document.getElementById('select-ambiente')?.value;
     const proc = document.getElementById('select-proceso')?.value;
-    //const fecha = new Date().toISOString().split('T')[0];
-	const fecha = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
+    const fecha = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
 
-    
     console.log('📤 Intentando guardar:', { estId, estado, matId, amb, proc, fecha });
 
     const { data, error } = await window.supabaseClient
@@ -288,7 +330,6 @@ window.modules.asistencia.marcarAsistencia = async function(estId, estado, btn) 
     }
 
     console.log('✅ Guardado exitoso en BD');
-    // La UI ya se actualizó al hacer clic. Si todo salió bien, se mantiene el color.
 };
 
 window.onPnfChangeAsistencia = window.modules.asistencia.onPnfChangeAsistencia;
@@ -301,4 +342,4 @@ window.onStatusChangeAsistencia = window.modules.asistencia.onStatusChangeAsiste
 window.onGeneroChangeAsistencia = window.modules.asistencia.onGeneroChangeAsistencia;
 window.cargarLista = window.modules.asistencia.cargarLista;
 window.marcarAsistencia = window.modules.asistencia.marcarAsistencia;
-console.log('✅ Asistencia JS cargado');
+console.log('✅ Asistencia JS cargado con soporte para tabla intermedia PNF-Unidades');
