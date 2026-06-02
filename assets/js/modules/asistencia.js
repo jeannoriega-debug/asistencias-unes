@@ -1,6 +1,6 @@
 /**
- * MÓDULO DE ASISTENCIA - VERSIÓN CORREGIDA
- * ✅ Soluciona: error de options undefined y consulta de unidades
+ * MÓDULO DE ASISTENCIA - VERSIÓN FINAL CORREGIDA
+ * ✅ Eliminado código duplicado y errores de sintaxis
  */
 window.modules = window.modules || {};
 window.modules.asistencia = {};
@@ -67,7 +67,7 @@ async function cargarPNF() {
 			}
 			
 			pnfs = [...new Map((data || []).map(a => [a.pnf?.id, a.pnf]).filter(p => p[0] && p[1])).values()];
-			console.log('✅ PNFs cargados (profesor):', pnfs.length, pnfs);
+			console.log('✅ PNFs cargados (profesor):', pnfs.length);
 		}
 		
 		sel.innerHTML = '<option value="">Seleccione PNF</option>';
@@ -80,7 +80,7 @@ async function cargarPNF() {
 		
 		console.log('✅ Dropdown PNF poblado con', pnfs.length, 'opciones');
 		
-		// ✅ CORRECCIÓN: Usar arrow function para preservar contexto
+		// Event listener para cambio de PNF
 		sel.onchange = function() {
 			const pnfId = this.value;
 			const selectedOption = this.options[this.selectedIndex];
@@ -94,8 +94,7 @@ async function cargarPNF() {
 	}
 }
 
-
-// ✅ NUEVA FUNCIÓN: Handler separado sin depender de 'this'
+// Handler para cambio de PNF
 window.modules.asistencia._onPnfChangeHandler = async function(pnfId) {
 	const selCat = document.getElementById('select-categoria');
 	['select-categoria', 'select-materia', 'select-proceso', 'select-trayecto', 'select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { 
@@ -130,7 +129,7 @@ window.modules.asistencia._onPnfChangeHandler = async function(pnfId) {
 		selCat.innerHTML = '<option value="">Todas las categorías</option>';
 		cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; selCat.appendChild(o); });
 		
-		// ✅ CORRECCIÓN: Event listener corregido para categoría
+		// Event listener para categoría
 		selCat.onchange = function() {
 			const cat = this.value;
 			console.log('🔄 Categoría seleccionada:', cat || 'TODAS', 'para PNF:', pnfId);
@@ -151,64 +150,7 @@ window.modules.asistencia._onPnfChangeHandler = async function(pnfId) {
 	}
 };
 
-
-	// ✅ EVENT LISTENER CORREGIDO
-	sel.addEventListener('change', function() {
-		window.modules.asistencia.onPnfChangeAsistencia.call(this);
-	});
-}
-
-// 1. PNF → CARGA CATEGORÍA Y UNIDADES
-window.modules.asistencia.onPnfChangeAsistencia = async function () {
-	const pnfId = this.value;
-	const pnfName = this.options[this.selectedIndex]?.text || 'Desconocido';
-	console.log('🔄 PNF seleccionado:', pnfId, '-', pnfName);
-	
-	const selCat = document.getElementById('select-categoria');
-	['select-categoria', 'select-materia', 'select-proceso', 'select-trayecto', 'select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { 
-		const el = document.getElementById(id); 
-		if (el) el.innerHTML = '<option value="">Cargando...</option>'; 
-	});
-	
-	if (!pnfId || !selCat) {
-		console.warn('️ No hay PNF seleccionado o no existe el select de categoría');
-		return;
-	}
-
-	try {
-		let cats = [];
-		if (window.appState.rolUsuarioActual === 'super_usuario') {
-			const { data, error } = await window.supabaseClient.from('estudiantes').select('categoria').eq('pnf_id', pnfId).not('categoria', 'is', null).eq('status', 'Activo');
-			if (error) console.error(' Error cargando categorías:', error);
-			cats = window.utils.getUniqueValues(data, 'categoria').filter(Boolean);
-		} else {
-			const { data, error } = await window.supabaseClient
-				.from('asignaciones_profesor')
-				.select('categoria')
-				.eq('profesor_id', window.appState.usuarioActualId)
-				.eq('pnf_id', pnfId);
-			
-			if (error) console.error('❌ Error cargando categorías profesor:', error);
-			cats = window.utils.getUniqueValues(data, 'categoria').filter(c => c !== null && c !== undefined && c !== '');
-		}
-		
-		console.log('✅ Categorías encontradas:', cats.length, cats);
-		
-		selCat.innerHTML = '<option value="">Todas las categorías</option>';
-		cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; selCat.appendChild(o); });
-		selCat.addEventListener('change', function() {
-			window.modules.asistencia.onCategoriaChangeAsistencia.call(this);
-		});
-		
-		// Cargar unidades inmediatamente
-		await cargarUnidadesDirectamente(pnfId);
-		
-	} catch (e) { 
-		console.error('❌ Error en onPnfChange:', e); 
-	}
-};
-
-// ✅ FUNCIÓN CORREGIDA: Cargar unidades con consulta en 2 pasos
+// Función para cargar unidades
 async function cargarUnidadesDirectamente(pnfId) {
 	const selMat = document.getElementById('select-materia');
 	if (!selMat || !pnfId) {
@@ -223,13 +165,12 @@ async function cargarUnidadesDirectamente(pnfId) {
 		let mats = [];
 		
 		if (window.appState.rolUsuarioActual === 'super_usuario') {
-			// Super usuario: usar tabla intermedia o fallback directo
 			const { data: relaciones, error: errorRel } = await window.supabaseClient
 				.from('pnf_unidades_relacion')
 				.select('unidad_curricular_id')
 				.eq('pnf_id', pnfId);
 
-			console.log(' Relaciones PNF-Unidad:', relaciones?.length || 0, errorRel ? 'con error' : 'OK');
+			console.log('📊 Relaciones PNF-Unidad:', relaciones?.length || 0, errorRel ? 'con error' : 'OK');
 
 			if (errorRel || !relaciones || relaciones.length === 0) {
 				console.warn('⚠️ No hay relaciones, usando fallback directo');
@@ -267,10 +208,8 @@ async function cargarUnidadesDirectamente(pnfId) {
 				console.log('✅ Unidades cargadas (desde relación):', mats.length);
 			}
 		} else {
-			// ✅ PROFESOR: CONSULTA EN 2 PASOS
 			console.log('👨‍🏫 Buscando asignaciones del profesor para PNF:', pnfId);
 			
-			// PASO 1: Obtener IDs de unidades asignadas
 			const { data: asignaciones, error: errorAsig } = await window.supabaseClient
 				.from('asignaciones_profesor')
 				.select('unidad_curricular_id')
@@ -283,14 +222,12 @@ async function cargarUnidadesDirectamente(pnfId) {
 				return;
 			}
 
-			console.log(' Asignaciones encontradas:', asignaciones?.length || 0);
+			console.log('📋 Asignaciones encontradas:', asignaciones?.length || 0);
 			
 			if (asignaciones && asignaciones.length > 0) {
-				// Obtener IDs únicos
 				const unidadIds = [...new Set(asignaciones.map(a => a.unidad_curricular_id).filter(Boolean))];
 				console.log('🔗 IDs únicos de unidades:', unidadIds);
 				
-				// PASO 2: Consultar nombres de unidades
 				const { data: unidades, error: errorUni } = await window.supabaseClient
 					.from('unidades_curriculares')
 					.select('id, nombre')
@@ -298,25 +235,18 @@ async function cargarUnidadesDirectamente(pnfId) {
 					.order('nombre');
 
 				if (errorUni) {
-					console.error(' Error cargando nombres de unidades:', errorUni);
+					console.error('❌ Error cargando nombres de unidades:', errorUni);
 					selMat.innerHTML = '<option value="">Error al cargar</option>';
 					return;
 				}
 
 				mats = unidades || [];
 				console.log('✅ Unidades cargadas (profesor - 2 pasos):', mats.length);
-				
-				// Mostrar detalles
-				mats.forEach((m, idx) => {
-					console.log(`  [${idx}] ${m.id}: ${m.nombre}`);
-				});
 			} else {
 				console.warn('⚠️ El profesor NO tiene asignaciones para este PNF');
-				console.log('💡 Solución: Un administrador debe asignarte unidades para este PNF en el panel de administración');
 			}
 		}
 
-		// Poblar el dropdown
 		selMat.innerHTML = '<option value="">Seleccione Unidad Curricular</option>';
 		if (mats.length === 0) {
 			selMat.innerHTML = '<option value="">No hay unidades disponibles</option>';
@@ -331,39 +261,28 @@ async function cargarUnidadesDirectamente(pnfId) {
 			console.log('✅ Dropdown de unidades poblado con', mats.length, 'opciones');
 		}
 		
+		// Event listener para materia
+		selMat.onchange = function() {
+			window.modules.asistencia._onMateriaChangeHandler();
+		};
+		
 	} catch (err) {
 		console.error('❌ Error general cargando unidades:', err);
 		selMat.innerHTML = '<option value="">Error al cargar</option>';
 	}
-
-	// ✅ EVENT LISTENER CORREGIDO
-	selMat.addEventListener('change', function() {
-		window.modules.asistencia.onMateriaChangeAsistencia.call(this);
-	});
 }
 
-// 2. CATEGORÍA → ACTUALIZA UNIDAD CURRICULAR
-window.modules.asistencia.onCategoriaChangeAsistencia = async function () {
+// Handler para cambio de materia
+window.modules.asistencia._onMateriaChangeHandler = async function() {
 	const pnfId = document.getElementById('select-pnf').value;
-	const cat = this.value;
-	console.log('🔄 Categoría seleccionada:', cat || 'TODAS', 'para PNF:', pnfId);
+	const cat = document.getElementById('select-categoria').value;
+	const selProc = document.getElementById('select-proceso');
 	
-	// Recargar unidades
-	await cargarUnidadesDirectamente(pnfId);
-	
-	// Resetear campos siguientes
 	['select-proceso', 'select-trayecto', 'select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { 
 		const el = document.getElementById(id); 
 		if (el) el.innerHTML = '<option value="">Cargando...</option>'; 
 	});
-};
-
-// 3. UNIDAD CURRICULAR → CARGA PROCESO
-window.modules.asistencia.onMateriaChangeAsistencia = async function () {
-	const pnfId = document.getElementById('select-pnf').value;
-	const cat = document.getElementById('select-categoria').value;
-	const selProc = document.getElementById('select-proceso');
-	['select-proceso', 'select-trayecto', 'select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = '<option value="">Cargando...</option>'; });
+	
 	if (!pnfId || !selProc) return;
 
 	try {
@@ -381,19 +300,25 @@ window.modules.asistencia.onMateriaChangeAsistencia = async function () {
 		}
 		selProc.innerHTML = '<option value="">Seleccione Proceso</option>';
 		procs.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; selProc.appendChild(o); });
-		selProc.addEventListener('change', function() {
-			window.modules.asistencia.onProcesoChangeAsistencia.call(this);
-		});
+		
+		selProc.onchange = function() {
+			window.modules.asistencia._onProcesoChangeHandler();
+		};
 	} catch (e) { console.error('Error proc:', e); }
 };
 
-// 4. PROCESO → CARGA TRAYECTO
-window.modules.asistencia.onProcesoChangeAsistencia = async function () {
+// Handler para cambio de proceso
+window.modules.asistencia._onProcesoChangeHandler = async function() {
 	const pnfId = document.getElementById('select-pnf').value;
 	const cat = document.getElementById('select-categoria').value;
-	const proc = this.value;
+	const proc = document.getElementById('select-proceso').value;
 	const selTray = document.getElementById('select-trayecto');
-	['select-trayecto', 'select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = '<option value="">Cargando...</option>'; });
+	
+	['select-trayecto', 'select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { 
+		const el = document.getElementById(id); 
+		if (el) el.innerHTML = '<option value="">Cargando...</option>'; 
+	});
+	
 	if (!pnfId || !proc || !selTray) return;
 
 	try {
@@ -411,20 +336,26 @@ window.modules.asistencia.onProcesoChangeAsistencia = async function () {
 		}
 		selTray.innerHTML = '<option value="">Seleccione Trayecto</option>';
 		tIds.forEach(id => { const info = tiposTrayectos.find(t => t.id === id); if (info) { const o = document.createElement('option'); o.value = id; o.textContent = info.nombre; selTray.appendChild(o); } });
-		selTray.addEventListener('change', function() {
-			window.modules.asistencia.onTrayectoChangeAsistencia.call(this);
-		});
+		
+		selTray.onchange = function() {
+			window.modules.asistencia._onTrayectoChangeHandler();
+		};
 	} catch (e) { console.error('Error tray:', e); }
 };
 
-// 5. TRAYECTO → CARGA AMBIENTE
-window.modules.asistencia.onTrayectoChangeAsistencia = async function () {
+// Handler para cambio de trayecto
+window.modules.asistencia._onTrayectoChangeHandler = async function() {
 	const pnfId = document.getElementById('select-pnf').value;
 	const cat = document.getElementById('select-categoria').value;
 	const proc = document.getElementById('select-proceso').value;
-	const trayId = this.value;
+	const trayId = document.getElementById('select-trayecto').value;
 	const selAmb = document.getElementById('select-ambiente');
-	['select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = '<option value="">Cargando...</option>'; });
+	
+	['select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { 
+		const el = document.getElementById(id); 
+		if (el) el.innerHTML = '<option value="">Cargando...</option>'; 
+	});
+	
 	if (!pnfId || !proc || !trayId || !selAmb) return;
 
 	try {
@@ -446,21 +377,23 @@ window.modules.asistencia.onTrayectoChangeAsistencia = async function () {
 		}
 		selAmb.innerHTML = '<option value="">Seleccione Ambiente</option>';
 		ambs.forEach(a => { const o = document.createElement('option'); o.value = a; o.textContent = `Ambiente ${a}`; selAmb.appendChild(o); });
-		selAmb.addEventListener('change', function() {
-			window.modules.asistencia.onAmbienteChangeAsistencia.call(this);
-		});
+		
+		selAmb.onchange = function() {
+			window.modules.asistencia._onAmbienteChangeHandler();
+		};
 	} catch (e) { console.error('Error amb:', e); }
 };
 
-// 6. AMBIENTE → CARGA ESTATUS & GÉNERO
-window.modules.asistencia.onAmbienteChangeAsistencia = async function () {
+// Handler para cambio de ambiente
+window.modules.asistencia._onAmbienteChangeHandler = async function() {
 	const pnfId = document.getElementById('select-pnf').value;
 	const cat = document.getElementById('select-categoria').value;
 	const proc = document.getElementById('select-proceso').value;
 	const trayId = document.getElementById('select-trayecto').value;
-	const amb = this.value;
+	const amb = document.getElementById('select-ambiente').value;
 	const selSt = document.getElementById('select-status-asist');
 	const selGe = document.getElementById('select-genero');
+	
 	if (!amb || !pnfId || !proc || !trayId) return;
 	if (selSt) selSt.innerHTML = '<option value="">Cargando...</option>';
 	if (selGe) selGe.innerHTML = '<option value="">Cargando...</option>';
@@ -552,14 +485,14 @@ window.modules.asistencia.marcarAsistencia = async function(estId, estado, btn) 
 };
 
 // Exportar funciones globales
-window.onPnfChangeAsistencia = window.modules.asistencia.onPnfChangeAsistencia;
+window.onPnfChangeAsistencia = window.modules.asistencia._onPnfChangeHandler;
 window.onCategoriaChangeAsistencia = window.modules.asistencia.onCategoriaChangeAsistencia;
-window.onMateriaChangeAsistencia = window.modules.asistencia.onMateriaChangeAsistencia;
-window.onProcesoChangeAsistencia = window.modules.asistencia.onProcesoChangeAsistencia;
-window.onTrayectoChangeAsistencia = window.modules.asistencia.onTrayectoChangeAsistencia;
-window.onAmbienteChangeAsistencia = window.modules.asistencia.onAmbienteChangeAsistencia;
+window.onMateriaChangeAsistencia = window.modules.asistencia._onMateriaChangeHandler;
+window.onProcesoChangeAsistencia = window.modules.asistencia._onProcesoChangeHandler;
+window.onTrayectoChangeAsistencia = window.modules.asistencia._onTrayectoChangeHandler;
+window.onAmbienteChangeAsistencia = window.modules.asistencia._onAmbienteChangeHandler;
 window.onStatusChangeAsistencia = window.modules.asistencia.onStatusChangeAsistencia;
 window.onGeneroChangeAsistencia = window.modules.asistencia.onGeneroChangeAsistencia;
 window.cargarLista = window.modules.asistencia.cargarLista;
 window.marcarAsistencia = window.modules.asistencia.marcarAsistencia;
-console.log('✅ Asistencia JS cargado - Versión corregida');
+console.log('✅ Asistencia JS cargado - Versión final corregida');
