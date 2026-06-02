@@ -94,6 +94,64 @@ async function cargarPNF() {
 	}
 }
 
+
+// ✅ NUEVA FUNCIÓN: Handler separado sin depender de 'this'
+window.modules.asistencia._onPnfChangeHandler = async function(pnfId) {
+	const selCat = document.getElementById('select-categoria');
+	['select-categoria', 'select-materia', 'select-proceso', 'select-trayecto', 'select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { 
+		const el = document.getElementById(id); 
+		if (el) el.innerHTML = '<option value="">Cargando...</option>'; 
+	});
+	
+	if (!pnfId || !selCat) {
+		console.warn('⚠️ No hay PNF seleccionado o no existe el select de categoría');
+		return;
+	}
+
+	try {
+		let cats = [];
+		if (window.appState.rolUsuarioActual === 'super_usuario') {
+			const { data, error } = await window.supabaseClient.from('estudiantes').select('categoria').eq('pnf_id', pnfId).not('categoria', 'is', null).eq('status', 'Activo');
+			if (error) console.error('❌ Error cargando categorías:', error);
+			cats = window.utils.getUniqueValues(data, 'categoria').filter(Boolean);
+		} else {
+			const { data, error } = await window.supabaseClient
+				.from('asignaciones_profesor')
+				.select('categoria')
+				.eq('profesor_id', window.appState.usuarioActualId)
+				.eq('pnf_id', pnfId);
+			
+			if (error) console.error('❌ Error cargando categorías profesor:', error);
+			cats = window.utils.getUniqueValues(data, 'categoria').filter(c => c !== null && c !== undefined && c !== '');
+		}
+		
+		console.log('✅ Categorías encontradas:', cats.length, cats);
+		
+		selCat.innerHTML = '<option value="">Todas las categorías</option>';
+		cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; selCat.appendChild(o); });
+		
+		// ✅ CORRECCIÓN: Event listener corregido para categoría
+		selCat.onchange = function() {
+			const cat = this.value;
+			console.log('🔄 Categoría seleccionada:', cat || 'TODAS', 'para PNF:', pnfId);
+			cargarUnidadesDirectamente(pnfId);
+			
+			// Resetear campos siguientes
+			['select-proceso', 'select-trayecto', 'select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { 
+				const el = document.getElementById(id); 
+				if (el) el.innerHTML = '<option value="">Cargando...</option>'; 
+			});
+		};
+		
+		// Cargar unidades inmediatamente
+		await cargarUnidadesDirectamente(pnfId);
+		
+	} catch (e) { 
+		console.error('❌ Error en onPnfChange:', e); 
+	}
+};
+
+
 	// ✅ EVENT LISTENER CORREGIDO
 	sel.addEventListener('change', function() {
 		window.modules.asistencia.onPnfChangeAsistencia.call(this);
