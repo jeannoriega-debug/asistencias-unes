@@ -1,5 +1,5 @@
 /**
- * MÓDULO DE ASISTENCIA - VERSIÓN FINAL CON DEBUG
+ * MÓDULO DE ASISTENCIA - VERSIÓN FINAL CON DEBUG MEJORADO
  * Orden: PNF → CATEGORÍA → UNIDAD CURRICULAR → PROCESO → TRAYECTO → AMBIENTE → ESTATUS → GÉNERO
  */
 window.modules = window.modules || {};
@@ -55,14 +55,21 @@ async function cargarPNF() {
 			pnfs = data || [];
 			console.log('✅ PNFs cargados (super_usuario):', pnfs.length);
 		} else {
-			const { data, error } = await window.supabaseClient.from('asignaciones_profesor').select('pnf:pnf_id(id, nombre)').eq('profesor_id', window.appState.usuarioActualId);
+			// Para profesores: obtener PNFs de sus asignaciones
+			const { data, error } = await window.supabaseClient
+				.from('asignaciones_profesor')
+				.select('pnf:pnf_id(id, nombre)')
+				.eq('profesor_id', window.appState.usuarioActualId);
+			
 			if (error) {
 				console.error('❌ Error cargando asignaciones:', error);
 				sel.innerHTML = '<option value="">Error al cargar asignaciones</option>';
 				return;
 			}
+			
+			// Eliminar duplicados
 			pnfs = [...new Map((data || []).map(a => [a.pnf?.id, a.pnf]).filter(p => p[0] && p[1])).values()];
-			console.log('✅ PNFs cargados (profesor):', pnfs.length);
+			console.log('✅ PNFs cargados (profesor):', pnfs.length, pnfs);
 		}
 		
 		sel.innerHTML = '<option value="">Seleccione PNF</option>';
@@ -81,10 +88,11 @@ async function cargarPNF() {
 	}
 }
 
-// 1. PNF → CARGA CATEGORÍA
+// 1. PNF → CARGA CATEGORÍA Y UNIDADES
 window.modules.asistencia.onPnfChangeAsistencia = async function () {
 	const pnfId = this.value;
-	console.log('🔄 PNF seleccionado:', pnfId);
+	const pnfName = this.options[this.selectedIndex].text;
+	console.log('🔄 PNF seleccionado:', pnfId, '-', pnfName);
 	
 	const selCat = document.getElementById('select-categoria');
 	['select-categoria', 'select-materia', 'select-proceso', 'select-trayecto', 'select-ambiente', 'select-status-asist', 'select-genero'].forEach(id => { 
@@ -104,7 +112,13 @@ window.modules.asistencia.onPnfChangeAsistencia = async function () {
 			if (error) console.error('❌ Error cargando categorías:', error);
 			cats = window.utils.getUniqueValues(data, 'categoria').filter(Boolean);
 		} else {
-			const { data, error } = await window.supabaseClient.from('asignaciones_profesor').select('categoria').eq('profesor_id', window.appState.usuarioActualId).eq('pnf_id', pnfId);
+			// Para profesores: obtener categorías de sus asignaciones para este PNF
+			const { data, error } = await window.supabaseClient
+				.from('asignaciones_profesor')
+				.select('categoria')
+				.eq('profesor_id', window.appState.usuarioActualId)
+				.eq('pnf_id', pnfId);
+			
 			if (error) console.error('❌ Error cargando categorías profesor:', error);
 			cats = window.utils.getUniqueValues(data, 'categoria').filter(c => c !== null && c !== undefined && c !== '');
 		}
@@ -115,7 +129,7 @@ window.modules.asistencia.onPnfChangeAsistencia = async function () {
 		cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; selCat.appendChild(o); });
 		selCat.addEventListener('change', window.modules.asistencia.onCategoriaChangeAsistencia);
 		
-		// ✅ NUEVO: También cargar unidades directamente (sin depender de categoría)
+		// Cargar unidades inmediatamente
 		await cargarUnidadesDirectamente(pnfId);
 		
 	} catch (e) { 
@@ -123,29 +137,31 @@ window.modules.asistencia.onPnfChangeAsistencia = async function () {
 	}
 };
 
-// ✅ NUEVA FUNCIÓN: Cargar unidades directamente al seleccionar PNF
+// ✅ FUNCIÓN MEJORADA: Cargar unidades
 async function cargarUnidadesDirectamente(pnfId) {
 	const selMat = document.getElementById('select-materia');
-	if (!selMat || !pnfId) return;
+	if (!selMat || !pnfId) {
+		console.warn('⚠️ No existe select-materia o no hay PNF:', { selMat: !!selMat, pnfId });
+		return;
+	}
 
-	console.log('🔍 Cargando unidades para PNF:', pnfId);
+	console.log('🔍 Cargando unidades para PNF:', pnfId, '| Rol:', window.appState.rolUsuarioActual);
 	selMat.innerHTML = '<option value="">Cargando unidades...</option>';
 
 	try {
 		let mats = [];
 		
 		if (window.appState.rolUsuarioActual === 'super_usuario') {
-			// Intentar con tabla intermedia primero
+			// Super usuario: usar tabla intermedia o fallback directo
 			const { data: relaciones, error: errorRel } = await window.supabaseClient
 				.from('pnf_unidades_relacion')
 				.select('unidad_curricular_id')
 				.eq('pnf_id', pnfId);
 
-			console.log('📊 Relaciones PNF-Unidad:', relaciones?.length || 0, errorRel ? 'con error' : 'OK');
+			console.log('📊 Relaciones PNF-Unidad:', relaciones?.length || 0, errorRel ? 'con error: ' + errorRel.message : 'OK');
 
 			if (errorRel || !relaciones || relaciones.length === 0) {
-				console.warn('⚠️ No hay relaciones o error, usando fallback directo');
-				// Fallback: consultar directamente por pnf_id
+				console.warn('⚠️ No hay relaciones o error, usando fallback directo en unidades_curriculares');
 				const { data: unidades, error: errorUni } = await window.supabaseClient
 					.from('unidades_curriculares')
 					.select('id, nombre')
@@ -161,7 +177,6 @@ async function cargarUnidadesDirectamente(pnfId) {
 				mats = unidades || [];
 				console.log('✅ Unidades cargadas (fallback directo):', mats.length);
 			} else {
-				// Hay relaciones, obtener las unidades
 				const unidadIds = relaciones.map(r => r.unidad_curricular_id);
 				console.log('🔗 IDs de unidades a buscar:', unidadIds.length);
 				
@@ -181,21 +196,35 @@ async function cargarUnidadesDirectamente(pnfId) {
 				console.log('✅ Unidades cargadas (desde relación):', mats.length);
 			}
 		} else {
-			// Para profesores, usar asignaciones
-			const { data, error } = await window.supabaseClient
+			// ✅ PROFESOR: Consultar asignaciones_profesor SIN filtrar por categoría
+			console.log('👨‍🏫 Buscando asignaciones del profesor para PNF:', pnfId);
+			
+			const { data: asignaciones, error: errorAsig } = await window.supabaseClient
 				.from('asignaciones_profesor')
-				.select('unidad:unidad_curricular_id(id, nombre)')
+				.select('unidad_curricular_id, unidad:unidad_curricular_id(id, nombre), categoria, proceso, trayecto_id, ambiente')
 				.eq('profesor_id', window.appState.usuarioActualId)
 				.eq('pnf_id', pnfId);
 
-			if (error) {
-				console.error('❌ Error cargando asignaciones:', error);
-				selMat.innerHTML = '<option value="">Error al cargar</option>';
+			if (errorAsig) {
+				console.error('❌ Error cargando asignaciones:', errorAsig);
+				selMat.innerHTML = '<option value="">Error al cargar asignaciones</option>';
 				return;
 			}
 
-			mats = [...new Map((data || []).map(a => [a.unidad?.id, a.unidad]).filter(u => u[0] && u[1])).values()];
-			console.log('✅ Unidades cargadas (profesor):', mats.length);
+			console.log('📋 Asignaciones encontradas:', asignaciones?.length || 0);
+			if (asignaciones && asignaciones.length > 0) {
+				// Mostrar detalles de las asignaciones
+				asignaciones.forEach((asig, idx) => {
+					console.log(`  [${idx}] Unidad:`, asig.unidad?.nombre, '| Cat:', asig.categoria, '| Proc:', asig.proceso);
+				});
+				
+				// Extraer unidades únicas
+				mats = [...new Map(asignaciones.map(a => [a.unidad_curricular_id, a.unidad]).filter(u => u[0] && u[1])).values()];
+				console.log('✅ Unidades únicas cargadas (profesor):', mats.length);
+			} else {
+				console.warn('⚠️ El profesor NO tiene asignaciones para este PNF');
+				console.log('💡 Verifica en Supabase: asignaciones_profesor WHERE profesor_id =', window.appState.usuarioActualId, 'AND pnf_id =', pnfId);
+			}
 		}
 
 		// Poblar el dropdown
@@ -203,6 +232,11 @@ async function cargarUnidadesDirectamente(pnfId) {
 		if (mats.length === 0) {
 			selMat.innerHTML = '<option value="">No hay unidades disponibles</option>';
 			console.warn('⚠️ No se encontraron unidades para este PNF');
+			
+			// Si es profesor, mostrar mensaje más informativo
+			if (window.appState.rolUsuarioActual === 'profesor') {
+				console.log('💡 Solución: Un administrador debe asignarte unidades para este PNF en el panel de administración');
+			}
 		} else {
 			mats.forEach(m => { 
 				const o = document.createElement('option'); 
@@ -210,6 +244,7 @@ async function cargarUnidadesDirectamente(pnfId) {
 				o.textContent = m.nombre; 
 				selMat.appendChild(o); 
 			});
+			console.log('✅ Dropdown de unidades poblado con', mats.length, 'opciones');
 		}
 		
 		selMat.addEventListener('change', window.modules.asistencia.onMateriaChangeAsistencia);
@@ -220,11 +255,11 @@ async function cargarUnidadesDirectamente(pnfId) {
 	}
 }
 
-// 2. CATEGORÍA → ACTUALIZA UNIDAD CURRICULAR (FILTRADA POR CATEGORÍA SI APLICA)
+// 2. CATEGORÍA → ACTUALIZA UNIDAD CURRICULAR
 window.modules.asistencia.onCategoriaChangeAsistencia = async function () {
 	const pnfId = document.getElementById('select-pnf').value;
 	const cat = this.value;
-	console.log('🔄 Categoría seleccionada:', cat, 'para PNF:', pnfId);
+	console.log('🔄 Categoría seleccionada:', cat || 'TODAS', 'para PNF:', pnfId);
 	
 	// Recargar unidades (podría filtrar por categoría si es necesario)
 	await cargarUnidadesDirectamente(pnfId);
@@ -358,7 +393,7 @@ window.modules.asistencia.onAmbienteChangeAsistencia = async function () {
 window.modules.asistencia.onStatusChangeAsistencia = () => console.log('Status:', document.getElementById('select-status-asist')?.value);
 window.modules.asistencia.onGeneroChangeAsistencia = () => console.log('Género:', document.getElementById('select-genero')?.value);
 
-// CARGAR LISTA (ACTIVOS E INACTIVOS)
+// CARGAR LISTA
 window.modules.asistencia.cargarLista = async function () {
 	const pnfId = document.getElementById('select-pnf')?.value;
 	const proc = document.getElementById('select-proceso')?.value;
@@ -423,6 +458,7 @@ window.modules.asistencia.marcarAsistencia = async function(estId, estado, btn) 
     console.log('✅ Guardado exitoso en BD');
 };
 
+// Exportar funciones globales
 window.onPnfChangeAsistencia = window.modules.asistencia.onPnfChangeAsistencia;
 window.onCategoriaChangeAsistencia = window.modules.asistencia.onCategoriaChangeAsistencia;
 window.onMateriaChangeAsistencia = window.modules.asistencia.onMateriaChangeAsistencia;
@@ -433,4 +469,4 @@ window.onStatusChangeAsistencia = window.modules.asistencia.onStatusChangeAsiste
 window.onGeneroChangeAsistencia = window.modules.asistencia.onGeneroChangeAsistencia;
 window.cargarLista = window.modules.asistencia.cargarLista;
 window.marcarAsistencia = window.modules.asistencia.marcarAsistencia;
-console.log('✅ Asistencia JS cargado con DEBUG y soporte para tabla intermedia');
+console.log('✅ Asistencia JS cargado con DEBUG mejorado y soporte para profesores');
