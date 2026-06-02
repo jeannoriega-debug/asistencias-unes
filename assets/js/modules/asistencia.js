@@ -79,10 +79,20 @@ async function cargarPNF() {
 		});
 		
 		console.log('✅ Dropdown PNF poblado con', pnfs.length, 'opciones');
+		
+		// ✅ CORRECCIÓN: Usar arrow function para preservar contexto
+		sel.onchange = function() {
+			const pnfId = this.value;
+			const selectedOption = this.options[this.selectedIndex];
+			const pnfName = selectedOption ? selectedOption.text : 'Desconocido';
+			console.log('🔄 PNF seleccionado:', pnfId, '-', pnfName);
+			window.modules.asistencia._onPnfChangeHandler(pnfId);
+		};
 	} catch (err) {
 		console.error('❌ Error general cargando PNF:', err);
 		sel.innerHTML = '<option value="">Error al cargar</option>';
 	}
+}
 
 	// ✅ EVENT LISTENER CORREGIDO
 	sel.addEventListener('change', function() {
