@@ -487,12 +487,26 @@ window.modules.asistencia.onGeneroChangeAsistencia = () => console.log('Género:
 // CARGAR LISTA
 window.modules.asistencia.cargarLista = async function () {
 	const pnfId = document.getElementById('select-pnf')?.value;
+	const catSelect = document.getElementById('select-categoria');
+	const cat = catSelect ? catSelect.value : '';
 	const proc = document.getElementById('select-proceso')?.value;
 	const trayId = document.getElementById('select-trayecto')?.value;
 	const amb = document.getElementById('select-ambiente')?.value;
 	const matId = document.getElementById('select-materia')?.value;
 	const status = document.getElementById('select-status-asist')?.value;
 	const genero = document.getElementById('select-genero')?.value;
+
+	console.log(' Valores capturados de los selects:', {
+		pnf_id: pnfId,
+		categoria: cat,
+		categoria_tipo: typeof cat,
+		categoria_length: cat?.length,
+		proceso: proc,
+		trayecto_id: trayId,
+		ambiente: amb,
+		status: status,
+		genero: genero
+	});
 
 	if (!pnfId || !proc || !trayId || !amb) return Swal.fire("Atención", "Complete PNF, Proceso, Trayecto y Ambiente", "warning");
 
@@ -506,22 +520,12 @@ window.modules.asistencia.cargarLista = async function () {
 			.eq('pnf_id', pnfId)
 			.eq('unidad_curricular_id', matId);
 
-		console.log('🔍 Verificando asignación del profesor:', {
-			profesor_id: window.appState.usuarioActualId,
-			pnf_id: pnfId,
-			unidad_curricular_id: matId,
-			asignaciones_encontradas: asig?.length || 0,
-			detalles: asig,
-			error: errorAsig
-		});
-
 		if (errorAsig) {
 			console.error('❌ Error verificando asignación:', errorAsig);
 			return Swal.fire("Error", "Error al verificar permisos: " + errorAsig.message, "error");
 		}
 
 		if (!asig || asig.length === 0) {
-			console.warn('⚠️ El profesor NO tiene asignación para esta unidad curricular');
 			return Swal.fire("Acceso denegado", "No tiene asignación para esta unidad curricular en este PNF", "error");
 		}
 
@@ -533,16 +537,11 @@ window.modules.asistencia.cargarLista = async function () {
 		});
 
 		if (!asignacionValida) {
-			console.warn('⚠️ Las asignaciones del profesor no coinciden con los filtros:', {
-				asignaciones: asig,
-				filtros_seleccionados: { proceso: proc, trayecto: trayId, ambiente: amb }
-			});
 			return Swal.fire("Acceso denegado", "No tiene asignación para esta combinación específica de filtros", "error");
 		}
-
-		console.log('✅ Asignación válida encontrada:', asignacionValida);
 	}
 
+	// ✅ CONSTRUIR CONSULTA BASE
 	let q = window.supabaseClient
 		.from('estudiantes')
 		.select(`*, tipos_trayecto(id, codigo, nombre, orden)`)
@@ -551,16 +550,30 @@ window.modules.asistencia.cargarLista = async function () {
 		.eq('trayecto_id', trayId)
 		.eq('ambiente', amb);
 	
-	if (status && status !== 'Todos') q = q.eq('status', status);
-	if (genero && genero !== 'Todos') q = q.eq('genero', genero);
+	// ✅ APLICAR FILTRO DE CATEGORÍA EXPLÍCITAMENTE
+	if (cat && cat !== '' && cat !== 'Todas las categorías') {
+		console.log('✅ Aplicando filtro de categoría:', `"${cat}"`);
+		q = q.eq('categoria', cat);
+	} else {
+		console.log('⚠️ NO se aplica filtro de categoría. Valor:', `"${cat}"`);
+	}
+	
+	// Otros filtros
+	if (status && status !== 'Todos' && status !== '') {
+		console.log(' Aplicando filtro de status:', status);
+		q = q.eq('status', status);
+	}
+	if (genero && genero !== 'Todos' && genero !== '') {
+		console.log(' Aplicando filtro de género:', genero);
+		q = q.eq('genero', genero);
+	}
 
-	console.log('📋 Consultando estudiantes con filtros:', {
+	console.log('📋 Ejecutando consulta con filtros:', {
 		pnf_id: pnfId,
+		categoria_aplicada: (cat && cat !== '' && cat !== 'Todas las categorías') ? cat : 'NINGUNA',
 		proceso: proc,
 		trayecto_id: trayId,
-		ambiente: amb,
-		status: status,
-		genero: genero
+		ambiente: amb
 	});
 
 	const { data, error } = await q.order('numero_lista');
@@ -571,13 +584,20 @@ window.modules.asistencia.cargarLista = async function () {
 	}
 
 	console.log('✅ Estudiantes cargados:', data?.length || 0);
+	
+	// Mostrar categorías de los estudiantes cargados para debug
+	if (data && data.length > 0) {
+		const catsEncontradas = {};
+		data.forEach(e => {
+			catsEncontradas[e.categoria] = (catsEncontradas[e.categoria] || 0) + 1;
+		});
+		console.log('📊 Categorías en los resultados:', catsEncontradas);
+	}
 
 	window.appState.estudiantesActuales = data || [];
 	
 	if (window.components?.tablas?.renderizarListaEstudiantes) {
 		window.components.tablas.renderizarListaEstudiantes();
-	} else {
-		console.warn('⚠️ No se encontró la función renderizarListaEstudiantes');
 	}
 };
 
