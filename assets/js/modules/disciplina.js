@@ -51,6 +51,87 @@ window.modules.disciplina = {
         return fechaString;
     },
 
+        /**
+     * 🎯 Muestra/Oculta los grupos de fechas según la cantidad de faltas ingresadas
+     * @param {string} tipo - 'leve', 'grave' o 'gravisima'
+     */
+    toggleFechasFalta: function(tipo) {
+        const cantidad = Number(document.getElementById(`disc-${tipo}s-cant`).value) || 0;
+        
+        // Mapeo de tipos a IDs de grupos
+        const gruposMap = {
+            'leve': 'grupo-fechas-leves',
+            'grave': 'grupo-fechas-graves',
+            'gravisima': 'grupo-fechas-gravisimas'
+        };
+        
+        const grupoId = gruposMap[tipo];
+        const grupo = document.getElementById(grupoId);
+        
+        if (!grupo) {
+            console.warn('⚠️ No se encontró el grupo:', grupoId);
+            return;
+        }
+        
+        if (cantidad > 0) {
+            // Mostrar el grupo con animación
+            grupo.classList.remove('hidden');
+            
+            // Aplicar efecto de resaltado
+            const container = grupo.querySelector('.grupo-fechas-container');
+            if (container) {
+                // Remover y volver a agregar la clase para reiniciar la animación
+                container.classList.remove('grupo-fechas-destacado');
+                void container.offsetWidth; // Forzar reflow
+                container.classList.add('grupo-fechas-destacado');
+                
+                // Remover la clase después de la animación
+                setTimeout(() => {
+                    container.classList.remove('grupo-fechas-destacado');
+                }, 1500);
+            }
+            
+            console.log(`✅ Mostrando fechas de faltas ${tipo}s (cantidad: ${cantidad})`);
+        } else {
+            // Ocultar el grupo y limpiar las fechas
+            grupo.classList.add('hidden');
+            
+            // Limpiar los campos de fecha del grupo
+            if (tipo === 'leve') {
+                document.getElementById('disc-fecha-leve').value = '';
+                document.getElementById('disc-fecha-leve-recibida').value = '';
+            } else if (tipo === 'grave') {
+                document.getElementById('disc-fecha-grave').value = '';
+                document.getElementById('disc-fecha-grave-recibida').value = '';
+            } else if (tipo === 'gravisima') {
+                document.getElementById('disc-fecha-gravisima').value = '';
+                document.getElementById('disc-fecha-gravisima-recibida').value = '';
+            }
+            
+            console.log(`🚫 Ocultando fechas de faltas ${tipo}s (cantidad: 0)`);
+        }
+    },
+
+    /**
+     * 🎯 Muestra las fechas correspondientes según las cantidades existentes (para cuando se carga un registro)
+     */
+    actualizarVisibilidadFechas: function() {
+        const leves = Number(document.getElementById('disc-leves-cant').value) || 0;
+        const graves = Number(document.getElementById('disc-graves-cant').value) || 0;
+        const gravisimas = Number(document.getElementById('disc-gravisimas-cant').value) || 0;
+        
+        // Mostrar/ocultar grupos sin animación
+        const grupoLeves = document.getElementById('grupo-fechas-leves');
+        const grupoGraves = document.getElementById('grupo-fechas-graves');
+        const grupoGravisimas = document.getElementById('grupo-fechas-gravisimas');
+        
+        if (grupoLeves) grupoLeves.classList.toggle('hidden', leves === 0);
+        if (grupoGraves) grupoGraves.classList.toggle('hidden', graves === 0);
+        if (grupoGravisimas) grupoGravisimas.classList.toggle('hidden', gravisimas === 0);
+    },
+
+
+    
     cargarLista: async function() {
         const tbody = document.getElementById('lista-disciplina-body');
         if (!tbody) return;
@@ -444,7 +525,7 @@ window.modules.disciplina = {
         setVal('disc-estatus-general', data.estatus_general || 'ACTIVO');
     },
 
-    llenarFormulario: function(data) {
+        llenarFormulario: function(data) {
         this.registroActualId = data.id;
 
         const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
@@ -479,6 +560,9 @@ window.modules.disciplina = {
         setVal('disc-observaciones', data.observaciones_jefe || '');
 
         setVal('disc-estatus-general', data.estatus_general || 'ACTIVO');
+
+        // ✅ Actualizar visibilidad de grupos de fechas según las cantidades
+        this.actualizarVisibilidadFechas();
 
         if(window.innerWidth < 1024) {
             document.querySelector('.lg\\:col-span-1')?.scrollIntoView({ behavior: 'smooth' });
@@ -669,6 +753,57 @@ window.modules.disciplina = {
         const estatus = document.getElementById('disc-estatus-general').value;
         const tipoBaja = document.getElementById('disc-tipo-baja').value;
 
+        // Obtener cantidades
+        const levesCant = Number(document.getElementById('disc-leves-cant').value) || 0;
+        const gravesCant = Number(document.getElementById('disc-graves-cant').value) || 0;
+        const gravisimasCant = Number(document.getElementById('disc-gravisimas-cant').value) || 0;
+
+        // ✅ VALIDACIÓN: Verificar que si hay cantidad > 0, las fechas estén completas
+        const erroresFechas = [];
+
+        if (levesCant > 0) {
+            const fechaLeve = document.getElementById('disc-fecha-leve').value;
+            const fechaLeveRecibida = document.getElementById('disc-fecha-leve-recibida').value;
+            if (!fechaLeve) erroresFechas.push('• Falta la "Fecha de Falta Leve"');
+            if (!fechaLeveRecibida) erroresFechas.push('• Falta la "Fecha Recibida de Falta Leve"');
+        }
+
+        if (gravesCant > 0) {
+            const fechaGrave = document.getElementById('disc-fecha-grave').value;
+            const fechaGraveRecibida = document.getElementById('disc-fecha-grave-recibida').value;
+            if (!fechaGrave) erroresFechas.push('• Falta la "Fecha de Falta Grave"');
+            if (!fechaGraveRecibida) erroresFechas.push('• Falta la "Fecha Recibida de Falta Grave"');
+        }
+
+        if (gravisimasCant > 0) {
+            const fechaGravisima = document.getElementById('disc-fecha-gravisima').value;
+            const fechaGravisimaRecibida = document.getElementById('disc-fecha-gravisima-recibida').value;
+            if (!fechaGravisima) erroresFechas.push('• Falta la "Fecha de Falta Gravísima"');
+            if (!fechaGravisimaRecibida) erroresFechas.push('• Falta la "Fecha Recibida de Falta Gravísima"');
+        }
+
+        // Si hay errores de fechas, mostrar mensaje y detener
+        if (erroresFechas.length > 0) {
+            Swal.fire({
+                icon: 'error',
+                title: '⚠️ Fechas Incompletas',
+                html: `
+                    <div class="text-left text-sm">
+                        <p class="mb-2 font-semibold">Debe completar las siguientes fechas:</p>
+                        <ul class="text-red-600 space-y-1">
+                            ${erroresFechas.map(e => `<li>${e}</li>`).join('')}
+                        </ul>
+                        <p class="mt-3 text-gray-600 text-xs">
+                            💡 Las fechas se muestran automáticamente al ingresar una cantidad mayor a 0 en el registro de faltas.
+                        </p>
+                    </div>
+                `,
+                confirmButtonColor: '#3b82f6',
+                confirmButtonText: 'Entendido'
+            });
+            return;
+        }
+
         // Confirmación si se está procesando una baja
         if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
             const confirm = await Swal.fire({
@@ -689,7 +824,7 @@ window.modules.disciplina = {
 
         // 2. Construir el objeto de datos capturando VALORES ACTUALES de los inputs
         const datos = {
-            cedula: cedula.toUpperCase(), // Vincula al estudiante activo
+            cedula: cedula.toUpperCase(),
             nombres: document.getElementById('disc-nombres').value.trim().toUpperCase(),
             apellidos: document.getElementById('disc-apellidos').value.trim().toUpperCase(),
             genero: document.getElementById('disc-genero').value !== 'SELECCIONAR' ? document.getElementById('disc-genero').value : null,
@@ -716,11 +851,11 @@ window.modules.disciplina = {
             acta_compromiso: document.getElementById('disc-acta-compromiso').value.trim() || null,
             observaciones_jefe: document.getElementById('disc-observaciones').value.trim() || null,
             
-            // ESTATUS Y CONTADORES (Usamos Number() para evitar errores de texto vacío)
+            // ESTATUS Y CONTADORES
             estatus_general: estatus,
-            faltas_leves_cant: Number(document.getElementById('disc-leves-cant').value) || 0,
-            faltas_graves_cant: Number(document.getElementById('disc-graves-cant').value) || 0,
-            faltas_gravisimas_cant: Number(document.getElementById('disc-gravisimas-cant').value) || 0,
+            faltas_leves_cant: levesCant,
+            faltas_graves_cant: gravesCant,
+            faltas_gravisimas_cant: gravisimasCant,
             creado_por: window.appState.usuarioActualId || null
         };
 
@@ -731,20 +866,16 @@ window.modules.disciplina = {
             
             // 3. Lógica de INSERT vs UPDATE
             if (this.registroActualId) {
-                // ACTUALIZAR registro existente
                 result = await window.supabaseClient
                     .from('disc_registros')
                     .update(datos)
                     .eq('id', this.registroActualId);
             } else {
-                // INSERTAR nuevo registro
-                // 🔑 IMPORTANTE: .select() hace que Supabase devuelva el registro creado (incluyendo el ID nuevo)
                 result = await window.supabaseClient
                     .from('disc_registros')
                     .insert([datos])
                     .select(); 
                 
-                // 🔧 CORRECCIÓN DEL BUG: Capturar el nuevo ID generado
                 if (result.data && result.data.length > 0) {
                     this.registroActualId = result.data[0].id;
                     console.log('✅ Nuevo ID capturado:', this.registroActualId);
@@ -753,7 +884,6 @@ window.modules.disciplina = {
 
             if (result.error) throw result.error;
 
-            // Si se marcó como INACTIVO con tipo de baja, actualizar tabla ESTUDIANTES
             if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
                 await this.actualizarEstatusEstudiante(cedula.toUpperCase(), 'Inactivo');
             }
@@ -766,15 +896,12 @@ window.modules.disciplina = {
                 showConfirmButton: false
             });
 
-            //  ACTUALIZAR TABLA Y RESALTAR ESTUDIANTE
             await this.cargarLista();
             
-            // Esperar un momento a que la tabla se renderice
             setTimeout(() => {
                 this.resaltarEstudianteEnTabla(cedula.toUpperCase());
             }, 300);
             
-            // Limpiar SOLO los campos de registro para permitir nueva entrada rápida
             this.limpiarCamposDisciplinarios(); 
 
         } catch (e) {
@@ -788,7 +915,6 @@ window.modules.disciplina = {
      * Resetea el ID para que el próximo "Guardar" cree un NUEVO registro.
      */
     limpiarCamposDisciplinarios: function() {
-        // Reseteamos el ID para que el sistema sepa que el siguiente guardado es un REGISTRO NUEVO
         this.registroActualId = null; 
         
         const setVal = (id, val) => { 
@@ -819,9 +945,13 @@ window.modules.disciplina = {
             'disc-fecha-gravisima-recibida', 'disc-fecha-incidencia', 'disc-fecha-consejo'
         ].forEach(id => setVal(id, ''));
         
+        // ✅ Ocultar todos los grupos de fechas
+        document.getElementById('grupo-fechas-leves')?.classList.add('hidden');
+        document.getElementById('grupo-fechas-graves')?.classList.add('hidden');
+        document.getElementById('grupo-fechas-gravisimas')?.classList.add('hidden');
+        
         console.log('🧹 Formularios de registro limpiados. Estudiante mantiene sus datos.');
     },
-
     /**
      * 🎯 Resalta visualmente al estudiante recién guardado en la tabla
      */
@@ -917,7 +1047,7 @@ window.modules.disciplina = {
     /**
      * LIMPIAR FORMULARIO COMPLETO
      */
-    limpiarFormulario: function() {
+        limpiarFormulario: function() {
         this.registroActualId = null;
         
         // Limpiar TODOS los elementos del formulario
@@ -942,6 +1072,11 @@ window.modules.disciplina = {
         document.getElementById('disc-graves-cant').value = 0;
         document.getElementById('disc-gravisimas-cant').value = 0;
         document.getElementById('disc-nucleo').value = 'NUEVA ESPARTA';
+        
+        // ✅ Ocultar todos los grupos de fechas
+        document.getElementById('grupo-fechas-leves')?.classList.add('hidden');
+        document.getElementById('grupo-fechas-graves')?.classList.add('hidden');
+        document.getElementById('grupo-fechas-gravisimas')?.classList.add('hidden');
         
         // Ocultar panel de datos personales
         document.getElementById('datos-personales-panel').classList.add('hidden');
