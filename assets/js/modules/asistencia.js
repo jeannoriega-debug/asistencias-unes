@@ -433,20 +433,92 @@ window.modules.asistencia.cargarLista = async function () {
 
 	if (window.appState.rolUsuarioActual === 'profesor') {
 		if (!matId) return Swal.fire("Atención", "Seleccione la Unidad Curricular", "warning");
-		const { data: asig } = await window.supabaseClient.from('asignaciones_profesor').select('id').eq('profesor_id', window.appState.usuarioActualId).eq('pnf_id', pnfId).eq('unidad_curricular_id', matId).eq('proceso', proc).eq('trayecto_id', trayId).or(`ambiente.eq.${amb},ambiente.is.null`).maybeSingle();
-		if (!asig) return Swal.fire("Acceso denegado", "No tiene asignación para esta combinación", "error");
+		
+		// ✅ CONSULTA MÁS FLEXIBLE: Verificar si el profesor tiene asignación para esta unidad
+		const { data: asig, error: errorAsig } = await window.supabaseClient
+			.from('asignaciones_profesor')
+			.select('id, proceso, trayecto_id, ambiente')
+			.eq('profesor_id', window.appState.usuarioActualId)
+			.eq('pnf_id', pnfId)
+			.eq('unidad_curricular_id', matId);
+
+		console.log('🔍 Verificando asignación del profesor:', {
+			profesor_id: window.appState.usuarioActualId,
+			pnf_id: pnfId,
+			unidad_curricular_id: matId,
+			asignaciones_encontradas: asig?.length || 0,
+			detalles: asig,
+			error: errorAsig
+		});
+
+		if (errorAsig) {
+			console.error('❌ Error verificando asignación:', errorAsig);
+			return Swal.fire("Error", "Error al verificar permisos: " + errorAsig.message, "error");
+		}
+
+		if (!asig || asig.length === 0) {
+			console.warn('⚠️ El profesor NO tiene asignación para esta unidad curricular');
+			return Swal.fire("Acceso denegado", "No tiene asignación para esta unidad curricular en este PNF", "error");
+		}
+
+		// ✅ Verificar si alguna asignación coincide con los filtros seleccionados
+		const asignacionValida = asig.find(a => {
+			const procMatch = !a.proceso || a.proceso === proc || proc === '';
+			const trayMatch = !a.trayecto_id || a.trayecto_id === trayId;
+			const ambMatch = !a.ambiente || a.ambiente === amb || amb === '';
+			return procMatch && trayMatch && ambMatch;
+		});
+
+		if (!asignacionValida) {
+			console.warn('⚠️ Las asignaciones del profesor no coinciden con los filtros:', {
+				asignaciones: asig,
+				filtros_seleccionados: { proceso: proc, trayecto: trayId, ambiente: amb }
+			});
+			return Swal.fire("Acceso denegado", "No tiene asignación para esta combinación específica de filtros", "error");
+		}
+
+		console.log('✅ Asignación válida encontrada:', asignacionValida);
 	}
 
-	let q = window.supabaseClient.from('estudiantes').select(`*, tipos_trayecto(id, codigo, nombre, orden)`).eq('pnf_id', pnfId).eq('proceso', proc).eq('trayecto_id', trayId).eq('ambiente', amb);
-	if (status) q = q.eq('status', status);
-	if (genero) q = q.eq('genero', genero);
+	// ✅ Cargar estudiantes SIN filtro de status por defecto (trae activos e inactivos)
+	let q = window.supabaseClient
+		.from('estudiantes')
+		.select(`*, tipos_trayecto(id, codigo, nombre, orden)`)
+		.eq('pnf_id', pnfId)
+		.eq('proceso', proc)
+		.eq('trayecto_id', trayId)
+		.eq('ambiente', amb);
+	
+	if (status && status !== 'Todos') q = q.eq('status', status);
+	if (genero && genero !== 'Todos') q = q.eq('genero', genero);
+
+	console.log('📋 Consultando estudiantes con filtros:', {
+		pnf_id: pnfId,
+		proceso: proc,
+		trayecto_id: trayId,
+		ambiente: amb,
+		status: status,
+		genero: genero
+	});
 
 	const { data, error } = await q.order('numero_lista');
-	if (error) return Swal.fire("Error", error.message, "error");
+	
+	if (error) {
+		console.error('❌ Error cargando estudiantes:', error);
+		return Swal.fire("Error", error.message, "error");
+	}
+
+	console.log('✅ Estudiantes cargados:', data?.length || 0);
 
 	window.appState.estudiantesActuales = data || [];
-	window.components?.tablas?.renderizarListaEstudiantes?.();
+	
+	if (window.components?.tablas?.renderizarListaEstudiantes) {
+		window.components.tablas.renderizarListaEstudiantes();
+	} else {
+		console.warn('⚠️ No se encontró la función renderizarListaEstudiantes');
+	}
 };
+
 
 window.modules.asistencia.marcarAsistencia = async function(estId, estado, btn) {
     const contenedor = btn.parentElement;
