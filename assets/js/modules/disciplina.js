@@ -1,6 +1,6 @@
 /**
  * MÓDULO CONSEJO DISCIPLINARIO 2026
- * Versión: 3.5 - Guardado inteligente + Resaltado visual dinámico
+ * Versión: 3.7 - Interfaz dinámica con fechas condicionales
  */
 
 window.modules = window.modules || {};
@@ -10,7 +10,7 @@ window.modules.disciplina = {
     datosCache: [],
 
     init: async function() {
-        console.log('🚀 Iniciando módulo Disciplinario v3.5...');
+        console.log('🚀 Iniciando módulo Disciplinario v3.7...');
         await this.cargarLista();
         
         const inputBusqueda = document.getElementById('buscar-cedula');
@@ -20,20 +20,7 @@ window.modules.disciplina = {
             });
         }
 
-        const selectTipoBaja = document.getElementById('disc-tipo-baja');
-        if (selectTipoBaja) {
-            selectTipoBaja.addEventListener('change', (e) => {
-                if (e.target.value !== 'SELECCIONAR') {
-                    document.getElementById('disc-estatus-general').value = 'INACTIVO';
-                    const fechaBaja = document.getElementById('disc-fecha-baja');
-                    if (!fechaBaja.value) {
-                        fechaBaja.value = new Date().toISOString().split('T')[0];
-                    }
-                } else {
-                    document.getElementById('disc-estatus-general').value = 'ACTIVO';
-                }
-            });
-        }
+        // El evento onchange del select tipo-baja ya está en el HTML
     },
 
     formatearFecha: function(fechaString) {
@@ -51,14 +38,13 @@ window.modules.disciplina = {
         return fechaString;
     },
 
-        /**
+    /**
      * 🎯 Muestra/Oculta los grupos de fechas según la cantidad de faltas ingresadas
      * @param {string} tipo - 'leve', 'grave' o 'gravisima'
      */
     toggleFechasFalta: function(tipo) {
         const cantidad = Number(document.getElementById(`disc-${tipo}s-cant`).value) || 0;
         
-        // Mapeo de tipos a IDs de grupos
         const gruposMap = {
             'leve': 'grupo-fechas-leves',
             'grave': 'grupo-fechas-graves',
@@ -74,18 +60,14 @@ window.modules.disciplina = {
         }
         
         if (cantidad > 0) {
-            // Mostrar el grupo con animación
             grupo.classList.remove('hidden');
             
-            // Aplicar efecto de resaltado
             const container = grupo.querySelector('.grupo-fechas-container');
             if (container) {
-                // Remover y volver a agregar la clase para reiniciar la animación
                 container.classList.remove('grupo-fechas-destacado');
-                void container.offsetWidth; // Forzar reflow
+                void container.offsetWidth;
                 container.classList.add('grupo-fechas-destacado');
                 
-                // Remover la clase después de la animación
                 setTimeout(() => {
                     container.classList.remove('grupo-fechas-destacado');
                 }, 1500);
@@ -93,10 +75,8 @@ window.modules.disciplina = {
             
             console.log(`✅ Mostrando fechas de faltas ${tipo}s (cantidad: ${cantidad})`);
         } else {
-            // Ocultar el grupo y limpiar las fechas
             grupo.classList.add('hidden');
             
-            // Limpiar los campos de fecha del grupo
             if (tipo === 'leve') {
                 document.getElementById('disc-fecha-leve').value = '';
                 document.getElementById('disc-fecha-leve-recibida').value = '';
@@ -113,25 +93,71 @@ window.modules.disciplina = {
     },
 
     /**
-     * 🎯 Muestra las fechas correspondientes según las cantidades existentes (para cuando se carga un registro)
+     * 🎯 Muestra/Oculta la fecha de baja según el tipo seleccionado
+     */
+    toggleFechaBaja: function() {
+        const tipoBaja = document.getElementById('disc-tipo-baja').value;
+        const grupoFechaBaja = document.getElementById('grupo-fecha-baja');
+        
+        if (!grupoFechaBaja) {
+            console.warn('⚠️ No se encontró el grupo de fecha de baja');
+            return;
+        }
+        
+        if (tipoBaja !== 'SELECCIONAR') {
+            grupoFechaBaja.classList.remove('hidden');
+            
+            const container = grupoFechaBaja.querySelector('.grupo-fechas-container');
+            if (container) {
+                container.classList.remove('grupo-fechas-destacado');
+                void container.offsetWidth;
+                container.classList.add('grupo-fechas-destacado');
+                
+                setTimeout(() => {
+                    container.classList.remove('grupo-fechas-destacado');
+                }, 1500);
+            }
+            
+            if (!document.getElementById('disc-fecha-baja').value) {
+                document.getElementById('disc-fecha-baja').value = new Date().toISOString().split('T')[0];
+            }
+            
+            console.log(`✅ Mostrando fecha de baja (tipo: ${tipoBaja})`);
+        } else {
+            grupoFechaBaja.classList.add('hidden');
+            document.getElementById('disc-fecha-baja').value = '';
+            console.log('🚫 Ocultando fecha de baja');
+        }
+    },
+
+    /**
+     * 🎯 Actualiza la visibilidad de los grupos de fechas según las cantidades existentes
+     * (para cuando se carga un registro existente)
      */
     actualizarVisibilidadFechas: function() {
         const leves = Number(document.getElementById('disc-leves-cant').value) || 0;
         const graves = Number(document.getElementById('disc-graves-cant').value) || 0;
         const gravisimas = Number(document.getElementById('disc-gravisimas-cant').value) || 0;
         
-        // Mostrar/ocultar grupos sin animación
         const grupoLeves = document.getElementById('grupo-fechas-leves');
         const grupoGraves = document.getElementById('grupo-fechas-graves');
         const grupoGravisimas = document.getElementById('grupo-fechas-gravisimas');
+        const grupoBaja = document.getElementById('grupo-fecha-baja');
+        const tipoBaja = document.getElementById('disc-tipo-baja').value;
         
         if (grupoLeves) grupoLeves.classList.toggle('hidden', leves === 0);
         if (grupoGraves) grupoGraves.classList.toggle('hidden', graves === 0);
         if (grupoGravisimas) grupoGravisimas.classList.toggle('hidden', gravisimas === 0);
+        
+        if (grupoBaja) {
+            if (tipoBaja !== 'SELECCIONAR') {
+                grupoBaja.classList.remove('hidden');
+            } else {
+                grupoBaja.classList.add('hidden');
+            }
+        }
     },
 
-
-    
     cargarLista: async function() {
         const tbody = document.getElementById('lista-disciplina-body');
         if (!tbody) return;
@@ -247,14 +273,11 @@ window.modules.disciplina = {
             });
 
         } catch (e) {
-            console.error(' Error cargando lista:', e);
+            console.error('❌ Error cargando lista:', e);
             tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos. Verifica la conexión.</td></tr>';
         }
     },
 
-    /**
-     * 🔍 BUSCAR POR CÉDULA (CON VISUALIZACIÓN COMPLETA EN SWAL)
-     */
     buscarPorCedula: async function() {
         const cedulaInput = document.getElementById('buscar-cedula').value.trim();
         if (!cedulaInput) {
@@ -266,7 +289,6 @@ window.modules.disciplina = {
         console.log('🔍 Buscando cédula:', cedulaNumeros);
 
         try {
-            // Buscar en ESTUDIANTES con relación PNF
             const { data: estudiantesData, error: errorEst } = await window.supabaseClient
                 .from('estudiantes')
                 .select(`
@@ -284,7 +306,6 @@ window.modules.disciplina = {
             if (estudiante) {
                 console.log('✅ Estudiante encontrado:', estudiante);
                 
-                // Buscar en DISC_REGISTROS para obtener el PNF (texto) si viene null
                 if (!estudiante.pnf || !estudiante.pnf.nombre) {
                     const { data: discData } = await window.supabaseClient
                         .from('disc_registros')
@@ -298,12 +319,10 @@ window.modules.disciplina = {
                     }
                 }
                 
-                // Llenar formulario con datos de ESTUDIANTES
                 this.llenarFormularioEstudiante(estudiante);
                 this.mostrarFiltroActivo(cedulaInput);
                 document.getElementById('datos-personales-panel').classList.remove('hidden');
 
-                // Buscar historial disciplinario
                 const { data: registrosDisc } = await window.supabaseClient
                     .from('disc_registros')
                     .select('*')
@@ -312,20 +331,16 @@ window.modules.disciplina = {
 
                 const totalRegistros = registrosDisc ? registrosDisc.length : 0;
                 
-                // Calcular totales de faltas
                 const totalLeves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_leves_cant || 0), 0) : 0;
                 const totalGraves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_graves_cant || 0), 0) : 0;
                 const totalGravisimas = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_gravisimas_cant || 0), 0) : 0;
 
-                // 🎯 MOSTRAR INFORMACIÓN COMPLETA EN SWAL.FIRE
                 Swal.fire({
                     title: `👤 ${estudiante.nombres} ${estudiante.apellidos}`,
                     html: `
                         <div style="text-align: left; font-size: 14px; line-height: 1.8;">
-                            
-                            <!-- DATOS PERSONALES -->
                             <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">
-                                 DATOS PERSONALES
+                                📋 DATOS PERSONALES
                             </h3>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                                 <p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p>
@@ -334,7 +349,6 @@ window.modules.disciplina = {
                                 <p><strong>Ambiente:</strong> ${estudiante.ambiente || 'N/A'}</p>
                             </div>
                             
-                            <!-- DATOS ACADÉMICOS -->
                             <h3 style="border-bottom: 2px solid #10b981; padding-bottom: 5px; color: #10b981; margin-top: 15px; font-size: 16px;">
                                 🎓 DATOS ACADÉMICOS
                             </h3>
@@ -345,7 +359,6 @@ window.modules.disciplina = {
                                 <p><strong>Trayecto:</strong> ${estudiante.trayecto_id ? 'Asignado' : 'No asignado'}</p>
                             </div>
 
-                            <!-- ESTADÍSTICAS DISCIPLINARIAS -->
                             <h3 style="border-bottom: 2px solid #f59e0b; padding-bottom: 5px; color: #f59e0b; margin-top: 15px; font-size: 16px;">
                                 📊 ESTADÍSTICAS DISCIPLINARIAS
                             </h3>
@@ -365,9 +378,8 @@ window.modules.disciplina = {
                             </div>
                             <p style="margin-top: 10px; text-align: center;"><strong>Total Registros:</strong> ${totalRegistros}</p>
                             
-                            <!-- ESTATUS GENERAL -->
                             <h3 style="border-bottom: 2px solid ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; padding-bottom: 5px; color: ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; margin-top: 15px; font-size: 16px;">
-                                 ESTATUS GENERAL
+                                ESTATUS GENERAL
                             </h3>
                             <p style="text-align: center; font-size: 16px;">
                                 <strong>Estado:</strong> 
@@ -389,17 +401,14 @@ window.modules.disciplina = {
                     }
                 });
 
-                // ✅ CAMBIO: Solo renderizar la tabla, NO llenar los formularios de fechas/faltas
                 if (registrosDisc && registrosDisc.length > 0) {
                     await this.renderizarTablaFiltrada(registrosDisc);
-                    //  ELIMINADA ESTA LÍNEA: this.llenarDatosDisciplinarios(registrosDisc[0]);
                 } else {
                     document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros disciplinarios</td></tr>';
                 }
                 return;
             }
 
-            // Fallback: buscar en DISC_REGISTROS
             console.log('⚠️ No encontrado en ESTUDIANTES, buscando en DISC_REGISTROS...');
             
             const { data: registrosDiscFallback } = await window.supabaseClient
@@ -457,10 +466,8 @@ window.modules.disciplina = {
         setVal('disc-nombres', est.nombres);
         setVal('disc-apellidos', est.apellidos);
         
-        // Género en mayúsculas
         setVal('disc-genero', est.genero ? est.genero.toUpperCase() : 'SELECCIONAR');
         
-        // CORRECCIÓN PNF: Extraer nombre del objeto pnf o usar string directo
         let pnfNombre = '';
         if (est.pnf) {
             if (typeof est.pnf === 'object' && est.pnf.nombre) {
@@ -474,7 +481,6 @@ window.modules.disciplina = {
         setVal('disc-proceso', est.proceso || '');
         setVal('disc-nucleo', 'NUEVA ESPARTA');
         
-        // Limpiar campos disciplinarios
         setVal('disc-tipo-baja', 'SELECCIONAR');
         setVal('disc-estatus-general', 'ACTIVO');
         setVal('disc-leves-cant', 0);
@@ -485,13 +491,18 @@ window.modules.disciplina = {
         setVal('disc-acta-compromiso', '');
         setVal('disc-observaciones', '');
         
-        // Limpiar todas las fechas
         const fechasIds = [
             'disc-fecha-baja', 'disc-fecha-leve', 'disc-fecha-leve-recibida', 
             'disc-fecha-grave', 'disc-fecha-grave-recibida', 'disc-fecha-gravisima',
             'disc-fecha-gravisima-recibida', 'disc-fecha-incidencia', 'disc-fecha-consejo'
         ];
         fechasIds.forEach(id => setVal(id, ''));
+        
+        // Ocultar todos los grupos de fechas dinámicas
+        document.getElementById('grupo-fechas-leves')?.classList.add('hidden');
+        document.getElementById('grupo-fechas-graves')?.classList.add('hidden');
+        document.getElementById('grupo-fechas-gravisimas')?.classList.add('hidden');
+        document.getElementById('grupo-fecha-baja')?.classList.add('hidden');
     },
 
     llenarDatosDisciplinarios: function(data) {
@@ -499,7 +510,6 @@ window.modules.disciplina = {
 
         const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
 
-        // Fechas
         setVal('disc-fecha-baja', data.fecha_baja);
         setVal('disc-fecha-leve', data.faltas_leves_fecha);
         setVal('disc-fecha-leve-recibida', data.fecha_falta_leve_recibida);
@@ -510,22 +520,19 @@ window.modules.disciplina = {
         setVal('disc-fecha-incidencia', data.fecha_incidencia_estudiante);
         setVal('disc-fecha-consejo', data.consejo_disciplinario_fecha);
 
-        // Contadores
         setVal('disc-leves-cant', data.faltas_leves_cant || 0);
         setVal('disc-graves-cant', data.faltas_graves_cant || 0);
         setVal('disc-gravisimas-cant', data.faltas_gravisimas_cant || 0);
 
-        // Textos largos
         setVal('disc-causal-graves', data.causal_faltas_graves_impuesta || '');
         setVal('disc-programa-supervision', data.programa_supervision_intensiva_aplicado_grave_impuesta || '');
         setVal('disc-acta-compromiso', data.acta_compromiso || '');
         setVal('disc-observaciones', data.observaciones_jefe || '');
 
-        // Estatus
         setVal('disc-estatus-general', data.estatus_general || 'ACTIVO');
     },
 
-        llenarFormulario: function(data) {
+    llenarFormulario: function(data) {
         this.registroActualId = data.id;
 
         const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val || ''; };
@@ -577,12 +584,10 @@ window.modules.disciplina = {
             return;
         }
 
-        // Llenar info del header
         document.getElementById('modal-cedula').textContent = registros[0].cedula;
         document.getElementById('modal-estudiante').textContent = `${registros[0].nombres} ${registros[0].apellidos}`;
         document.getElementById('modal-total').textContent = registros.length;
 
-        // Ordenar cronológicamente (más reciente primero)
         const registrosOrdenados = [...registros].sort((a, b) => b.id - a.id);
 
         const tbody = document.getElementById('modal-body-faltas');
@@ -592,10 +597,8 @@ window.modules.disciplina = {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-blue-50 transition';
             
-            // CORRECCIÓN: Mostrar TODAS las fechas disponibles según el tipo de falta
             let fechaMostrar = '-';
             
-            // Prioridad: Fecha de la falta según su tipo
             if (reg.faltas_leves_cant > 0 && reg.faltas_leves_fecha) {
                 fechaMostrar = this.formatearFecha(reg.faltas_leves_fecha);
             }
@@ -606,12 +609,10 @@ window.modules.disciplina = {
                 fechaMostrar = this.formatearFecha(reg.faltas_gravisima_fecha);
             }
             
-            // Si no hay fecha de falta específica, usar fecha de incidencia
             if (fechaMostrar === '-' && reg.fecha_incidencia_estudiante) {
                 fechaMostrar = this.formatearFecha(reg.fecha_incidencia_estudiante);
             }
             
-            // Estilos para contadores
             const leveClass = reg.faltas_leves_cant > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'text-gray-400';
             const graveClass = reg.faltas_graves_cant > 0 ? 'bg-red-200 text-red-800 font-bold' : 'text-gray-400';
             const gravisimaClass = reg.faltas_gravisimas_cant > 0 ? 'bg-gray-800 text-white font-bold' : 'text-gray-400';
@@ -633,7 +634,6 @@ window.modules.disciplina = {
             tbody.appendChild(tr);
         });
 
-        // Mostrar modal centrado
         document.getElementById('modal-detalle').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
     },
@@ -733,7 +733,7 @@ window.modules.disciplina = {
                     <div class="flex justify-center gap-1">
                         <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" 
                                 class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" 
-                                title="Ver Detalle">👁️</button>
+                                title="Ver Detalle">️</button>
                     </div>
                 </td>
             `;
@@ -742,7 +742,6 @@ window.modules.disciplina = {
     },
 
     guardarRegistro: async function() {
-        // 1. Obtener la Cédula del estudiante activo en "Datos Personales"
         const cedula = document.getElementById('disc-cedula').value.trim();
         
         if (!cedula) {
@@ -753,7 +752,6 @@ window.modules.disciplina = {
         const estatus = document.getElementById('disc-estatus-general').value;
         const tipoBaja = document.getElementById('disc-tipo-baja').value;
 
-        // Obtener cantidades
         const levesCant = Number(document.getElementById('disc-leves-cant').value) || 0;
         const gravesCant = Number(document.getElementById('disc-graves-cant').value) || 0;
         const gravisimasCant = Number(document.getElementById('disc-gravisimas-cant').value) || 0;
@@ -782,11 +780,10 @@ window.modules.disciplina = {
             if (!fechaGravisimaRecibida) erroresFechas.push('• Falta la "Fecha Recibida de Falta Gravísima"');
         }
 
-        // Si hay errores de fechas, mostrar mensaje y detener
         if (erroresFechas.length > 0) {
             Swal.fire({
                 icon: 'error',
-                title: '⚠️ Fechas Incompletas',
+                title: '️ Fechas Incompletas',
                 html: `
                     <div class="text-left text-sm">
                         <p class="mb-2 font-semibold">Debe completar las siguientes fechas:</p>
@@ -804,7 +801,6 @@ window.modules.disciplina = {
             return;
         }
 
-        // Confirmación si se está procesando una baja
         if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
             const confirm = await Swal.fire({
                 icon: 'warning',
@@ -818,11 +814,9 @@ window.modules.disciplina = {
             if (!confirm.isConfirmed) return;
         }
 
-        // Normalizar supervisión
         let supervisionValor = document.getElementById('disc-supervision')?.value || 'NO';
         if (supervisionValor === 'NO APLICA' || supervisionValor === '') supervisionValor = 'NO';
 
-        // 2. Construir el objeto de datos capturando VALORES ACTUALES de los inputs
         const datos = {
             cedula: cedula.toUpperCase(),
             nombres: document.getElementById('disc-nombres').value.trim().toUpperCase(),
@@ -834,7 +828,6 @@ window.modules.disciplina = {
             supervision_continua: supervisionValor,
             tipo_baja: tipoBaja !== 'SELECCIONAR' ? tipoBaja : null,
             
-            // FECHAS
             fecha_baja: document.getElementById('disc-fecha-baja').value || null,
             faltas_leves_fecha: document.getElementById('disc-fecha-leve').value || null,
             fecha_falta_leve_recibida: document.getElementById('disc-fecha-leve-recibida').value || null,
@@ -845,13 +838,11 @@ window.modules.disciplina = {
             fecha_incidencia_estudiante: document.getElementById('disc-fecha-incidencia').value || null,
             consejo_disciplinario_fecha: document.getElementById('disc-fecha-consejo').value || null,
             
-            // TEXTOS
             causal_faltas_graves_impuesta: document.getElementById('disc-causal-graves').value.trim() || null,
             programa_supervision_intensiva_aplicado_grave_impuesta: document.getElementById('disc-programa-supervision').value.trim() || null,
             acta_compromiso: document.getElementById('disc-acta-compromiso').value.trim() || null,
             observaciones_jefe: document.getElementById('disc-observaciones').value.trim() || null,
             
-            // ESTATUS Y CONTADORES
             estatus_general: estatus,
             faltas_leves_cant: levesCant,
             faltas_graves_cant: gravesCant,
@@ -864,7 +855,6 @@ window.modules.disciplina = {
         try {
             let result;
             
-            // 3. Lógica de INSERT vs UPDATE
             if (this.registroActualId) {
                 result = await window.supabaseClient
                     .from('disc_registros')
@@ -910,10 +900,6 @@ window.modules.disciplina = {
         }
     },
 
-    /**
-     * Limpia los formularios de FECHAS y FALTAS, pero mantiene al ESTUDIANTE cargado.
-     * Resetea el ID para que el próximo "Guardar" cree un NUEVO registro.
-     */
     limpiarCamposDisciplinarios: function() {
         this.registroActualId = null; 
         
@@ -922,39 +908,33 @@ window.modules.disciplina = {
             if(el) el.value = val; 
         };
 
-        // Limpiar Selectores
         setVal('disc-tipo-baja', 'SELECCIONAR');
         setVal('disc-estatus-general', 'ACTIVO');
         setVal('disc-supervision', 'NO APLICA');
         
-        // Limpiar Contadores
         setVal('disc-leves-cant', 0);
         setVal('disc-graves-cant', 0);
         setVal('disc-gravisimas-cant', 0);
         
-        // Limpiar Textos
         setVal('disc-causal-graves', '');
         setVal('disc-programa-supervision', '');
         setVal('disc-acta-compromiso', '');
         setVal('disc-observaciones', '');
         
-        // Limpiar Fechas
         [
             'disc-fecha-baja', 'disc-fecha-leve', 'disc-fecha-leve-recibida', 
             'disc-fecha-grave', 'disc-fecha-grave-recibida', 'disc-fecha-gravisima',
             'disc-fecha-gravisima-recibida', 'disc-fecha-incidencia', 'disc-fecha-consejo'
         ].forEach(id => setVal(id, ''));
         
-        // ✅ Ocultar todos los grupos de fechas
         document.getElementById('grupo-fechas-leves')?.classList.add('hidden');
         document.getElementById('grupo-fechas-graves')?.classList.add('hidden');
         document.getElementById('grupo-fechas-gravisimas')?.classList.add('hidden');
+        document.getElementById('grupo-fecha-baja')?.classList.add('hidden');
         
         console.log('🧹 Formularios de registro limpiados. Estudiante mantiene sus datos.');
     },
-    /**
-     * 🎯 Resalta visualmente al estudiante recién guardado en la tabla
-     */
+
     resaltarEstudianteEnTabla: function(cedula) {
         const tbody = document.getElementById('lista-disciplina-body');
         if (!tbody) return;
@@ -964,11 +944,9 @@ window.modules.disciplina = {
         filas.forEach(fila => {
             const celdaCedula = fila.querySelector('td:nth-child(2)');
             if (celdaCedula && celdaCedula.textContent.trim() === cedula) {
-                // Efecto de resaltado
                 fila.classList.add('bg-blue-100', 'transition', 'duration-500');
                 fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 
-                // Quitar el resaltado después de 3 segundos
                 setTimeout(() => {
                     fila.classList.remove('bg-blue-100', 'transition', 'duration-500');
                 }, 3000);
@@ -1037,20 +1015,13 @@ window.modules.disciplina = {
         document.getElementById('filtro-activo').classList.add('hidden');
     },
 
-    /**
-     * LIMPIAR TODO (Formulario + Lista + Búsqueda + Foco)
-     */
     limpiarTodo: function() {
         this.limpiarFormulario();
     },
 
-    /**
-     * LIMPIAR FORMULARIO COMPLETO
-     */
-        limpiarFormulario: function() {
+    limpiarFormulario: function() {
         this.registroActualId = null;
         
-        // Limpiar TODOS los elementos del formulario
         document.querySelectorAll('input, select, textarea').forEach(el => {
             if (el.id !== 'buscar-cedula') {
                 if (el.tagName === 'SELECT') {
@@ -1067,27 +1038,22 @@ window.modules.disciplina = {
             }
         });
 
-        // Resetear valores numéricos específicos
         document.getElementById('disc-leves-cant').value = 0;
         document.getElementById('disc-graves-cant').value = 0;
         document.getElementById('disc-gravisimas-cant').value = 0;
         document.getElementById('disc-nucleo').value = 'NUEVA ESPARTA';
         
-        // ✅ Ocultar todos los grupos de fechas
         document.getElementById('grupo-fechas-leves')?.classList.add('hidden');
         document.getElementById('grupo-fechas-graves')?.classList.add('hidden');
         document.getElementById('grupo-fechas-gravisimas')?.classList.add('hidden');
+        document.getElementById('grupo-fecha-baja')?.classList.add('hidden');
         
-        // Ocultar panel de datos personales
         document.getElementById('datos-personales-panel').classList.add('hidden');
 
-        // Limpiar búsqueda
         this.limpiarBusqueda();
         
-        // Restablecer lista derecha a estado inicial
         this.cargarLista();
         
-        // Poner foco en el input de búsqueda
         setTimeout(() => {
             const inputBusqueda = document.getElementById('buscar-cedula');
             if (inputBusqueda) {
@@ -1107,7 +1073,7 @@ window.limpiarFormulario = function() { window.modules.disciplina.limpiarFormula
 window.limpiarTodo = function() { window.modules.disciplina.limpiarTodo(); };
 window.filtrarRegistros = function(filtro) { window.modules.disciplina.filtrarRegistros(filtro); };
 window.generarReporteProceso = function() { Swal.fire('ℹ️ Info', 'Generación de reporte de proceso en desarrollo', 'info'); };
-window.generarReporteBajas = function() { Swal.fire('ℹ️ Info', 'Generación de reporte de bajas en desarrollo', 'info'); };
+window.generarReporteBajas = function() { abrirModalBajas(); };
 
 window.cerrarSesion = function() {
     if (window.supabaseClient) {
@@ -1133,7 +1099,6 @@ function abrirModalBajas() {
     document.getElementById('modal-reporte-bajas').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     
-    // Establecer fechas por defecto (mes actual)
     const hoy = new Date();
     const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
@@ -1141,7 +1106,6 @@ function abrirModalBajas() {
     document.getElementById('bajas-fecha-inicial').value = primerDia.toISOString().split('T')[0];
     document.getElementById('bajas-fecha-final').value = ultimoDia.toISOString().split('T')[0];
     
-    // Ocultar estadísticas inicialmente
     document.getElementById('bajas-estadisticas').classList.add('hidden');
     document.getElementById('btn-descargar-pdf').classList.add('hidden');
 }
@@ -1161,7 +1125,6 @@ async function generarReporteBajasConFechas() {
     }
 
     try {
-        // Obtener datos de Supabase
         const { data, error } = await window.supabaseClient
             .from('disc_registros')
             .select(`
@@ -1175,7 +1138,6 @@ async function generarReporteBajasConFechas() {
 
         if (error) throw error;
 
-        // Procesar datos
         const bajas = (data || []).map(reg => ({
             cedula: reg.cedula,
             nombres: reg.nombres,
@@ -1185,7 +1147,6 @@ async function generarReporteBajasConFechas() {
             fecha_baja: window.modules.disciplina.formatearFecha(reg.fecha_baja)
         }));
 
-        // Generar tabla dinámica
         const tiposBajas = ['BAJA_VOLUNTARIA', 'BAJA_POR_INASISTENCIA', 'BAJA_ACADEMICA', 'BAJA_MEDICA'];
         const tablaDinamica = {};
         const totalesPorTipo = {};
@@ -1202,12 +1163,10 @@ async function generarReporteBajasConFechas() {
             }
         });
 
-        // Mostrar estadísticas
         document.getElementById('stat-total-bajas').textContent = bajas.length;
         document.getElementById('stat-total-pnf').textContent = Object.keys(tablaDinamica).length;
         document.getElementById('stat-total-general').textContent = bajas.length;
         
-        // Llenar tabla dinámica
         const tbody = document.getElementById('tabla-dinamica-bajas');
         tbody.innerHTML = '';
         
@@ -1239,18 +1198,15 @@ async function generarReporteBajasConFechas() {
             tbody.appendChild(fila);
         });
         
-        // Actualizar totales
         document.getElementById('total-voluntaria').textContent = totalVoluntaria;
         document.getElementById('total-inasistencia').textContent = totalInasistencia;
         document.getElementById('total-academica').textContent = totalAcademica;
         document.getElementById('total-medica').textContent = totalMedica;
         document.getElementById('total-final').textContent = bajas.length;
         
-        // Mostrar sección de estadísticas y botón de PDF
         document.getElementById('bajas-estadisticas').classList.remove('hidden');
         document.getElementById('btn-descargar-pdf').classList.remove('hidden');
         
-        // Guardar datos para el PDF
         window.datosReporteBajas = {
             bajas,
             tablaDinamica,
@@ -1274,7 +1230,6 @@ async function descargarPDFBajas() {
     
     try {
         const { jsPDF } = window.jspdf;
-        // Formato vertical con márgenes de 2cm (20mm)
         const doc = new jsPDF({ 
             orientation: 'portrait', 
             unit: 'mm', 
@@ -1287,7 +1242,6 @@ async function descargarPDFBajas() {
             }
         });
         
-        // Función para formatear fecha DD/MM/AAAA
         const formatearFecha = (fechaStr) => {
             if (!fechaStr) return '';
             const partes = fechaStr.split('-');
@@ -1303,7 +1257,6 @@ async function descargarPDFBajas() {
             weekday:'long', year:'numeric', month:'long', day:'numeric' 
         });
         
-        // Header centrado (margen superior 20mm)
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.text('REPORTE DE BAJAS DISCIPLINARIAS', 105, 25, { align: 'center' });
@@ -1313,12 +1266,10 @@ async function descargarPDFBajas() {
         doc.text(`Período: ${fechaIniFormateada} al ${fechaFinFormateada}`, 105, 30, { align: 'center' });
         doc.text(`Generado: ${fechaGeneracion}`, 105, 35, { align: 'center' });
         
-        // Estadísticas
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.text(`Total Bajas: ${totalBajas} | PNF: ${totalPnf}`, 105, 42, { align: 'center' });
         
-        // Tabla dinámica (comienza en Y=48mm)
         doc.setFontSize(10);
         doc.text('TABLA DINAMICA: BAJAS POR PNF Y TIPO', 20, 52);
         
@@ -1340,7 +1291,6 @@ async function descargarPDFBajas() {
             tableRows.push(fila);
         });
         
-        // Totales
         const totales = ['TOTAL GENERAL'];
         let totalGeneral = 0;
         tiposBajas.forEach(tipo => {
@@ -1351,7 +1301,6 @@ async function descargarPDFBajas() {
         totales.push(totalGeneral);
         tableRows.push(totales);
         
-        // Dibujar tabla dinámica con colores
         doc.autoTable({
             head: [tableColumn],
             body: tableRows,
@@ -1381,9 +1330,7 @@ async function descargarPDFBajas() {
             }
         });
         
-        // Listado detallado
         if (bajas.length > 0) {
-            // Calcular posición Y después de la tabla dinámica
             let startYListado = doc.lastAutoTable.finalY + 5;
             
             doc.setFontSize(10);
@@ -1400,7 +1347,6 @@ async function descargarPDFBajas() {
                 b.tipo_baja.replace('BAJA_', '').replace('_', ' ')
             ]);
             
-            // Tabla más compacta con márgenes de 2cm
             doc.autoTable({
                 head: [detalleColumn],
                 body: detalleRows,
@@ -1430,11 +1376,10 @@ async function descargarPDFBajas() {
                     0: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
                     1: { cellWidth: 16, halign: 'center' },
                     2: { cellWidth: 18, halign: 'center' },
-                    3: { cellWidth: 55 }, // AUMENTADO para evitar saltos de línea
+                    3: { cellWidth: 55 },
                     4: { cellWidth: 32 },
                     5: { cellWidth: 26, halign: 'center' }
                 },
-                // Header se repite automáticamente en cada página
                 didParseCell: function(data) {
                     if (data.section === 'head') {
                         data.cell.styles.fontStyle = 'bold';
@@ -1443,21 +1388,15 @@ async function descargarPDFBajas() {
             });
         }
         
-        // Guardar
         const nombreArchivo = `reporte_bajas_${fechaInicial}_a_${fechaFinal}.pdf`;
         doc.save(nombreArchivo);
         
         Swal.fire('✅ PDF Descargado', 'El reporte se ha descargado correctamente', 'success');
         
     } catch (e) {
-        console.error(' Error generando PDF:', e);
+        console.error('❌ Error generando PDF:', e);
         Swal.fire('Error', 'No se pudo generar el PDF: ' + e.message, 'error');
     }
 }
 
-// Función original (ahora abre el modal)
-window.generarReporteBajas = function() {
-    abrirModalBajas();
-};
-
-console.log('✅ Módulo Consejo Disciplinario v3.5 Cargado');
+console.log('✅ Módulo Consejo Disciplinario v3.7 Cargado');
