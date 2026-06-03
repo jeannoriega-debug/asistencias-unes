@@ -1,6 +1,6 @@
 /**
- * MÓDULO DE ASISTENCIA - VERSIÓN FINAL CORREGIDA
- * ✅ Eliminado código duplicado y errores de sintaxis
+ * MÓDULO DE ASISTENCIA - VERSIÓN FINAL CON CATEGORÍAS AGRUPADAS
+ * ✅ Incluye: Agrupación de categorías similares con contadores
  */
 window.modules = window.modules || {};
 window.modules.asistencia = {};
@@ -108,26 +108,79 @@ window.modules.asistencia._onPnfChangeHandler = async function(pnfId) {
 	}
 
 	try {
-		let cats = [];
-		if (window.appState.rolUsuarioActual === 'super_usuario') {
-			const { data, error } = await window.supabaseClient.from('estudiantes').select('categoria').eq('pnf_id', pnfId).not('categoria', 'is', null).eq('status', 'Activo');
-			if (error) console.error('❌ Error cargando categorías:', error);
-			cats = window.utils.getUniqueValues(data, 'categoria').filter(Boolean);
-		} else {
-			const { data, error } = await window.supabaseClient
-				.from('asignaciones_profesor')
-				.select('categoria')
-				.eq('profesor_id', window.appState.usuarioActualId)
-				.eq('pnf_id', pnfId);
+		// Obtener categorías con conteo de estudiantes
+		const { data, error } = await window.supabaseClient
+			.from('estudiantes')
+			.select('categoria')
+			.eq('pnf_id', pnfId)
+			.not('categoria', 'is', null)
+			.eq('status', 'Activo');
+		
+		if (error) console.error('❌ Error cargando categorías:', error);
+		
+		// Contar estudiantes por categoría
+		const conteoPorCategoria = {};
+		(data || []).forEach(est => {
+			if (est.categoria) {
+				conteoPorCategoria[est.categoria] = (conteoPorCategoria[est.categoria] || 0) + 1;
+			}
+		});
+		
+		const categorias = Object.keys(conteoPorCategoria).filter(Boolean);
+		console.log('✅ Categorías encontradas:', categorias.length, conteoPorCategoria);
+		
+		// ✅ FUNCIÓN PARA AGRUPAR CATEGORÍAS SIMILARES
+		const agruparCategorias = (cats) => {
+			const grupos = {};
 			
-			if (error) console.error('❌ Error cargando categorías profesor:', error);
-			cats = window.utils.getUniqueValues(data, 'categoria').filter(c => c !== null && c !== undefined && c !== '');
-		}
+			cats.forEach(cat => {
+				// Detectar si es una variante de TSU
+				if (cat.includes('TSU')) {
+					const grupoKey = 'TSU (Todas las variantes)';
+					if (!grupos[grupoKey]) {
+						grupos[grupoKey] = [];
+					}
+					grupos[grupoKey].push(cat);
+				} else {
+					// Otras categorías van solas
+					grupos[cat] = [cat];
+				}
+			});
+			
+			return grupos;
+		};
 		
-		console.log('✅ Categorías encontradas:', cats.length, cats);
+		const categoriasAgrupadas = agruparCategorias(categorias);
 		
+		// Crear el select con optgroups
 		selCat.innerHTML = '<option value="">Todas las categorías</option>';
-		cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; selCat.appendChild(o); });
+		
+		Object.entries(categoriasAgrupadas).forEach(([grupo, variantes]) => {
+			const totalVariantes = variantes.reduce((sum, v) => sum + conteoPorCategoria[v], 0);
+			
+			if (variantes.length > 1) {
+				// Crear optgroup para categorías con variantes
+				const optgroup = document.createElement('optgroup');
+				optgroup.label = `${grupo.split(' (')[0]} (${totalVariantes})`;
+				
+				variantes.forEach(variante => {
+					const o = document.createElement('option');
+					o.value = variante;
+					o.textContent = `  ${variante} (${conteoPorCategoria[variante]})`; // Indentación visual con contador
+					optgroup.appendChild(o);
+				});
+				
+				selCat.appendChild(optgroup);
+			} else {
+				// Categoría simple sin variantes
+				const o = document.createElement('option');
+				o.value = variantes[0];
+				o.textContent = `${variantes[0]} (${conteoPorCategoria[variantes[0]]})`;
+				selCat.appendChild(o);
+			}
+		});
+		
+		console.log('✅ Categorías agrupadas:', categoriasAgrupadas);
 		
 		// Event listener para categoría
 		selCat.onchange = function() {
@@ -208,11 +261,12 @@ async function cargarUnidadesDirectamente(pnfId) {
 				console.log('✅ Unidades cargadas (desde relación):', mats.length);
 			}
 		} else {
-			console.log('👨‍🏫 Buscando asignaciones del profesor para PNF:', pnfId);
+			console.log('👨‍ Buscando asignaciones del profesor para PNF:', pnfId);
+			console.log('🔑 Usuario actual:', window.appState.usuarioActualId);
 			
 			const { data: asignaciones, error: errorAsig } = await window.supabaseClient
 				.from('asignaciones_profesor')
-				.select('unidad_curricular_id')
+				.select('unidad_curricular_id, categoria, proceso')
 				.eq('profesor_id', window.appState.usuarioActualId)
 				.eq('pnf_id', pnfId);
 
@@ -223,10 +277,13 @@ async function cargarUnidadesDirectamente(pnfId) {
 			}
 
 			console.log('📋 Asignaciones encontradas:', asignaciones?.length || 0);
+			console.log('📄 Detalles de asignaciones:', asignaciones);
 			
 			if (asignaciones && asignaciones.length > 0) {
 				const unidadIds = [...new Set(asignaciones.map(a => a.unidad_curricular_id).filter(Boolean))];
 				console.log('🔗 IDs únicos de unidades:', unidadIds);
+				
+				console.log('🔍 Consultando unidades_curriculares con IDs:', unidadIds);
 				
 				const { data: unidades, error: errorUni } = await window.supabaseClient
 					.from('unidades_curriculares')
@@ -234,9 +291,16 @@ async function cargarUnidadesDirectamente(pnfId) {
 					.in('id', unidadIds)
 					.order('nombre');
 
+				console.log('📦 Respuesta de unidades_curriculares:', {
+					data: unidades,
+					error: errorUni,
+					count: unidades?.length || 0
+				});
+
 				if (errorUni) {
 					console.error('❌ Error cargando nombres de unidades:', errorUni);
-					selMat.innerHTML = '<option value="">Error al cargar</option>';
+					console.log('💡 Esto probablemente es un problema de RLS. Verifica las políticas en Supabase.');
+					selMat.innerHTML = '<option value="">Error al cargar - Verifica permisos RLS</option>';
 					return;
 				}
 
@@ -244,6 +308,7 @@ async function cargarUnidadesDirectamente(pnfId) {
 				console.log('✅ Unidades cargadas (profesor - 2 pasos):', mats.length);
 			} else {
 				console.warn('⚠️ El profesor NO tiene asignaciones para este PNF');
+				console.log('💡 Solución: Un administrador debe asignarte unidades para este PNF en el panel de administración');
 			}
 		}
 
@@ -434,7 +499,6 @@ window.modules.asistencia.cargarLista = async function () {
 	if (window.appState.rolUsuarioActual === 'profesor') {
 		if (!matId) return Swal.fire("Atención", "Seleccione la Unidad Curricular", "warning");
 		
-		// ✅ CONSULTA MÁS FLEXIBLE: Verificar si el profesor tiene asignación para esta unidad
 		const { data: asig, error: errorAsig } = await window.supabaseClient
 			.from('asignaciones_profesor')
 			.select('id, proceso, trayecto_id, ambiente')
@@ -461,7 +525,6 @@ window.modules.asistencia.cargarLista = async function () {
 			return Swal.fire("Acceso denegado", "No tiene asignación para esta unidad curricular en este PNF", "error");
 		}
 
-		// ✅ Verificar si alguna asignación coincide con los filtros seleccionados
 		const asignacionValida = asig.find(a => {
 			const procMatch = !a.proceso || a.proceso === proc || proc === '';
 			const trayMatch = !a.trayecto_id || a.trayecto_id === trayId;
@@ -480,7 +543,6 @@ window.modules.asistencia.cargarLista = async function () {
 		console.log('✅ Asignación válida encontrada:', asignacionValida);
 	}
 
-	// ✅ Cargar estudiantes SIN filtro de status por defecto (trae activos e inactivos)
 	let q = window.supabaseClient
 		.from('estudiantes')
 		.select(`*, tipos_trayecto(id, codigo, nombre, orden)`)
@@ -518,7 +580,6 @@ window.modules.asistencia.cargarLista = async function () {
 		console.warn('⚠️ No se encontró la función renderizarListaEstudiantes');
 	}
 };
-
 
 window.modules.asistencia.marcarAsistencia = async function(estId, estado, btn) {
     const contenedor = btn.parentElement;
@@ -567,4 +628,4 @@ window.onStatusChangeAsistencia = window.modules.asistencia.onStatusChangeAsiste
 window.onGeneroChangeAsistencia = window.modules.asistencia.onGeneroChangeAsistencia;
 window.cargarLista = window.modules.asistencia.cargarLista;
 window.marcarAsistencia = window.modules.asistencia.marcarAsistencia;
-console.log('✅ Asistencia JS cargado - Versión final corregida');
+console.log('✅ Asistencia JS cargado - Versión final con categorías agrupadas');
