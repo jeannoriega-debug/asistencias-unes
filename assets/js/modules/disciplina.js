@@ -433,66 +433,192 @@ window.modules.disciplina = {
 
     guardarRegistro: async function() {
         const cedula = document.getElementById('disc-cedula').value.trim();
-        if (!cedula) { Swal.fire({ icon: 'warning', title: 'Atención', text: 'Primero busque y seleccione un estudiante', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false }); return; }
+        if (!cedula) {
+            Swal.fire({ icon: 'warning', title: 'Atención', text: 'Primero busque y seleccione un estudiante', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+            return;
+        }
 
         const estatus = document.getElementById('disc-estatus-general').value;
         const tipoBaja = document.getElementById('disc-tipo-baja').value;
+        const hayBaja = (tipoBaja !== 'SELECCIONAR');
+
         const levesCant = Number(document.getElementById('disc-leves-cant').value) || 0;
         const gravesCant = Number(document.getElementById('disc-graves-cant').value) || 0;
         const gravisimasCant = Number(document.getElementById('disc-gravisimas-cant').value) || 0;
 
-        const erroresFechas = [];
-        if (levesCant > 0) { if (!document.getElementById('disc-fecha-leve').value) erroresFechas.push('• Falta la "Fecha de Falta Leve"'); if (!document.getElementById('disc-fecha-leve-recibida').value) erroresFechas.push('• Falta la "Fecha Recibida de Falta Leve"'); }
-        if (gravesCant > 0) { if (!document.getElementById('disc-fecha-grave').value) erroresFechas.push('• Falta la "Fecha de Falta Grave"'); if (!document.getElementById('disc-fecha-grave-recibida').value) erroresFechas.push('• Falta la "Fecha Recibida de Falta Grave"'); }
-        if (gravisimasCant > 0) { if (!document.getElementById('disc-fecha-gravisima').value) erroresFechas.push('• Falta la "Fecha de Falta Gravísima"'); if (!document.getElementById('disc-fecha-gravisima-recibida').value) erroresFechas.push('• Falta la "Fecha Recibida de Falta Gravísima"'); }
+        // ==========================================
+        // VALIDACIÓN 1: Solo se permite UN tipo de falta a la vez
+        // ==========================================
+        let tiposDeFaltaSeleccionados = 0;
+        if (levesCant > 0) tiposDeFaltaSeleccionados++;
+        if (gravesCant > 0) tiposDeFaltaSeleccionados++;
+        if (gravisimasCant > 0) tiposDeFaltaSeleccionados++;
 
-        if (erroresFechas.length > 0) {
-            Swal.fire({ icon: 'error', title: '️ Fechas Incompletas', html: `<div class="text-left text-sm"><p class="mb-2 font-semibold">Debe completar las siguientes fechas:</p><ul class="text-red-600 space-y-1">${erroresFechas.map(e => `<li>${e}</li>`).join('')}</ul><p class="mt-3 text-gray-600 text-xs">💡 Las fechas se muestran automáticamente al ingresar una cantidad mayor a 0 en el registro de faltas.</p></div>`, confirmButtonColor: '#3b82f6', confirmButtonText: 'Entendido' });
+        if (tiposDeFaltaSeleccionados > 1) {
+            Swal.fire({
+                icon: 'error',
+                title: '⚠️ Regla de Negocio',
+                html: '<p class="text-sm">Solo se permite guardar <strong>UN tipo de falta</strong> a la vez (Leve, Grave o Gravísima).</p><p class="text-xs text-gray-500 mt-2">Por favor, deje en 0 los otros tipos de falta.</p>',
+                confirmButtonColor: '#3b82f6'
+            });
             return;
         }
 
-        if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') {
-            const confirm = await Swal.fire({ icon: 'warning', title: '¿Confirmar Baja?', html: `Se marcará al estudiante como <strong>INACTIVO</strong> con tipo de baja: <strong>${tipoBaja}</strong>.`, showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Sí, guardar baja', cancelButtonText: 'Cancelar' });
+        // ==========================================
+        // VALIDACIÓN 2: Debe haber al menos una acción (Falta o Baja)
+        // ==========================================
+        if (tiposDeFaltaSeleccionados === 0 && !hayBaja) {
+            Swal.fire({
+                icon: 'warning',
+                title: '️ Registro Incompleto',
+                html: '<p class="text-sm">Debe registrar al menos una falta o seleccionar un Tipo de Baja.</p>',
+                confirmButtonColor: '#3b82f6'
+            });
+            return;
+        }
+
+        // ==========================================
+        // VALIDACIÓN 3: Fechas Obligatorias según selección
+        // ==========================================
+        const erroresFechas = [];
+
+        // Si hay faltas Leves
+        if (levesCant > 0) {
+            if (!document.getElementById('disc-fecha-leve').value) erroresFechas.push('Fecha de Falta Leve');
+            if (!document.getElementById('disc-fecha-leve-recibida').value) erroresFechas.push('Fecha Recibida de Falta Leve');
+        }
+
+        // Si hay faltas Graves
+        if (gravesCant > 0) {
+            if (!document.getElementById('disc-fecha-grave').value) erroresFechas.push('Fecha de Falta Grave');
+            if (!document.getElementById('disc-fecha-grave-recibida').value) erroresFechas.push('Fecha Recibida de Falta Grave');
+        }
+
+        // Si hay faltas Gravísimas
+        if (gravisimasCant > 0) {
+            if (!document.getElementById('disc-fecha-gravisima').value) erroresFechas.push('Fecha de Falta Gravísima');
+            if (!document.getElementById('disc-fecha-gravisima-recibida').value) erroresFechas.push('Fecha Recibida de Falta Gravísima');
+        }
+
+        // Si hay Tipo de Baja
+        if (hayBaja) {
+            if (!document.getElementById('disc-fecha-baja').value) erroresFechas.push('Fecha de Baja');
+        }
+
+        // Detener si faltan fechas
+        if (erroresFechas.length > 0) {
+            Swal.fire({
+                icon: 'error',
+                title: '⚠️ Fechas Incompletas',
+                html: `
+                    <div class="text-left text-sm">
+                        <p class="mb-2">Debe completar las siguientes fechas obligatorias:</p>
+                        <ul class="text-red-600 space-y-1 list-disc pl-5">
+                            ${erroresFechas.map(e => `<li>${e}</li>`).join('')}
+                        </ul>
+                    </div>
+                `,
+                confirmButtonColor: '#3b82f6',
+                confirmButtonText: 'Entendido'
+            });
+            return;
+        }
+
+        // ==========================================
+        // CONFIRMACIÓN DE BAJA (Si aplica)
+        // ==========================================
+        if (estatus === 'INACTIVO' && hayBaja) {
+            const confirm = await Swal.fire({
+                icon: 'warning',
+                title: '¿Confirmar Baja?',
+                html: `Se marcará al estudiante como <strong>INACTIVO</strong> con tipo de baja: <strong>${tipoBaja}</strong>.`,
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Sí, guardar',
+                cancelButtonText: 'Cancelar'
+            });
             if (!confirm.isConfirmed) return;
         }
 
+        // ==========================================
+        // PREPARAR DATOS Y GUARDAR
+        // ==========================================
         let supervisionValor = document.getElementById('disc-supervision')?.value || 'NO';
         if (supervisionValor === 'NO APLICA' || supervisionValor === '') supervisionValor = 'NO';
 
         const datos = {
-            cedula: cedula.toUpperCase(), nombres: document.getElementById('disc-nombres').value.trim().toUpperCase(), apellidos: document.getElementById('disc-apellidos').value.trim().toUpperCase(),
-            genero: document.getElementById('disc-genero').value !== 'SELECCIONAR' ? document.getElementById('disc-genero').value : null, nucleo: document.getElementById('disc-nucleo').value.trim().toUpperCase() || 'NUEVA ESPARTA',
-            pnf: document.getElementById('disc-pnf').value.trim().toUpperCase(), proceso: document.getElementById('disc-proceso').value.trim().toUpperCase(), supervision_continua: supervisionValor,
-            tipo_baja: tipoBaja !== 'SELECCIONAR' ? tipoBaja : null, fecha_baja: document.getElementById('disc-fecha-baja').value || null,
-            faltas_leves_fecha: document.getElementById('disc-fecha-leve').value || null, fecha_falta_leve_recibida: document.getElementById('disc-fecha-leve-recibida').value || null,
-            faltas_graves_fecha: document.getElementById('disc-fecha-grave').value || null, faltas_graves_fecha_recibida: document.getElementById('disc-fecha-grave-recibida').value || null,
-            faltas_gravisima_fecha: document.getElementById('disc-fecha-gravisima').value || null, faltas_gravisima_fecha_recibida: document.getElementById('disc-fecha-gravisima-recibida').value || null,
-            fecha_incidencia_estudiante: document.getElementById('disc-fecha-incidencia').value || null, consejo_disciplinario_fecha: document.getElementById('disc-fecha-consejo').value || null,
-            causal_faltas_graves_impuesta: document.getElementById('disc-causal-graves').value.trim() || null, programa_supervision_intensiva_aplicado_grave_impuesta: document.getElementById('disc-programa-supervision').value.trim() || null,
-            acta_compromiso: document.getElementById('disc-acta-compromiso').value.trim() || null, observaciones_jefe: document.getElementById('disc-observaciones').value.trim() || null,
-            estatus_general: estatus, faltas_leves_cant: levesCant, faltas_graves_cant: gravesCant, faltas_gravisimas_cant: gravisimasCant, creado_por: window.appState.usuarioActualId || null
+            cedula: cedula.toUpperCase(),
+            nombres: document.getElementById('disc-nombres').value.trim().toUpperCase(),
+            apellidos: document.getElementById('disc-apellidos').value.trim().toUpperCase(),
+            genero: document.getElementById('disc-genero').value !== 'SELECCIONAR' ? document.getElementById('disc-genero').value : null,
+            nucleo: document.getElementById('disc-nucleo').value.trim().toUpperCase() || 'NUEVA ESPARTA',
+            pnf: document.getElementById('disc-pnf').value.trim().toUpperCase(),
+            proceso: document.getElementById('disc-proceso').value.trim().toUpperCase(),
+            supervision_continua: supervisionValor,
+            tipo_baja: hayBaja ? tipoBaja : null,
+            
+            // Fechas
+            fecha_baja: document.getElementById('disc-fecha-baja').value || null,
+            faltas_leves_fecha: document.getElementById('disc-fecha-leve').value || null,
+            fecha_falta_leve_recibida: document.getElementById('disc-fecha-leve-recibida').value || null,
+            faltas_graves_fecha: document.getElementById('disc-fecha-grave').value || null,
+            faltas_graves_fecha_recibida: document.getElementById('disc-fecha-grave-recibida').value || null,
+            faltas_gravisima_fecha: document.getElementById('disc-fecha-gravisima').value || null,
+            faltas_gravisima_fecha_recibida: document.getElementById('disc-fecha-gravisima-recibida').value || null,
+            fecha_incidencia_estudiante: document.getElementById('disc-fecha-incidencia').value || null,
+            consejo_disciplinario_fecha: document.getElementById('disc-fecha-consejo').value || null,
+            
+            // Textos
+            causal_faltas_graves_impuesta: document.getElementById('disc-causal-graves').value.trim() || null,
+            programa_supervision_intensiva_aplicado_grave_impuesta: document.getElementById('disc-programa-supervision').value.trim() || null,
+            acta_compromiso: document.getElementById('disc-acta-compromiso').value.trim() || null,
+            observaciones_jefe: document.getElementById('disc-observaciones').value.trim() || null,
+            
+            // Contadores y Estatus
+            estatus_general: estatus,
+            faltas_leves_cant: levesCant,
+            faltas_graves_cant: gravesCant,
+            faltas_gravisimas_cant: gravisimasCant,
+            creado_por: window.appState.usuarioActualId || null
         };
+
+        console.log('💾 Datos a guardar:', datos);
 
         try {
             let result;
-            if (this.registroActualId) result = await window.supabaseClient.from('disc_registros').update(datos).eq('id', this.registroActualId);
-            else {
+            if (this.registroActualId) {
+                result = await window.supabaseClient.from('disc_registros').update(datos).eq('id', this.registroActualId);
+            } else {
                 result = await window.supabaseClient.from('disc_registros').insert([datos]).select();
-                if (result.data && result.data.length > 0) { this.registroActualId = result.data[0].id; }
+                if (result.data && result.data.length > 0) {
+                    this.registroActualId = result.data[0].id;
+                }
             }
+
             if (result.error) throw result.error;
 
-            if (estatus === 'INACTIVO' && tipoBaja !== 'SELECCIONAR') await this.actualizarEstatusEstudiante(cedula.toUpperCase(), 'Inactivo');
+            if (estatus === 'INACTIVO' && hayBaja) {
+                await this.actualizarEstatusEstudiante(cedula.toUpperCase(), 'Inactivo');
+            }
 
-            Swal.fire({ icon: 'success', title: this.registroActualId ? '✅ Registro Actualizado' : '✅ Nuevo Registro Guardado', text: 'La información disciplinaria se guardó correctamente', timer: 2500, showConfirmButton: false });
+            Swal.fire({
+                icon: 'success',
+                title: this.registroActualId ? '✅ Registro Actualizado' : '✅ Nuevo Registro Guardado',
+                text: 'La información disciplinaria se guardó correctamente',
+                timer: 2500,
+                showConfirmButton: false
+            });
+
             await this.cargarLista();
             setTimeout(() => this.resaltarEstudianteEnTabla(cedula.toUpperCase()), 300);
             this.limpiarCamposDisciplinarios();
+
         } catch (e) {
-            console.error(' Error al guardar:', e);
+            console.error('❌ Error al guardar:', e);
             Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar: ' + e.message });
         }
     },
+    
 
     limpiarCamposDisciplinarios: function() {
         this.registroActualId = null;
