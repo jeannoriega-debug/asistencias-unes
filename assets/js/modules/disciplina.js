@@ -1,6 +1,6 @@
 /**
  * MÓDULO CONSEJO DISCIPLINARIO 2026
- * Versión: 3.8 - Agrega botón eliminar en modal de detalle de faltas
+ * Versión: 3.9 - Validaciones estrictas + Detección de estado de baja
  */
 
 window.modules = window.modules || {};
@@ -10,7 +10,7 @@ window.modules.disciplina = {
     datosCache: [],
 
     init: async function() {
-        console.log('🚀 Iniciando módulo Disciplinario v3.8...');
+        console.log('🚀 Iniciando módulo Disciplinario v3.9...');
         await this.cargarLista();
         
         const inputBusqueda = document.getElementById('buscar-cedula');
@@ -122,7 +122,7 @@ window.modules.disciplina = {
             this.datosCache = data || [];
 
             if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500 bg-gray-50 rounded-lg"> No hay registros disciplinarios</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500 bg-gray-50 rounded-lg">📭 No hay registros disciplinarios</td></tr>';
                 return;
             }
 
@@ -180,7 +180,7 @@ window.modules.disciplina = {
                     <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_gravisimas}</span></td>
                     <td class="p-2 text-center">
                         <div class="flex justify-center gap-1">
-                            <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" title="Ver Detalle">👁️</button>
+                            <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" title="Ver Detalle">️</button>
                             <button onclick="window.modules.disciplina.eliminarEstudiante('${est.cedula}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" title="Eliminar">🗑️</button>
                         </div>
                     </td>
@@ -189,7 +189,7 @@ window.modules.disciplina = {
             });
         } catch (e) {
             console.error('❌ Error cargando lista:', e);
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold"> Error al cargar datos.</td></tr>';
         }
     },
 
@@ -220,13 +220,83 @@ window.modules.disciplina = {
                 const totalGraves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_graves_cant || 0), 0) : 0;
                 const totalGravisimas = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_gravisimas_cant || 0), 0) : 0;
 
+                // ✅ DETECTAR SI ESTÁ DE BAJA
+                let estaDeBaja = false;
+                let tipoBajaEstudiante = null;
+                let fechaBajaEstudiante = null;
+
+                if (registrosDisc && registrosDisc.length > 0) {
+                    const registroBaja = registrosDisc.find(r => r.tipo_baja && r.tipo_baja !== 'SELECCIONAR');
+                    if (registroBaja) {
+                        estaDeBaja = true;
+                        tipoBajaEstudiante = registroBaja.tipo_baja;
+                        fechaBajaEstudiante = registroBaja.fecha_baja;
+                    }
+                }
+
+                // Formatear tipo de baja para mostrar
+                const tipoBajaFormateado = tipoBajaEstudiante 
+                    ? tipoBajaEstudiante.replace('BAJA_', '').replace(/_/g, ' ')
+                    : '';
+
                 Swal.fire({
                     title: ` ${estudiante.nombres} ${estudiante.apellidos}`,
-                    html: `<div style="text-align: left; font-size: 14px; line-height: 1.8;"><h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;"> DATOS PERSONALES</h3><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;"><p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p><p><strong>Género:</strong> ${estudiante.genero || 'N/A'}</p><p><strong>Núcleo:</strong> ${estudiante.nucleo || 'NUEVA ESPARTA'}</p><p><strong>Ambiente:</strong> ${estudiante.ambiente || 'N/A'}</p></div><h3 style="border-bottom: 2px solid #10b981; padding-bottom: 5px; color: #10b981; margin-top: 15px; font-size: 16px;">🎓 DATOS ACADÉMICOS</h3><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;"><p><strong>PNF:</strong> ${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p><p><strong>Proceso:</strong> ${estudiante.proceso || 'N/A'}</p><p><strong>Categoría:</strong> ${estudiante.categoria || 'N/A'}</p><p><strong>Trayecto:</strong> ${estudiante.trayecto_id ? 'Asignado' : 'No asignado'}</p></div><h3 style="border-bottom: 2px solid #f59e0b; padding-bottom: 5px; color: #f59e0b; margin-top: 15px; font-size: 16px;">📊 ESTADÍSTICAS DISCIPLINARIAS</h3><div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;"><div style="background: #fef3c7; padding: 8px; border-radius: 5px;"><strong style="color: #d97706;">${totalLeves}</strong><br><span style="font-size: 12px;">Leves</span></div><div style="background: #fee2e2; padding: 8px; border-radius: 5px;"><strong style="color: #dc2626;">${totalGraves}</strong><br><span style="font-size: 12px;">Graves</span></div><div style="background: #1f2937; color: white; padding: 8px; border-radius: 5px;"><strong style="color: white;">${totalGravisimas}</strong><br><span style="font-size: 12px;">Gravísimas</span></div></div><p style="margin-top: 10px; text-align: center;"><strong>Total Registros:</strong> ${totalRegistros}</p><h3 style="border-bottom: 2px solid ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; padding-bottom: 5px; color: ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; margin-top: 15px; font-size: 16px;">ESTATUS GENERAL</h3><p style="text-align: center; font-size: 16px;"><strong>Estado:</strong> <span style="padding: 5px 15px; border-radius: 20px; background: ${estudiante.status === 'Activo' ? '#d1fae5' : '#fee2e2'}; color: ${estudiante.status === 'Activo' ? '#065f46' : '#991b1b'}; font-weight: bold;">${estudiante.status || 'ACTIVO'}</span></p></div>`,
-                    width: 700, padding: '25px', showCloseButton: true, showCancelButton: false, confirmButtonText: 'Aceptar', confirmButtonColor: '#3b82f6', focusConfirm: false, customClass: { popup: 'rounded-xl shadow-2xl' }
+                    html: `
+                        <div style="text-align: left; font-size: 14px; line-height: 1.8;">
+                            <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">📋 DATOS PERSONALES</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p>
+                                <p><strong>Género:</strong> ${estudiante.genero || 'N/A'}</p>
+                                <p><strong>Núcleo:</strong> ${estudiante.nucleo || 'NUEVA ESPARTA'}</p>
+                                <p><strong>Ambiente:</strong> ${estudiante.ambiente || 'N/A'}</p>
+                            </div>
+                            
+                            <h3 style="border-bottom: 2px solid #10b981; padding-bottom: 5px; color: #10b981; margin-top: 15px; font-size: 16px;">🎓 DATOS ACADÉMICOS</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <p><strong>PNF:</strong> ${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
+                                <p><strong>Proceso:</strong> ${estudiante.proceso || 'N/A'}</p>
+                                <p><strong>Categoría:</strong> ${estudiante.categoria || 'N/A'}</p>
+                                <p><strong>Trayecto:</strong> ${estudiante.trayecto_id ? 'Asignado' : 'No asignado'}</p>
+                            </div>
+
+                            <h3 style="border-bottom: 2px solid #f59e0b; padding-bottom: 5px; color: #f59e0b; margin-top: 15px; font-size: 16px;">📊 ESTADÍSTICAS DISCIPLINARIAS</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+                                <div style="background: #fef3c7; padding: 8px; border-radius: 5px;"><strong style="color: #d97706;">${totalLeves}</strong><br><span style="font-size: 12px;">Leves</span></div>
+                                <div style="background: #fee2e2; padding: 8px; border-radius: 5px;"><strong style="color: #dc2626;">${totalGraves}</strong><br><span style="font-size: 12px;">Graves</span></div>
+                                <div style="background: #1f2937; color: white; padding: 8px; border-radius: 5px;"><strong style="color: white;">${totalGravisimas}</strong><br><span style="font-size: 12px;">Gravísimas</span></div>
+                            </div>
+                            <p style="margin-top: 10px; text-align: center;"><strong>Total Registros:</strong> ${totalRegistros}</p>
+                            
+                            <h3 style="border-bottom: 2px solid ${estaDeBaja ? '#dc2626' : (estudiante.status === 'Activo' ? '#10b981' : '#ef4444')}; padding-bottom: 5px; color: ${estaDeBaja ? '#dc2626' : (estudiante.status === 'Activo' ? '#10b981' : '#ef4444')}; margin-top: 15px; font-size: 16px;">ESTATUS GENERAL</h3>
+                            <div style="text-align: center; margin-top: 10px;">
+                                <span style="padding: 8px 20px; border-radius: 20px; background: ${estaDeBaja ? '#fee2e2' : (estudiante.status === 'Activo' ? '#d1fae5' : '#fee2e2')}; color: ${estaDeBaja ? '#991b1b' : (estudiante.status === 'Activo' ? '#065f46' : '#991b1b')}; font-weight: bold; font-size: 16px; display: inline-block;">
+                                    ${estaDeBaja ? '🚫 DE BAJA' : (estudiante.status || 'ACTIVO')}
+                                </span>
+                            </div>
+                            ${estaDeBaja ? `
+                                <div style="background: #fef2f2; border: 2px solid #fca5a5; border-radius: 8px; padding: 12px; margin-top: 10px;">
+                                    <p style="margin: 0; font-size: 14px; color: #991b1b;"><strong>📋 Tipo de Baja:</strong> ${tipoBajaFormateado}</p>
+                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #991b1b;"><strong>📅 Fecha de Baja:</strong> ${fechaBajaEstudiante ? this.formatearFecha(fechaBajaEstudiante) : 'No registrada'}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `,
+                    width: 700,
+                    padding: '25px',
+                    showCloseButton: true,
+                    showCancelButton: false,
+                    confirmButtonText: 'Aceptar',
+                    confirmButtonColor: estaDeBaja ? '#dc2626' : '#3b82f6',
+                    focusConfirm: false,
+                    customClass: {
+                        popup: 'rounded-xl shadow-2xl',
+                        title: estaDeBaja ? 'text-red-600' : ''
+                    },
+                    background: estaDeBaja ? '#fef2f2' : '#ffffff'
                 });
+
                 if (registrosDisc && registrosDisc.length > 0) await this.renderizarTablaFiltrada(registrosDisc);
-                else document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500"> No hay registros disciplinarios</td></tr>';
+                else document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros disciplinarios</td></tr>';
                 return;
             }
             Swal.fire({ icon: 'error', title: 'No Encontrado', html: `Cédula <strong>${cedulaInput}</strong> no encontrada`, toast: false });
@@ -344,9 +414,6 @@ window.modules.disciplina = {
         }
     },
 
-    /**
-     * 🗑️ Eliminar un registro de falta específico
-     */
     eliminarRegistroFalta: async function(id) {
         const registro = this.datosCache.find(r => r.id === id);
         if (!registro) { Swal.fire('Error', 'No se encontró el registro', 'error'); return; }
@@ -360,7 +427,7 @@ window.modules.disciplina = {
                     <p class="text-gray-700 mb-2"><strong>Estudiante:</strong> ${registro.nombres} ${registro.apellidos}</p>
                     <p class="text-gray-700 mb-2"><strong>Cédula:</strong> ${registro.cedula}</p>
                     <div class="bg-red-50 border-l-4 border-red-400 p-2 mt-3">
-                        <p class="text-sm text-red-700"><strong>️ Advertencia:</strong> Esta acción no se puede deshacer y eliminará el registro de la base de datos.</p>
+                        <p class="text-sm text-red-700"><strong>⚠️ Advertencia:</strong> Esta acción no se puede deshacer y eliminará el registro de la base de datos.</p>
                     </div>
                 </div>
             `,
@@ -382,7 +449,7 @@ window.modules.disciplina = {
             this.cerrarModal();
             await this.cargarLista();
         } catch (e) {
-            console.error(' Error al eliminar registro:', e);
+            console.error('❌ Error al eliminar registro:', e);
             Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo eliminar el registro: ' + e.message });
         }
     },
@@ -425,7 +492,7 @@ window.modules.disciplina = {
                 <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_leves}</span></td>
                 <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_graves}</span></td>
                 <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_gravisimas}</span></td>
-                <td class="p-2 text-center"><div class="flex justify-center gap-1"><button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" title="Ver Detalle">👁️</button></div></td>
+                <td class="p-2 text-center"><div class="flex justify-center gap-1"><button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" title="Ver Detalle">️</button></div></td>
             `;
             tbody.appendChild(tr);
         });
@@ -470,7 +537,7 @@ window.modules.disciplina = {
         if (tiposDeFaltaSeleccionados === 0 && !hayBaja) {
             Swal.fire({
                 icon: 'warning',
-                title: '️ Registro Incompleto',
+                title: '⚠️ Registro Incompleto',
                 html: '<p class="text-sm">Debe registrar al menos una falta o seleccionar un Tipo de Baja.</p>',
                 confirmButtonColor: '#3b82f6'
             });
@@ -482,30 +549,25 @@ window.modules.disciplina = {
         // ==========================================
         const erroresFechas = [];
 
-        // Si hay faltas Leves
         if (levesCant > 0) {
             if (!document.getElementById('disc-fecha-leve').value) erroresFechas.push('Fecha de Falta Leve');
             if (!document.getElementById('disc-fecha-leve-recibida').value) erroresFechas.push('Fecha Recibida de Falta Leve');
         }
 
-        // Si hay faltas Graves
         if (gravesCant > 0) {
             if (!document.getElementById('disc-fecha-grave').value) erroresFechas.push('Fecha de Falta Grave');
             if (!document.getElementById('disc-fecha-grave-recibida').value) erroresFechas.push('Fecha Recibida de Falta Grave');
         }
 
-        // Si hay faltas Gravísimas
         if (gravisimasCant > 0) {
             if (!document.getElementById('disc-fecha-gravisima').value) erroresFechas.push('Fecha de Falta Gravísima');
             if (!document.getElementById('disc-fecha-gravisima-recibida').value) erroresFechas.push('Fecha Recibida de Falta Gravísima');
         }
 
-        // Si hay Tipo de Baja
         if (hayBaja) {
             if (!document.getElementById('disc-fecha-baja').value) erroresFechas.push('Fecha de Baja');
         }
 
-        // Detener si faltan fechas
         if (erroresFechas.length > 0) {
             Swal.fire({
                 icon: 'error',
@@ -527,14 +589,16 @@ window.modules.disciplina = {
         // ==========================================
         // CONFIRMACIÓN DE BAJA (Si aplica)
         // ==========================================
-        if (estatus === 'INACTIVO' && hayBaja) {
+        const debeProcesarBaja = hayBaja;
+
+        if (debeProcesarBaja) {
             const confirm = await Swal.fire({
                 icon: 'warning',
                 title: '¿Confirmar Baja?',
-                html: `Se marcará al estudiante como <strong>INACTIVO</strong> con tipo de baja: <strong>${tipoBaja}</strong>.`,
+                html: `Se marcará al estudiante como <strong>INACTIVO</strong> con tipo de baja: <strong>${tipoBaja}</strong>.<br><br>Esto actualizará su estatus en la matrícula general.`,
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
-                confirmButtonText: 'Sí, guardar',
+                confirmButtonText: 'Sí, procesar baja',
                 cancelButtonText: 'Cancelar'
             });
             if (!confirm.isConfirmed) return;
@@ -557,7 +621,6 @@ window.modules.disciplina = {
             supervision_continua: supervisionValor,
             tipo_baja: hayBaja ? tipoBaja : null,
             
-            // Fechas
             fecha_baja: document.getElementById('disc-fecha-baja').value || null,
             faltas_leves_fecha: document.getElementById('disc-fecha-leve').value || null,
             fecha_falta_leve_recibida: document.getElementById('disc-fecha-leve-recibida').value || null,
@@ -568,14 +631,12 @@ window.modules.disciplina = {
             fecha_incidencia_estudiante: document.getElementById('disc-fecha-incidencia').value || null,
             consejo_disciplinario_fecha: document.getElementById('disc-fecha-consejo').value || null,
             
-            // Textos
             causal_faltas_graves_impuesta: document.getElementById('disc-causal-graves').value.trim() || null,
             programa_supervision_intensiva_aplicado_grave_impuesta: document.getElementById('disc-programa-supervision').value.trim() || null,
             acta_compromiso: document.getElementById('disc-acta-compromiso').value.trim() || null,
             observaciones_jefe: document.getElementById('disc-observaciones').value.trim() || null,
             
-            // Contadores y Estatus
-            estatus_general: estatus,
+            estatus_general: debeProcesarBaja ? 'INACTIVO' : estatus,
             faltas_leves_cant: levesCant,
             faltas_graves_cant: gravesCant,
             faltas_gravisimas_cant: gravisimasCant,
@@ -597,14 +658,16 @@ window.modules.disciplina = {
 
             if (result.error) throw result.error;
 
-            if (estatus === 'INACTIVO' && hayBaja) {
+            // ✅ ACTUALIZAR TABLA ESTUDIANTES SI HAY BAJA
+            if (debeProcesarBaja) {
                 await this.actualizarEstatusEstudiante(cedula.toUpperCase(), 'Inactivo');
+                console.log('✅ Estatus actualizado en tabla estudiantes');
             }
 
             Swal.fire({
                 icon: 'success',
                 title: this.registroActualId ? '✅ Registro Actualizado' : '✅ Nuevo Registro Guardado',
-                text: 'La información disciplinaria se guardó correctamente',
+                text: debeProcesarBaja ? 'Baja procesada correctamente' : 'La información disciplinaria se guardó correctamente',
                 timer: 2500,
                 showConfirmButton: false
             });
@@ -618,7 +681,6 @@ window.modules.disciplina = {
             Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar: ' + e.message });
         }
     },
-    
 
     limpiarCamposDisciplinarios: function() {
         this.registroActualId = null;
@@ -647,7 +709,11 @@ window.modules.disciplina = {
     },
 
     actualizarEstatusEstudiante: async function(cedula, nuevoEstatus) {
-        try { const { error } = await window.supabaseClient.from('estudiantes').update({ status: nuevoEstatus }).eq('cedula', cedula); if (error) console.warn('⚠️ No se pudo actualizar estatus:', error.message); } catch (e) { console.error('❌ Error actualizando estatus:', e); }
+        try {
+            const { error } = await window.supabaseClient.from('estudiantes').update({ status: nuevoEstatus }).eq('cedula', cedula);
+            if (error) console.warn('⚠️ No se pudo actualizar estatus:', error.message);
+            else console.log('✅ Estatus actualizado en tabla estudiantes para:', cedula);
+        } catch (e) { console.error(' Error actualizando estatus:', e); }
     },
 
     eliminarEstudiante: async function(cedula) {
@@ -700,7 +766,7 @@ window.guardarRegistro = function() { window.modules.disciplina.guardarRegistro(
 window.limpiarFormulario = function() { window.modules.disciplina.limpiarFormulario(); };
 window.limpiarTodo = function() { window.modules.disciplina.limpiarTodo(); };
 window.filtrarRegistros = function(filtro) { window.modules.disciplina.filtrarRegistros(filtro); };
-window.generarReporteProceso = function() { Swal.fire('ℹ️ Info', 'Generación de reporte de proceso en desarrollo', 'info'); };
+window.generarReporteProceso = function() { Swal.fire('️ Info', 'Generación de reporte de proceso en desarrollo', 'info'); };
 window.generarReporteBajas = function() { abrirModalBajas(); };
 window.cerrarSesion = function() { if (window.supabaseClient) window.supabaseClient.auth.signOut().then(() => window.location.href = 'index.html'); else window.location.href = 'index.html'; };
 
@@ -772,4 +838,4 @@ async function descargarPDFBajas() {
     } catch (e) { console.error('❌ Error generando PDF:', e); Swal.fire('Error', 'No se pudo generar el PDF: ' + e.message, 'error'); }
 }
 
-console.log('✅ Módulo Consejo Disciplinario v3.8 Cargado');
+console.log('✅ Módulo Consejo Disciplinario v3.9 Cargado');
