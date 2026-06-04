@@ -181,7 +181,6 @@ window.modules.disciplina = {
                     <td class="p-2 text-center">
                         <div class="flex justify-center gap-1">
                             <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" title="Ver Detalle">️</button>
-                            <button onclick="window.modules.disciplina.eliminarEstudiante('${est.cedula}')" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" title="Eliminar">🗑️</button>
                         </div>
                     </td>
                 `;
