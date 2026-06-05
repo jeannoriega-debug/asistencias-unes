@@ -248,61 +248,80 @@ cargarLista: async function() {
                     ? tipoBajaEstudiante.replace('BAJA_', '').replace(/_/g, ' ')
                     : '';
 
-                Swal.fire({
-                    title: ` ${estudiante.nombres} ${estudiante.apellidos}`,
-                    html: `
-                        <div style="text-align: left; font-size: 14px; line-height: 1.8;">
-                            <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">📋 DATOS PERSONALES</h3>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                                <p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p>
-                                <p><strong>Género:</strong> ${estudiante.genero || 'N/A'}</p>
-                                <p><strong>Núcleo:</strong> ${estudiante.nucleo || 'NUEVA ESPARTA'}</p>
-                                <p><strong>Ambiente:</strong> ${estudiante.ambiente || 'N/A'}</p>
-                            </div>
-                            
-                            <h3 style="border-bottom: 2px solid #10b981; padding-bottom: 5px; color: #10b981; margin-top: 15px; font-size: 16px;">🎓 DATOS ACADÉMICOS</h3>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                                <p><strong>PNF:</strong> ${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
-                                <p><strong>Proceso:</strong> ${estudiante.proceso || 'N/A'}</p>
-                                <p><strong>Categoría:</strong> ${estudiante.categoria || 'N/A'}</p>
-                                <p><strong>Trayecto:</strong> ${estudiante.trayecto_id ? 'Asignado' : 'No asignado'}</p>
-                            </div>
+// Dentro de buscarPorCedula, después de detectar estaDeBaja:
 
-                            <h3 style="border-bottom: 2px solid #f59e0b; padding-bottom: 5px; color: #f59e0b; margin-top: 15px; font-size: 16px;">📊 ESTADÍSTICAS DISCIPLINARIAS</h3>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
-                                <div style="background: #fef3c7; padding: 8px; border-radius: 5px;"><strong style="color: #d97706;">${totalLeves}</strong><br><span style="font-size: 12px;">Leves</span></div>
-                                <div style="background: #fee2e2; padding: 8px; border-radius: 5px;"><strong style="color: #dc2626;">${totalGraves}</strong><br><span style="font-size: 12px;">Graves</span></div>
-                                <div style="background: #1f2937; color: white; padding: 8px; border-radius: 5px;"><strong style="color: white;">${totalGravisimas}</strong><br><span style="font-size: 12px;">Gravísimas</span></div>
-                            </div>
-                            <p style="margin-top: 10px; text-align: center;"><strong>Total Registros:</strong> ${totalRegistros}</p>
-                            
-                            <h3 style="border-bottom: 2px solid ${estaDeBaja ? '#dc2626' : (estudiante.status === 'Activo' ? '#10b981' : '#ef4444')}; padding-bottom: 5px; color: ${estaDeBaja ? '#dc2626' : (estudiante.status === 'Activo' ? '#10b981' : '#ef4444')}; margin-top: 15px; font-size: 16px;">ESTATUS GENERAL</h3>
-                            <div style="text-align: center; margin-top: 10px;">
-                                <span style="padding: 8px 20px; border-radius: 20px; background: ${estaDeBaja ? '#fee2e2' : (estudiante.status === 'Activo' ? '#d1fae5' : '#fee2e2')}; color: ${estaDeBaja ? '#991b1b' : (estudiante.status === 'Activo' ? '#065f46' : '#991b1b')}; font-weight: bold; font-size: 16px; display: inline-block;">
-                                    ${estaDeBaja ? '🚫 DE BAJA' : (estudiante.status || 'ACTIVO')}
-                                </span>
-                            </div>
-                            ${estaDeBaja ? `
-                                <div style="background: #fef2f2; border: 2px solid #fca5a5; border-radius: 8px; padding: 12px; margin-top: 10px;">
-                                    <p style="margin: 0; font-size: 14px; color: #991b1b;"><strong>📋 Tipo de Baja:</strong> ${tipoBajaFormateado}</p>
-                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #991b1b;"><strong>📅 Fecha de Baja:</strong> ${fechaBajaEstudiante ? this.formatearFecha(fechaBajaEstudiante) : 'No registrada'}</p>
-                                </div>
-                            ` : ''}
-                        </div>
-                    `,
-                    width: 700,
-                    padding: '25px',
-                    showCloseButton: true,
-                    showCancelButton: false,
-                    confirmButtonText: 'Aceptar',
-                    confirmButtonColor: estaDeBaja ? '#dc2626' : '#3b82f6',
-                    focusConfirm: false,
-                    customClass: {
-                        popup: 'rounded-xl shadow-2xl',
-                        title: estaDeBaja ? 'text-red-600' : ''
-                    },
-                    background: estaDeBaja ? '#fef2f2' : '#ffffff'
-                });
+Swal.fire({
+    title: estaDeBaja ? '🚫 ESTUDIANTE DE BAJA' : `👤 ${estudiante.nombres} ${estudiante.apellidos}`,
+    html: estaDeBaja ? `
+        <div class="text-left text-sm">
+            <div class="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-3">
+                <p class="text-xs text-gray-600 mb-1"><strong>Cédula:</strong></p>
+                <p class="text-lg font-bold text-gray-800 mb-3">${estudiante.cedula || 'N/A'}</p>
+                
+                <p class="text-xs text-gray-600 mb-1"><strong>Nombre:</strong></p>
+                <p class="text-base font-semibold text-gray-800 mb-3">${estudiante.nombres} ${estudiante.apellidos}</p>
+                
+                <p class="text-xs text-gray-600 mb-1"><strong>PNF:</strong></p>
+                <p class="text-base font-semibold text-blue-700 mb-3">${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
+                
+                <p class="text-xs text-gray-600 mb-1"><strong>Motivo de Baja:</strong></p>
+                <p class="text-base font-bold text-red-700 mb-3">${tipoBajaFormateado}</p>
+                
+                <p class="text-xs text-gray-600 mb-1"><strong>Fecha de Baja:</strong></p>
+                <p class="text-base font-semibold text-gray-800">${fechaBajaEstudiante ? this.formatearFecha(fechaBajaEstudiante) : 'No registrada'}</p>
+            </div>
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                <p class="text-sm text-yellow-800 text-center font-semibold">
+                    ⚠️ Este estudiante no puede ser registrado nuevamente.
+                </p>
+            </div>
+        </div>
+    ` : `
+        <div style="text-align: left; font-size: 14px; line-height: 1.8;">
+            <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">📋 DATOS PERSONALES</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p>
+                <p><strong>Género:</strong> ${estudiante.genero || 'N/A'}</p>
+                <p><strong>Núcleo:</strong> ${estudiante.nucleo || 'NUEVA ESPARTA'}</p>
+                <p><strong>Ambiente:</strong> ${estudiante.ambiente || 'N/A'}</p>
+            </div>
+            
+            <h3 style="border-bottom: 2px solid #10b981; padding-bottom: 5px; color: #10b981; margin-top: 15px; font-size: 16px;">🎓 DATOS ACADÉMICOS</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <p><strong>PNF:</strong> ${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
+                <p><strong>Proceso:</strong> ${estudiante.proceso || 'N/A'}</p>
+                <p><strong>Categoría:</strong> ${estudiante.categoria || 'N/A'}</p>
+                <p><strong>Trayecto:</strong> ${estudiante.trayecto_id ? 'Asignado' : 'No asignado'}</p>
+            </div>
+
+            <h3 style="border-bottom: 2px solid #f59e0b; padding-bottom: 5px; color: #f59e0b; margin-top: 15px; font-size: 16px;">📊 ESTADÍSTICAS DISCIPLINARIAS</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+                <div style="background: #fef3c7; padding: 8px; border-radius: 5px;"><strong style="color: #d97706;">${totalLeves}</strong><br><span style="font-size: 12px;">Leves</span></div>
+                <div style="background: #fee2e2; padding: 8px; border-radius: 5px;"><strong style="color: #dc2626;">${totalGraves}</strong><br><span style="font-size: 12px;">Graves</span></div>
+                <div style="background: #1f2937; color: white; padding: 8px; border-radius: 5px;"><strong style="color: white;">${totalGravisimas}</strong><br><span style="font-size: 12px;">Gravísimas</span></div>
+            </div>
+            <p style="margin-top: 10px; text-align: center;"><strong>Total Registros:</strong> ${totalRegistros}</p>
+            
+            <h3 style="border-bottom: 2px solid ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; padding-bottom: 5px; color: ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; margin-top: 15px; font-size: 16px;">ESTATUS GENERAL</h3>
+            <p style="text-align: center; font-size: 16px;">
+                <span style="padding: 5px 15px; border-radius: 20px; background: ${estudiante.status === 'Activo' ? '#d1fae5' : '#fee2e2'}; color: ${estudiante.status === 'Activo' ? '#065f46' : '#991b1b'}; font-weight: bold;">
+                    ${estudiante.status || 'ACTIVO'}
+                </span>
+            </p>
+        </div>
+    `,
+    width: estaDeBaja ? '450px' : '700px',
+    padding: estaDeBaja ? '20px' : '25px',
+    showCloseButton: true,
+    showCancelButton: false,
+    confirmButtonText: 'Aceptar',
+    confirmButtonColor: estaDeBaja ? '#dc2626' : '#3b82f6',
+    focusConfirm: false,
+    customClass: {
+        popup: estaDeBaja ? 'rounded-xl shadow-2xl' : 'rounded-xl shadow-2xl'
+    },
+    background: estaDeBaja ? '#fef2f2' : '#ffffff'
+});
 
                 if (registrosDisc && registrosDisc.length > 0) await this.renderizarTablaFiltrada(registrosDisc);
                 else document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros disciplinarios</td></tr>';
