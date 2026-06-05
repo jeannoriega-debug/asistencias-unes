@@ -110,87 +110,97 @@ window.modules.disciplina = {
         }
     },
 
-    cargarLista: async function() {
-        const tbody = document.getElementById('lista-disciplina-body');
-        if (!tbody) return;
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8"><div class="animate-pulse text-blue-600 font-bold">⏳ Cargando registros disciplinarios...</div></td></tr>';
+cargarLista: async function() {
+    const tbody = document.getElementById('lista-disciplina-body');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8"><div class="animate-pulse text-blue-600 font-bold">⏳ Cargando registros disciplinarios...</div></td></tr>';
 
-        try {
-            const { data, error } = await window.supabaseClient.from('disc_registros').select('*').order('id', { ascending: false });
-            if (error) throw error;
-            tbody.innerHTML = ''; 
-            this.datosCache = data || [];
+    try {
+        const { data, error } = await window.supabaseClient.from('disc_registros').select('*').order('id', { ascending: false });
+        if (error) throw error;
+        tbody.innerHTML = ''; 
+        this.datosCache = data || [];
 
-            if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500 bg-gray-50 rounded-lg">📭 No hay registros disciplinarios</td></tr>';
-                return;
-            }
-
-            const estudiantesUnicos = {};
-            data.forEach(reg => {
-                if (!estudiantesUnicos[reg.cedula]) {
-                    estudiantesUnicos[reg.cedula] = {
-                        cedula: reg.cedula, nombres: reg.nombres, apellidos: reg.apellidos,
-                        pnf: reg.pnf, proceso: reg.proceso, estatus_general: reg.estatus_general,
-                        _total_leves: 0, _total_graves: 0, _total_gravisimas: 0,
-                        _ids_registros: [], _ultimo_id: reg.id
-                    };
-                }
-                estudiantesUnicos[reg.cedula]._total_leves += (reg.faltas_leves_cant || 0);
-                estudiantesUnicos[reg.cedula]._total_graves += (reg.faltas_graves_cant || 0);
-                estudiantesUnicos[reg.cedula]._total_gravisimas += (reg.faltas_gravisimas_cant || 0);
-                estudiantesUnicos[reg.cedula]._ids_registros.push(reg.id);
-                if (reg.id > estudiantesUnicos[reg.cedula]._ultimo_id) {
-                    estudiantesUnicos[reg.cedula].nombres = reg.nombres;
-                    estudiantesUnicos[reg.cedula].apellidos = reg.apellidos;
-                    estudiantesUnicos[reg.cedula].estatus_general = reg.estatus_general;
-                }
-            });
-
-            let datosFiltrados = Object.values(estudiantesUnicos);
-            if (this.filtroActual === 'ACTIVOS') datosFiltrados = datosFiltrados.filter(e => e.estatus_general === 'ACTIVO');
-            else if (this.filtroActual === 'INACTIVOS') datosFiltrados = datosFiltrados.filter(e => e.estatus_general === 'INACTIVO');
-
-            datosFiltrados.sort((a, b) => {
-                if (a.estatus_general === 'ACTIVO' && b.estatus_general === 'INACTIVO') return -1;
-                if (a.estatus_general === 'INACTIVO' && b.estatus_general === 'ACTIVO') return 1;
-                if (b._total_gravisimas !== a._total_gravisimas) return b._total_gravisimas - a._total_gravisimas;
-                if (b._total_graves !== a._total_graves) return b._total_graves - a._total_graves;
-                if (b._total_leves !== a._total_leves) return b._total_leves - a._total_leves;
-                return a.apellidos.localeCompare(b.apellidos);
-            });
-
-            datosFiltrados.forEach(est => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-blue-50 border-b border-gray-100 transition';
-                const leveClass = est._total_leves > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'bg-gray-100 text-gray-500';
-                const graveClass = est._total_graves > 0 ? 'bg-red-200 text-red-800 font-bold' : 'bg-gray-100 text-gray-500';
-                const gravisimaClass = est._total_gravisimas > 0 ? 'bg-gray-800 text-white font-bold' : 'bg-gray-100 text-gray-500';
-                const statusBadge = (est.estatus_general === 'ACTIVO') ? '<span class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-bold shadow-sm">ACTIVO</span>' : '<span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-bold shadow-sm">INACTIVO</span>';
-
-                tr.innerHTML = `
-                    <td class="p-2 text-sm text-gray-600 font-mono">${est._ultimo_id}</td>
-                    <td class="p-2 text-sm font-bold text-gray-800">${est.cedula}</td>
-                    <td class="p-2 text-sm text-gray-700">${est.nombres} ${est.apellidos}</td>
-                    <td class="p-2 text-xs uppercase font-bold tracking-wide text-gray-600 hidden md:table-cell">${est.pnf}</td>
-                    <td class="p-2 text-sm hidden md:table-cell"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">${est.proceso}</span></td>
-                    <td class="p-2">${statusBadge}</td>
-                    <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_leves}</span></td>
-                    <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_graves}</span></td>
-                    <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_gravisimas}</span></td>
-                    <td class="p-2 text-center">
-                        <div class="flex justify-center gap-1">
-                            <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" title="Ver Detalle">️</button>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        } catch (e) {
-            console.error('❌ Error cargando lista:', e);
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold"> Error al cargar datos.</td></tr>';
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500 bg-gray-50 rounded-lg">📭 No hay registros disciplinarios</td></tr>';
+            return;
         }
-    },
+
+        const estudiantesUnicos = {};
+        data.forEach(reg => {
+            if (!estudiantesUnicos[reg.cedula]) {
+                estudiantesUnicos[reg.cedula] = {
+                    cedula: reg.cedula, nombres: reg.nombres, apellidos: reg.apellidos,
+                    pnf: reg.pnf, proceso: reg.proceso, estatus_general: reg.estatus_general,
+                    _total_leves: 0, _total_graves: 0, _total_gravisimas: 0,
+                    _ids_registros: [], _ultimo_id: reg.id
+                };
+            }
+            estudiantesUnicos[reg.cedula]._total_leves += (reg.faltas_leves_cant || 0);
+            estudiantesUnicos[reg.cedula]._total_graves += (reg.faltas_graves_cant || 0);
+            estudiantesUnicos[reg.cedula]._total_gravisimas += (reg.faltas_gravisimas_cant || 0);
+            estudiantesUnicos[reg.cedula]._ids_registros.push(reg.id);
+            if (reg.id > estudiantesUnicos[reg.cedula]._ultimo_id) {
+                estudiantesUnicos[reg.cedula].nombres = reg.nombres;
+                estudiantesUnicos[reg.cedula].apellidos = reg.apellidos;
+                estudiantesUnicos[reg.cedula].estatus_general = reg.estatus_general;
+            }
+        });
+
+        let datosFiltrados = Object.values(estudiantesUnicos);
+        if (this.filtroActual === 'ACTIVOS') datosFiltrados = datosFiltrados.filter(e => e.estatus_general === 'ACTIVO');
+        else if (this.filtroActual === 'INACTIVOS') datosFiltrados = datosFiltrados.filter(e => e.estatus_general === 'INACTIVO');
+
+        datosFiltrados.sort((a, b) => {
+            if (a.estatus_general === 'ACTIVO' && b.estatus_general === 'INACTIVO') return -1;
+            if (a.estatus_general === 'INACTIVO' && b.estatus_general === 'ACTIVO') return 1;
+            if (b._total_gravisimas !== a._total_gravisimas) return b._total_gravisimas - a._total_gravisimas;
+            if (b._total_graves !== a._total_graves) return b._total_graves - a._total_graves;
+            if (b._total_leves !== a._total_leves) return b._total_leves - a._total_leves;
+            return a.apellidos.localeCompare(b.apellidos);
+        });
+
+        datosFiltrados.forEach(est => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-blue-50 border-b border-gray-100 transition';
+            const leveClass = est._total_leves > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'bg-gray-100 text-gray-500';
+            const graveClass = est._total_graves > 0 ? 'bg-red-200 text-red-800 font-bold' : 'bg-gray-100 text-gray-500';
+            const gravisimaClass = est._total_gravisimas > 0 ? 'bg-gray-800 text-white font-bold' : 'bg-gray-100 text-gray-500';
+            const statusBadge = (est.estatus_general === 'ACTIVO') ? '<span class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-bold shadow-sm">ACTIVO</span>' : '<span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-bold shadow-sm">INACTIVO</span>';
+
+            // Determinar si es baja
+            const esBaja = est.estatus_general === 'INACTIVO';
+            const actionIcon = esBaja ? 
+                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>' :
+                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
+            const actionBg = esBaja ? 'bg-red-500 hover:bg-red-600' : 'bg-yellow-500 hover:bg-yellow-600';
+            const actionTitle = esBaja ? 'Estudiante de Baja' : 'Ver Detalle';
+
+            tr.innerHTML = `
+                <td class="p-2 text-sm text-gray-600 font-mono">${est._ultimo_id}</td>
+                <td class="p-2 text-sm font-bold text-gray-800">${est.cedula}</td>
+                <td class="p-2 text-sm text-gray-700">${est.nombres} ${est.apellidos}</td>
+                <td class="p-2 text-xs uppercase font-bold tracking-wide text-gray-600 hidden md:table-cell">${est.pnf}</td>
+                <td class="p-2 text-sm hidden md:table-cell"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">${est.proceso}</span></td>
+                <td class="p-2">${statusBadge}</td>
+                <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_leves}</span></td>
+                <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_graves}</span></td>
+                <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_gravisimas}</span></td>
+                <td class="p-2 text-center">
+                    <div class="flex justify-center gap-1">
+                        <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="${actionBg} text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm flex items-center justify-center" title="${actionTitle}">
+                            ${actionIcon}
+                        </button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error('❌ Error cargando lista:', e);
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos.</td></tr>';
+    }
+},
 
     buscarPorCedula: async function() {
         const cedulaInput = document.getElementById('buscar-cedula').value.trim();
