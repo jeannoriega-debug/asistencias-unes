@@ -246,6 +246,22 @@
     <script src="assets/js/modules/asistencia-simple.js"></script>
     <script src="assets/js/modules/reportes.js"></script>
 
+<script>
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📄 Iniciando Asistencia Simplificada...');
+    if (window.modules && window.modules.asistenciaSimple) {
+        setTimeout(() => {
+            console.log('✅ Llamando a init()');
+            window.modules.asistenciaSimple.init();
+        }, 500); // Pequeña espera para asegurar que todos los scripts cargaron
+    }
+});
+</script>
+    
+
+
+    
 </body>
 
 </html>
