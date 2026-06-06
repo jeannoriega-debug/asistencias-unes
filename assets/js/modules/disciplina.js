@@ -1,6 +1,6 @@
 /**
  * MÓDULO CONSEJO DISCIPLINARIO 2026
- * Versión: 3.9 - Validaciones estrictas + Detección de estado de baja
+ * Versión: 4.0 - Fallback mejorado para estudiantes de baja
  */
 
 window.modules = window.modules || {};
@@ -10,7 +10,7 @@ window.modules.disciplina = {
     datosCache: [],
 
     init: async function() {
-        console.log('🚀 Iniciando módulo Disciplinario v3.9...');
+        console.log('🚀 Iniciando módulo Disciplinario v4.0...');
         await this.cargarLista();
         
         const inputBusqueda = document.getElementById('buscar-cedula');
@@ -110,97 +110,96 @@ window.modules.disciplina = {
         }
     },
 
-cargarLista: async function() {
-    const tbody = document.getElementById('lista-disciplina-body');
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8"><div class="animate-pulse text-blue-600 font-bold">⏳ Cargando registros disciplinarios...</div></td></tr>';
+    cargarLista: async function() {
+        const tbody = document.getElementById('lista-disciplina-body');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8"><div class="animate-pulse text-blue-600 font-bold">⏳ Cargando registros disciplinarios...</div></td></tr>';
 
-    try {
-        const { data, error } = await window.supabaseClient.from('disc_registros').select('*').order('id', { ascending: false });
-        if (error) throw error;
-        tbody.innerHTML = ''; 
-        this.datosCache = data || [];
+        try {
+            const { data, error } = await window.supabaseClient.from('disc_registros').select('*').order('id', { ascending: false });
+            if (error) throw error;
+            tbody.innerHTML = ''; 
+            this.datosCache = data || [];
 
-        if (!data || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500 bg-gray-50 rounded-lg">📭 No hay registros disciplinarios</td></tr>';
-            return;
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500 bg-gray-50 rounded-lg">📭 No hay registros disciplinarios</td></tr>';
+                return;
+            }
+
+            const estudiantesUnicos = {};
+            data.forEach(reg => {
+                if (!estudiantesUnicos[reg.cedula]) {
+                    estudiantesUnicos[reg.cedula] = {
+                        cedula: reg.cedula, nombres: reg.nombres, apellidos: reg.apellidos,
+                        pnf: reg.pnf, proceso: reg.proceso, estatus_general: reg.estatus_general,
+                        _total_leves: 0, _total_graves: 0, _total_gravisimas: 0,
+                        _ids_registros: [], _ultimo_id: reg.id
+                    };
+                }
+                estudiantesUnicos[reg.cedula]._total_leves += (reg.faltas_leves_cant || 0);
+                estudiantesUnicos[reg.cedula]._total_graves += (reg.faltas_graves_cant || 0);
+                estudiantesUnicos[reg.cedula]._total_gravisimas += (reg.faltas_gravisimas_cant || 0);
+                estudiantesUnicos[reg.cedula]._ids_registros.push(reg.id);
+                if (reg.id > estudiantesUnicos[reg.cedula]._ultimo_id) {
+                    estudiantesUnicos[reg.cedula].nombres = reg.nombres;
+                    estudiantesUnicos[reg.cedula].apellidos = reg.apellidos;
+                    estudiantesUnicos[reg.cedula].estatus_general = reg.estatus_general;
+                }
+            });
+
+            let datosFiltrados = Object.values(estudiantesUnicos);
+            if (this.filtroActual === 'ACTIVOS') datosFiltrados = datosFiltrados.filter(e => e.estatus_general === 'ACTIVO');
+            else if (this.filtroActual === 'INACTIVOS') datosFiltrados = datosFiltrados.filter(e => e.estatus_general === 'INACTIVO');
+
+            datosFiltrados.sort((a, b) => {
+                if (a.estatus_general === 'ACTIVO' && b.estatus_general === 'INACTIVO') return -1;
+                if (a.estatus_general === 'INACTIVO' && b.estatus_general === 'ACTIVO') return 1;
+                if (b._total_gravisimas !== a._total_gravisimas) return b._total_gravisimas - a._total_gravisimas;
+                if (b._total_graves !== a._total_graves) return b._total_graves - a._total_graves;
+                if (b._total_leves !== a._total_leves) return b._total_leves - a._total_leves;
+                return a.apellidos.localeCompare(b.apellidos);
+            });
+
+            datosFiltrados.forEach(est => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-blue-50 border-b border-gray-100 transition';
+                const leveClass = est._total_leves > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'bg-gray-100 text-gray-500';
+                const graveClass = est._total_graves > 0 ? 'bg-red-200 text-red-800 font-bold' : 'bg-gray-100 text-gray-500';
+                const gravisimaClass = est._total_gravisimas > 0 ? 'bg-gray-800 text-white font-bold' : 'bg-gray-100 text-gray-500';
+                const statusBadge = (est.estatus_general === 'ACTIVO') ? '<span class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-bold shadow-sm">ACTIVO</span>' : '<span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-bold shadow-sm">INACTIVO</span>';
+
+                const esBaja = est.estatus_general === 'INACTIVO';
+                const actionIcon = esBaja ? 
+                    '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>' :
+                    '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
+                const actionBg = esBaja ? 'bg-red-500 hover:bg-red-600' : 'bg-yellow-500 hover:bg-yellow-600';
+                const actionTitle = esBaja ? 'Estudiante de Baja' : 'Ver Detalle';
+
+                tr.innerHTML = `
+                    <td class="p-2 text-sm text-gray-600 font-mono">${est._ultimo_id}</td>
+                    <td class="p-2 text-sm font-bold text-gray-800">${est.cedula}</td>
+                    <td class="p-2 text-sm text-gray-700">${est.nombres} ${est.apellidos}</td>
+                    <td class="p-2 text-xs uppercase font-bold tracking-wide text-gray-600 hidden md:table-cell">${est.pnf}</td>
+                    <td class="p-2 text-sm hidden md:table-cell"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">${est.proceso}</span></td>
+                    <td class="p-2">${statusBadge}</td>
+                    <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_leves}</span></td>
+                    <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_graves}</span></td>
+                    <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_gravisimas}</span></td>
+                    <td class="p-2 text-center">
+                        <div class="flex justify-center gap-1">
+                            <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="${actionBg} text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm flex items-center justify-center" title="${actionTitle}">
+                                ${actionIcon}
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error('❌ Error cargando lista:', e);
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos.</td></tr>';
         }
-
-        const estudiantesUnicos = {};
-        data.forEach(reg => {
-            if (!estudiantesUnicos[reg.cedula]) {
-                estudiantesUnicos[reg.cedula] = {
-                    cedula: reg.cedula, nombres: reg.nombres, apellidos: reg.apellidos,
-                    pnf: reg.pnf, proceso: reg.proceso, estatus_general: reg.estatus_general,
-                    _total_leves: 0, _total_graves: 0, _total_gravisimas: 0,
-                    _ids_registros: [], _ultimo_id: reg.id
-                };
-            }
-            estudiantesUnicos[reg.cedula]._total_leves += (reg.faltas_leves_cant || 0);
-            estudiantesUnicos[reg.cedula]._total_graves += (reg.faltas_graves_cant || 0);
-            estudiantesUnicos[reg.cedula]._total_gravisimas += (reg.faltas_gravisimas_cant || 0);
-            estudiantesUnicos[reg.cedula]._ids_registros.push(reg.id);
-            if (reg.id > estudiantesUnicos[reg.cedula]._ultimo_id) {
-                estudiantesUnicos[reg.cedula].nombres = reg.nombres;
-                estudiantesUnicos[reg.cedula].apellidos = reg.apellidos;
-                estudiantesUnicos[reg.cedula].estatus_general = reg.estatus_general;
-            }
-        });
-
-        let datosFiltrados = Object.values(estudiantesUnicos);
-        if (this.filtroActual === 'ACTIVOS') datosFiltrados = datosFiltrados.filter(e => e.estatus_general === 'ACTIVO');
-        else if (this.filtroActual === 'INACTIVOS') datosFiltrados = datosFiltrados.filter(e => e.estatus_general === 'INACTIVO');
-
-        datosFiltrados.sort((a, b) => {
-            if (a.estatus_general === 'ACTIVO' && b.estatus_general === 'INACTIVO') return -1;
-            if (a.estatus_general === 'INACTIVO' && b.estatus_general === 'ACTIVO') return 1;
-            if (b._total_gravisimas !== a._total_gravisimas) return b._total_gravisimas - a._total_gravisimas;
-            if (b._total_graves !== a._total_graves) return b._total_graves - a._total_graves;
-            if (b._total_leves !== a._total_leves) return b._total_leves - a._total_leves;
-            return a.apellidos.localeCompare(b.apellidos);
-        });
-
-        datosFiltrados.forEach(est => {
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-blue-50 border-b border-gray-100 transition';
-            const leveClass = est._total_leves > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'bg-gray-100 text-gray-500';
-            const graveClass = est._total_graves > 0 ? 'bg-red-200 text-red-800 font-bold' : 'bg-gray-100 text-gray-500';
-            const gravisimaClass = est._total_gravisimas > 0 ? 'bg-gray-800 text-white font-bold' : 'bg-gray-100 text-gray-500';
-            const statusBadge = (est.estatus_general === 'ACTIVO') ? '<span class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-bold shadow-sm">ACTIVO</span>' : '<span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-bold shadow-sm">INACTIVO</span>';
-
-            // Determinar si es baja
-            const esBaja = est.estatus_general === 'INACTIVO';
-            const actionIcon = esBaja ? 
-                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>' :
-                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
-            const actionBg = esBaja ? 'bg-red-500 hover:bg-red-600' : 'bg-yellow-500 hover:bg-yellow-600';
-            const actionTitle = esBaja ? 'Estudiante de Baja' : 'Ver Detalle';
-
-            tr.innerHTML = `
-                <td class="p-2 text-sm text-gray-600 font-mono">${est._ultimo_id}</td>
-                <td class="p-2 text-sm font-bold text-gray-800">${est.cedula}</td>
-                <td class="p-2 text-sm text-gray-700">${est.nombres} ${est.apellidos}</td>
-                <td class="p-2 text-xs uppercase font-bold tracking-wide text-gray-600 hidden md:table-cell">${est.pnf}</td>
-                <td class="p-2 text-sm hidden md:table-cell"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">${est.proceso}</span></td>
-                <td class="p-2">${statusBadge}</td>
-                <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_leves}</span></td>
-                <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_graves}</span></td>
-                <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_gravisimas}</span></td>
-                <td class="p-2 text-center">
-                    <div class="flex justify-center gap-1">
-                        <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="${actionBg} text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm flex items-center justify-center" title="${actionTitle}">
-                            ${actionIcon}
-                        </button>
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    } catch (e) {
-        console.error('❌ Error cargando lista:', e);
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center p-8 text-red-500 font-bold">❌ Error al cargar datos.</td></tr>';
-    }
-},
+    },
 
     buscarPorCedula: async function() {
         const cedulaInput = document.getElementById('buscar-cedula').value.trim();
@@ -229,7 +228,6 @@ cargarLista: async function() {
                 const totalGraves = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_graves_cant || 0), 0) : 0;
                 const totalGravisimas = registrosDisc ? registrosDisc.reduce((sum, r) => sum + (r.faltas_gravisimas_cant || 0), 0) : 0;
 
-                // ✅ DETECTAR SI ESTÁ DE BAJA
                 let estaDeBaja = false;
                 let tipoBajaEstudiante = null;
                 let fechaBajaEstudiante = null;
@@ -243,92 +241,177 @@ cargarLista: async function() {
                     }
                 }
 
-                // Formatear tipo de baja para mostrar
                 const tipoBajaFormateado = tipoBajaEstudiante 
                     ? tipoBajaEstudiante.replace('BAJA_', '').replace(/_/g, ' ')
                     : '';
 
-// Dentro de buscarPorCedula, después de detectar estaDeBaja:
+                Swal.fire({
+                    title: estaDeBaja ? '🚫 ESTUDIANTE DE BAJA' : `👤 ${estudiante.nombres} ${estudiante.apellidos}`,
+                    html: estaDeBaja ? `
+                        <div class="text-left text-sm">
+                            <div class="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-3">
+                                <p class="text-xs text-gray-600 mb-1"><strong>Cédula:</strong></p>
+                                <p class="text-lg font-bold text-gray-800 mb-3">${estudiante.cedula || 'N/A'}</p>
+                                
+                                <p class="text-xs text-gray-600 mb-1"><strong>Nombre:</strong></p>
+                                <p class="text-base font-semibold text-gray-800 mb-3">${estudiante.nombres} ${estudiante.apellidos}</p>
+                                
+                                <p class="text-xs text-gray-600 mb-1"><strong>PNF:</strong></p>
+                                <p class="text-base font-semibold text-blue-700 mb-3">${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
+                                
+                                <p class="text-xs text-gray-600 mb-1"><strong>Motivo de Baja:</strong></p>
+                                <p class="text-base font-bold text-red-700 mb-3">${tipoBajaFormateado}</p>
+                                
+                                <p class="text-xs text-gray-600 mb-1"><strong>Fecha de Baja:</strong></p>
+                                <p class="text-base font-semibold text-gray-800">${fechaBajaEstudiante ? this.formatearFecha(fechaBajaEstudiante) : 'No registrada'}</p>
+                            </div>
+                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                                <p class="text-sm text-yellow-800 text-center font-semibold">
+                                    ⚠️ Este estudiante no puede ser registrado nuevamente.
+                                </p>
+                            </div>
+                        </div>
+                    ` : `
+                        <div style="text-align: left; font-size: 14px; line-height: 1.8;">
+                            <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">📋 DATOS PERSONALES</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p>
+                                <p><strong>Género:</strong> ${estudiante.genero || 'N/A'}</p>
+                                <p><strong>Núcleo:</strong> ${estudiante.nucleo || 'NUEVA ESPARTA'}</p>
+                                <p><strong>Ambiente:</strong> ${estudiante.ambiente || 'N/A'}</p>
+                            </div>
+                            
+                            <h3 style="border-bottom: 2px solid #10b981; padding-bottom: 5px; color: #10b981; margin-top: 15px; font-size: 16px;">🎓 DATOS ACADÉMICOS</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <p><strong>PNF:</strong> ${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
+                                <p><strong>Proceso:</strong> ${estudiante.proceso || 'N/A'}</p>
+                                <p><strong>Categoría:</strong> ${estudiante.categoria || 'N/A'}</p>
+                                <p><strong>Trayecto:</strong> ${estudiante.trayecto_id ? 'Asignado' : 'No asignado'}</p>
+                            </div>
 
-Swal.fire({
-    title: estaDeBaja ? '🚫 ESTUDIANTE DE BAJA' : `👤 ${estudiante.nombres} ${estudiante.apellidos}`,
-    html: estaDeBaja ? `
-        <div class="text-left text-sm">
-            <div class="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-3">
-                <p class="text-xs text-gray-600 mb-1"><strong>Cédula:</strong></p>
-                <p class="text-lg font-bold text-gray-800 mb-3">${estudiante.cedula || 'N/A'}</p>
-                
-                <p class="text-xs text-gray-600 mb-1"><strong>Nombre:</strong></p>
-                <p class="text-base font-semibold text-gray-800 mb-3">${estudiante.nombres} ${estudiante.apellidos}</p>
-                
-                <p class="text-xs text-gray-600 mb-1"><strong>PNF:</strong></p>
-                <p class="text-base font-semibold text-blue-700 mb-3">${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
-                
-                <p class="text-xs text-gray-600 mb-1"><strong>Motivo de Baja:</strong></p>
-                <p class="text-base font-bold text-red-700 mb-3">${tipoBajaFormateado}</p>
-                
-                <p class="text-xs text-gray-600 mb-1"><strong>Fecha de Baja:</strong></p>
-                <p class="text-base font-semibold text-gray-800">${fechaBajaEstudiante ? this.formatearFecha(fechaBajaEstudiante) : 'No registrada'}</p>
-            </div>
-            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
-                <p class="text-sm text-yellow-800 text-center font-semibold">
-                    ⚠️ Este estudiante no puede ser registrado nuevamente.
-                </p>
-            </div>
-        </div>
-    ` : `
-        <div style="text-align: left; font-size: 14px; line-height: 1.8;">
-            <h3 style="border-bottom: 2px solid #3b82f6; padding-bottom: 5px; color: #3b82f6; margin-top: 0; font-size: 16px;">📋 DATOS PERSONALES</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <p><strong>Cédula:</strong> ${estudiante.cedula || 'N/A'}</p>
-                <p><strong>Género:</strong> ${estudiante.genero || 'N/A'}</p>
-                <p><strong>Núcleo:</strong> ${estudiante.nucleo || 'NUEVA ESPARTA'}</p>
-                <p><strong>Ambiente:</strong> ${estudiante.ambiente || 'N/A'}</p>
-            </div>
-            
-            <h3 style="border-bottom: 2px solid #10b981; padding-bottom: 5px; color: #10b981; margin-top: 15px; font-size: 16px;">🎓 DATOS ACADÉMICOS</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <p><strong>PNF:</strong> ${estudiante.pnf?.nombre || estudiante.pnf || 'N/A'}</p>
-                <p><strong>Proceso:</strong> ${estudiante.proceso || 'N/A'}</p>
-                <p><strong>Categoría:</strong> ${estudiante.categoria || 'N/A'}</p>
-                <p><strong>Trayecto:</strong> ${estudiante.trayecto_id ? 'Asignado' : 'No asignado'}</p>
-            </div>
-
-            <h3 style="border-bottom: 2px solid #f59e0b; padding-bottom: 5px; color: #f59e0b; margin-top: 15px; font-size: 16px;">📊 ESTADÍSTICAS DISCIPLINARIAS</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
-                <div style="background: #fef3c7; padding: 8px; border-radius: 5px;"><strong style="color: #d97706;">${totalLeves}</strong><br><span style="font-size: 12px;">Leves</span></div>
-                <div style="background: #fee2e2; padding: 8px; border-radius: 5px;"><strong style="color: #dc2626;">${totalGraves}</strong><br><span style="font-size: 12px;">Graves</span></div>
-                <div style="background: #1f2937; color: white; padding: 8px; border-radius: 5px;"><strong style="color: white;">${totalGravisimas}</strong><br><span style="font-size: 12px;">Gravísimas</span></div>
-            </div>
-            <p style="margin-top: 10px; text-align: center;"><strong>Total Registros:</strong> ${totalRegistros}</p>
-            
-            <h3 style="border-bottom: 2px solid ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; padding-bottom: 5px; color: ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; margin-top: 15px; font-size: 16px;">ESTATUS GENERAL</h3>
-            <p style="text-align: center; font-size: 16px;">
-                <span style="padding: 5px 15px; border-radius: 20px; background: ${estudiante.status === 'Activo' ? '#d1fae5' : '#fee2e2'}; color: ${estudiante.status === 'Activo' ? '#065f46' : '#991b1b'}; font-weight: bold;">
-                    ${estudiante.status || 'ACTIVO'}
-                </span>
-            </p>
-        </div>
-    `,
-    width: estaDeBaja ? '450px' : '700px',
-    padding: estaDeBaja ? '20px' : '25px',
-    showCloseButton: true,
-    showCancelButton: false,
-    confirmButtonText: 'Aceptar',
-    confirmButtonColor: estaDeBaja ? '#dc2626' : '#3b82f6',
-    focusConfirm: false,
-    customClass: {
-        popup: estaDeBaja ? 'rounded-xl shadow-2xl' : 'rounded-xl shadow-2xl'
-    },
-    background: estaDeBaja ? '#fef2f2' : '#ffffff'
-});
+                            <h3 style="border-bottom: 2px solid #f59e0b; padding-bottom: 5px; color: #f59e0b; margin-top: 15px; font-size: 16px;">📊 ESTADÍSTICAS DISCIPLINARIAS</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+                                <div style="background: #fef3c7; padding: 8px; border-radius: 5px;"><strong style="color: #d97706;">${totalLeves}</strong><br><span style="font-size: 12px;">Leves</span></div>
+                                <div style="background: #fee2e2; padding: 8px; border-radius: 5px;"><strong style="color: #dc2626;">${totalGraves}</strong><br><span style="font-size: 12px;">Graves</span></div>
+                                <div style="background: #1f2937; color: white; padding: 8px; border-radius: 5px;"><strong style="color: white;">${totalGravisimas}</strong><br><span style="font-size: 12px;">Gravísimas</span></div>
+                            </div>
+                            <p style="margin-top: 10px; text-align: center;"><strong>Total Registros:</strong> ${totalRegistros}</p>
+                            
+                            <h3 style="border-bottom: 2px solid ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; padding-bottom: 5px; color: ${estudiante.status === 'Activo' ? '#10b981' : '#ef4444'}; margin-top: 15px; font-size: 16px;">ESTATUS GENERAL</h3>
+                            <p style="text-align: center; font-size: 16px;">
+                                <span style="padding: 5px 15px; border-radius: 20px; background: ${estudiante.status === 'Activo' ? '#d1fae5' : '#fee2e2'}; color: ${estudiante.status === 'Activo' ? '#065f46' : '#991b1b'}; font-weight: bold;">
+                                    ${estudiante.status || 'ACTIVO'}
+                                </span>
+                            </p>
+                        </div>
+                    `,
+                    width: estaDeBaja ? '450px' : '700px',
+                    padding: estaDeBaja ? '20px' : '25px',
+                    showCloseButton: true,
+                    showCancelButton: false,
+                    confirmButtonText: 'Aceptar',
+                    confirmButtonColor: estaDeBaja ? '#dc2626' : '#3b82f6',
+                    focusConfirm: false,
+                    customClass: {
+                        popup: 'rounded-xl shadow-2xl'
+                    },
+                    background: estaDeBaja ? '#fef2f2' : '#ffffff'
+                });
 
                 if (registrosDisc && registrosDisc.length > 0) await this.renderizarTablaFiltrada(registrosDisc);
                 else document.getElementById('lista-disciplina-body').innerHTML = '<tr><td colspan="10" class="text-center p-8 text-gray-500">📭 No hay registros disciplinarios</td></tr>';
                 return;
             }
-            Swal.fire({ icon: 'error', title: 'No Encontrado', html: `Cédula <strong>${cedulaInput}</strong> no encontrada`, toast: false });
-            this.limpiarFormulario();
+
+            // Fallback: buscar en DISC_REGISTROS
+            console.log('⚠️ No encontrado en ESTUDIANTES, buscando en DISC_REGISTROS...');
+
+            const { data: registrosDiscFallback } = await window.supabaseClient
+                .from('disc_registros')
+                .select('*')
+                .or(`cedula.ilike.%${cedulaNumeros}%`)
+                .order('id', { ascending: false });
+
+            if (registrosDiscFallback && registrosDiscFallback.length > 0) {
+                // Buscar si hay un registro de baja
+                const registroBaja = registrosDiscFallback.find(r => 
+                    r.tipo_baja && r.tipo_baja !== 'SELECCIONAR' && r.estatus_general === 'INACTIVO'
+                );
+                
+                const reg = registroBaja || registrosDiscFallback[0]; // Priorizar el de baja
+                
+                const estudianteFake = { 
+                    cedula: reg.cedula, 
+                    nombres: reg.nombres, 
+                    apellidos: reg.apellidos, 
+                    genero: reg.genero || 'SELECCIONAR', 
+                    pnf: reg.pnf, 
+                    proceso: reg.proceso 
+                };
+                
+                this.llenarFormularioEstudiante(estudianteFake);
+                this.mostrarFiltroActivo(cedulaInput);
+                document.getElementById('datos-personales-panel').classList.remove('hidden');
+                
+                await this.renderizarTablaFiltrada(registrosDiscFallback);
+
+                // Si hay registro de baja, mostrar modal compacto de baja
+                if (registroBaja) {
+                    const tipoBajaFormateado = registroBaja.tipo_baja 
+                        ? registroBaja.tipo_baja.replace('BAJA_', '').replace(/_/g, ' ')
+                        : '';
+                    
+                    Swal.fire({
+                        title: '🚫 ESTUDIANTE DE BAJA',
+                        html: `
+                            <div class="text-left text-sm">
+                                <div class="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-3">
+                                    <p class="text-xs text-gray-600 mb-1"><strong>Cédula:</strong></p>
+                                    <p class="text-lg font-bold text-gray-800 mb-3">${registroBaja.cedula || 'N/A'}</p>
+                                    
+                                    <p class="text-xs text-gray-600 mb-1"><strong>Nombre:</strong></p>
+                                    <p class="text-base font-semibold text-gray-800 mb-3">${registroBaja.nombres} ${registroBaja.apellidos}</p>
+                                    
+                                    <p class="text-xs text-gray-600 mb-1"><strong>PNF:</strong></p>
+                                    <p class="text-base font-semibold text-blue-700 mb-3">${registroBaja.pnf || 'N/A'}</p>
+                                    
+                                    <p class="text-xs text-gray-600 mb-1"><strong>Motivo de Baja:</strong></p>
+                                    <p class="text-base font-bold text-red-700 mb-3">${tipoBajaFormateado}</p>
+                                    
+                                    <p class="text-xs text-gray-600 mb-1"><strong>Fecha de Baja:</strong></p>
+                                    <p class="text-base font-semibold text-gray-800">${registroBaja.fecha_baja ? this.formatearFecha(registroBaja.fecha_baja) : 'No registrada'}</p>
+                                </div>
+                                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                                    <p class="text-sm text-yellow-800 text-center font-semibold">
+                                        ⚠️ Este estudiante no puede ser registrado nuevamente.
+                                    </p>
+                                </div>
+                            </div>
+                        `,
+                        width: '450px',
+                        padding: '20px',
+                        showCloseButton: true,
+                        showCancelButton: false,
+                        confirmButtonText: 'Aceptar',
+                        confirmButtonColor: '#dc2626',
+                        focusConfirm: false,
+                        customClass: {
+                            popup: 'rounded-xl shadow-2xl'
+                        },
+                        background: '#fef2f2'
+                    });
+                } else {
+                    Swal.fire('⚠️ Solo en Disciplina', 'Datos obtenidos de registros históricos', 'warning');
+                }
+            } else {
+                Swal.fire({ 
+                    icon: 'error', 
+                    title: 'No Encontrado', 
+                    html: `Cédula <strong>${cedulaInput}</strong> no encontrada`,
+                    toast: false 
+                });
+                this.limpiarFormulario();
+            }
         } catch (e) {
             console.error('❌ Error:', e);
             Swal.fire({ icon: 'error', title: 'Error', text: e.message });
@@ -382,72 +465,68 @@ Swal.fire({
         if(window.innerWidth < 1024) document.querySelector('.lg\\:col-span-1')?.scrollIntoView({ behavior: 'smooth' });
     },
 
-abrirModalDetalle: function(cedula) {
-    const registros = this.datosCache.filter(r => r.cedula === cedula.toUpperCase());
-    if (registros.length === 0) { Swal.fire('ℹ️ Info', 'No se encontraron registros disciplinarios para esta cédula', 'info'); return; }
+    abrirModalDetalle: function(cedula) {
+        const registros = this.datosCache.filter(r => r.cedula === cedula.toUpperCase());
+        if (registros.length === 0) { Swal.fire('ℹ️ Info', 'No se encontraron registros disciplinarios para esta cédula', 'info'); return; }
 
-    document.getElementById('modal-cedula').textContent = registros[0].cedula;
-    document.getElementById('modal-estudiante').textContent = `${registros[0].nombres} ${registros[0].apellidos}`;
-    document.getElementById('modal-total').textContent = registros.length;
+        document.getElementById('modal-cedula').textContent = registros[0].cedula;
+        document.getElementById('modal-estudiante').textContent = `${registros[0].nombres} ${registros[0].apellidos}`;
+        document.getElementById('modal-total').textContent = registros.length;
 
-    const registrosOrdenados = [...registros].sort((a, b) => b.id - a.id);
-    const tbody = document.getElementById('modal-body-faltas');
-    tbody.innerHTML = '';
+        const registrosOrdenados = [...registros].sort((a, b) => b.id - a.id);
+        const tbody = document.getElementById('modal-body-faltas');
+        tbody.innerHTML = '';
 
-    registrosOrdenados.forEach(reg => {
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-blue-50 transition';
-        
-        // Determinar fecha y tipo
-        let fechaMostrar = '-';
-        let tipoRegistro = '<span class="text-gray-400 text-[10px]">-</span>';
-        
-        // Si es baja
-        if (reg.tipo_baja && reg.tipo_baja !== 'SELECCIONAR') {
-            fechaMostrar = reg.fecha_baja ? this.formatearFecha(reg.fecha_baja) : 'Sin fecha';
-            const tipoBajaTexto = reg.tipo_baja.replace('BAJA_', '').replace(/_/g, ' ');
-            tipoRegistro = `<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-red-100 text-red-800">🚫 ${tipoBajaTexto}</span>`;
-        } else {
-            // Si es falta
-            if (reg.faltas_leves_cant > 0 && reg.faltas_leves_fecha) fechaMostrar = this.formatearFecha(reg.faltas_leves_fecha);
-            if (reg.faltas_graves_cant > 0 && reg.faltas_graves_fecha) fechaMostrar = this.formatearFecha(reg.faltas_graves_fecha);
-            if (reg.faltas_gravisimas_cant > 0 && reg.faltas_gravisima_fecha) fechaMostrar = this.formatearFecha(reg.faltas_gravisima_fecha);
-            if (fechaMostrar === '-' && reg.fecha_incidencia_estudiante) fechaMostrar = this.formatearFecha(reg.fecha_incidencia_estudiante);
+        registrosOrdenados.forEach(reg => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-blue-50 transition';
             
-            // Determinar tipo de falta
-            if (reg.faltas_leves_cant > 0) tipoRegistro = '<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-yellow-100 text-yellow-800">📋 LEVE</span>';
-            else if (reg.faltas_graves_cant > 0) tipoRegistro = '<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-red-100 text-red-800">⚠️ GRAVE</span>';
-            else if (reg.faltas_gravisimas_cant > 0) tipoRegistro = '<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-gray-800 text-white">🔴 GRAVÍSIMA</span>';
-        }
+            let fechaMostrar = '-';
+            let tipoRegistro = '<span class="text-gray-400 text-[10px]">-</span>';
+            
+            if (reg.tipo_baja && reg.tipo_baja !== 'SELECCIONAR') {
+                fechaMostrar = reg.fecha_baja ? this.formatearFecha(reg.fecha_baja) : 'Sin fecha';
+                const tipoBajaTexto = reg.tipo_baja.replace('BAJA_', '').replace(/_/g, ' ');
+                tipoRegistro = `<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-red-100 text-red-800">🚫 ${tipoBajaTexto}</span>`;
+            } else {
+                if (reg.faltas_leves_cant > 0 && reg.faltas_leves_fecha) fechaMostrar = this.formatearFecha(reg.faltas_leves_fecha);
+                if (reg.faltas_graves_cant > 0 && reg.faltas_graves_fecha) fechaMostrar = this.formatearFecha(reg.faltas_graves_fecha);
+                if (reg.faltas_gravisimas_cant > 0 && reg.faltas_gravisima_fecha) fechaMostrar = this.formatearFecha(reg.faltas_gravisima_fecha);
+                if (fechaMostrar === '-' && reg.fecha_incidencia_estudiante) fechaMostrar = this.formatearFecha(reg.fecha_incidencia_estudiante);
+                
+                if (reg.faltas_leves_cant > 0) tipoRegistro = '<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-yellow-100 text-yellow-800">📋 LEVE</span>';
+                else if (reg.faltas_graves_cant > 0) tipoRegistro = '<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-red-100 text-red-800">⚠️ GRAVE</span>';
+                else if (reg.faltas_gravisimas_cant > 0) tipoRegistro = '<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-gray-800 text-white">🔴 GRAVÍSIMA</span>';
+            }
 
-        const leveClass = reg.faltas_leves_cant > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'text-gray-400';
-        const graveClass = reg.faltas_graves_cant > 0 ? 'bg-red-200 text-red-800 font-bold' : 'text-gray-400';
-        const gravisimaClass = reg.faltas_gravisimas_cant > 0 ? 'bg-gray-800 text-white font-bold' : 'text-gray-400';
+            const leveClass = reg.faltas_leves_cant > 0 ? 'bg-yellow-200 text-yellow-800 font-bold' : 'text-gray-400';
+            const graveClass = reg.faltas_graves_cant > 0 ? 'bg-red-200 text-red-800 font-bold' : 'text-gray-400';
+            const gravisimaClass = reg.faltas_gravisimas_cant > 0 ? 'bg-gray-800 text-white font-bold' : 'text-gray-400';
 
-        tr.innerHTML = `
-            <td class="p-2 text-center font-mono text-gray-600 font-semibold">${reg.id}</td>
-            <td class="p-2 text-left font-medium text-gray-800">${fechaMostrar}</td>
-            <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_leves_cant || 0}</span></td>
-            <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_graves_cant || 0}</span></td>
-            <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_gravisimas_cant || 0}</span></td>
-            <td class="p-2 text-center">${tipoRegistro}</td>
-            <td class="p-2 text-center">
-                <div class="flex justify-center gap-1">
-                    <button onclick="window.modules.disciplina.editarDesdeModal(${reg.id})" class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded transition shadow-sm" title="Editar">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                    </button>
-                    <button onclick="window.modules.disciplina.eliminarRegistroFalta(${reg.id})" class="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded transition shadow-sm" title="Eliminar Registro">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
+            tr.innerHTML = `
+                <td class="p-2 text-center font-mono text-gray-600 font-semibold">${reg.id}</td>
+                <td class="p-2 text-left font-medium text-gray-800">${fechaMostrar}</td>
+                <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_leves_cant || 0}</span></td>
+                <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_graves_cant || 0}</span></td>
+                <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-[10px] font-bold">${reg.faltas_gravisimas_cant || 0}</span></td>
+                <td class="p-2 text-center">${tipoRegistro}</td>
+                <td class="p-2 text-center">
+                    <div class="flex justify-center gap-1">
+                        <button onclick="window.modules.disciplina.editarDesdeModal(${reg.id})" class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded transition shadow-sm" title="Editar">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </button>
+                        <button onclick="window.modules.disciplina.eliminarRegistroFalta(${reg.id})" class="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded transition shadow-sm" title="Eliminar Registro">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
 
-    document.getElementById('modal-detalle').classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-},
+        document.getElementById('modal-detalle').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    },
 
     editarDesdeModal: function(id) {
         const registro = this.datosCache.find(r => r.id === id);
@@ -528,6 +607,13 @@ abrirModalDetalle: function(cedula) {
             const gravisimaClass = est._total_gravisimas > 0 ? 'bg-gray-800 text-white font-bold' : 'bg-gray-100 text-gray-500';
             const statusBadge = (est.estatus_general === 'ACTIVO') ? '<span class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-bold shadow-sm">ACTIVO</span>' : '<span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800 font-bold shadow-sm">INACTIVO</span>';
 
+            const esBaja = est.estatus_general === 'INACTIVO';
+            const actionIcon = esBaja ? 
+                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>' :
+                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
+            const actionBg = esBaja ? 'bg-red-500 hover:bg-red-600' : 'bg-yellow-500 hover:bg-yellow-600';
+            const actionTitle = esBaja ? 'Estudiante de Baja' : 'Ver Detalle';
+
             tr.innerHTML = `
                 <td class="p-2 text-sm text-gray-600 font-mono">${est._ultimo_id}</td>
                 <td class="p-2 text-sm font-bold text-gray-800">${est.cedula}</td>
@@ -538,7 +624,13 @@ abrirModalDetalle: function(cedula) {
                 <td class="p-2 text-center"><span class="${leveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_leves}</span></td>
                 <td class="p-2 text-center"><span class="${graveClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_graves}</span></td>
                 <td class="p-2 text-center"><span class="${gravisimaClass} px-2 py-1 rounded text-xs shadow-sm">${est._total_gravisimas}</span></td>
-                <td class="p-2 text-center"><div class="flex justify-center gap-1"><button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm" title="Ver Detalle">️</button></div></td>
+                <td class="p-2 text-center">
+                    <div class="flex justify-center gap-1">
+                        <button onclick="window.modules.disciplina.abrirModalDetalle('${est.cedula}')" class="${actionBg} text-white px-2 py-1 rounded text-xs font-bold transition shadow-sm flex items-center justify-center" title="${actionTitle}">
+                            ${actionIcon}
+                        </button>
+                    </div>
+                </td>
             `;
             tbody.appendChild(tr);
         });
@@ -559,9 +651,6 @@ abrirModalDetalle: function(cedula) {
         const gravesCant = Number(document.getElementById('disc-graves-cant').value) || 0;
         const gravisimasCant = Number(document.getElementById('disc-gravisimas-cant').value) || 0;
 
-        // ==========================================
-        // VALIDACIÓN 1: Solo se permite UN tipo de falta a la vez
-        // ==========================================
         let tiposDeFaltaSeleccionados = 0;
         if (levesCant > 0) tiposDeFaltaSeleccionados++;
         if (gravesCant > 0) tiposDeFaltaSeleccionados++;
@@ -577,9 +666,6 @@ abrirModalDetalle: function(cedula) {
             return;
         }
 
-        // ==========================================
-        // VALIDACIÓN 2: Debe haber al menos una acción (Falta o Baja)
-        // ==========================================
         if (tiposDeFaltaSeleccionados === 0 && !hayBaja) {
             Swal.fire({
                 icon: 'warning',
@@ -590,9 +676,6 @@ abrirModalDetalle: function(cedula) {
             return;
         }
 
-        // ==========================================
-        // VALIDACIÓN 3: Fechas Obligatorias según selección
-        // ==========================================
         const erroresFechas = [];
 
         if (levesCant > 0) {
@@ -632,9 +715,6 @@ abrirModalDetalle: function(cedula) {
             return;
         }
 
-        // ==========================================
-        // CONFIRMACIÓN DE BAJA (Si aplica)
-        // ==========================================
         const debeProcesarBaja = hayBaja;
 
         if (debeProcesarBaja) {
@@ -650,9 +730,6 @@ abrirModalDetalle: function(cedula) {
             if (!confirm.isConfirmed) return;
         }
 
-        // ==========================================
-        // PREPARAR DATOS Y GUARDAR
-        // ==========================================
         let supervisionValor = document.getElementById('disc-supervision')?.value || 'NO';
         if (supervisionValor === 'NO APLICA' || supervisionValor === '') supervisionValor = 'NO';
 
@@ -704,7 +781,6 @@ abrirModalDetalle: function(cedula) {
 
             if (result.error) throw result.error;
 
-            // ✅ ACTUALIZAR TABLA ESTUDIANTES SI HAY BAJA
             if (debeProcesarBaja) {
                 await this.actualizarEstatusEstudiante(cedula.toUpperCase(), 'Inactivo');
                 console.log('✅ Estatus actualizado en tabla estudiantes');
@@ -759,7 +835,7 @@ abrirModalDetalle: function(cedula) {
             const { error } = await window.supabaseClient.from('estudiantes').update({ status: nuevoEstatus }).eq('cedula', cedula);
             if (error) console.warn('⚠️ No se pudo actualizar estatus:', error.message);
             else console.log('✅ Estatus actualizado en tabla estudiantes para:', cedula);
-        } catch (e) { console.error(' Error actualizando estatus:', e); }
+        } catch (e) { console.error('❌ Error actualizando estatus:', e); }
     },
 
     eliminarEstudiante: async function(cedula) {
@@ -812,7 +888,7 @@ window.guardarRegistro = function() { window.modules.disciplina.guardarRegistro(
 window.limpiarFormulario = function() { window.modules.disciplina.limpiarFormulario(); };
 window.limpiarTodo = function() { window.modules.disciplina.limpiarTodo(); };
 window.filtrarRegistros = function(filtro) { window.modules.disciplina.filtrarRegistros(filtro); };
-window.generarReporteProceso = function() { Swal.fire('️ Info', 'Generación de reporte de proceso en desarrollo', 'info'); };
+window.generarReporteProceso = function() { Swal.fire('ℹ️ Info', 'Generación de reporte de proceso en desarrollo', 'info'); };
 window.generarReporteBajas = function() { abrirModalBajas(); };
 window.cerrarSesion = function() { if (window.supabaseClient) window.supabaseClient.auth.signOut().then(() => window.location.href = 'index.html'); else window.location.href = 'index.html'; };
 
@@ -884,4 +960,4 @@ async function descargarPDFBajas() {
     } catch (e) { console.error('❌ Error generando PDF:', e); Swal.fire('Error', 'No se pudo generar el PDF: ' + e.message, 'error'); }
 }
 
-console.log('✅ Módulo Consejo Disciplinario v3.9 Cargado');
+console.log('✅ Módulo Consejo Disciplinario v4.0 Cargado');
