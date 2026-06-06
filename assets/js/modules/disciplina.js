@@ -443,6 +443,13 @@ window.modules.disciplina = {
         document.getElementById('grupo-fechas-graves')?.classList.add('hidden');
         document.getElementById('grupo-fechas-gravisimas')?.classList.add('hidden');
         document.getElementById('grupo-fecha-baja')?.classList.add('hidden');
+
+            // ✅ AGREGAR ESTO: Actualizar dropdown de estatus según el status del estudiante
+            if (est.status) {
+                const statusNormalizado = est.status.toUpperCase() === 'INACTIVO' || est.status.toUpperCase() === 'BAJA' ? 'INACTIVO' : 'ACTIVO';
+                setVal('disc-estatus-general', statusNormalizado);
+            }
+        
     },
 
     llenarFormulario: function(data) {
