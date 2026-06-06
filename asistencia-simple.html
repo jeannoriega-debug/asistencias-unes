@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistencia Simplificada - UNES</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-green { animation: pulseGreen 2s infinite; }
+        @keyframes pulseGreen { 0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); } 50% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } }
+        .asignacion-card { transition: all 0.3s; }
+        .asignacion-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .asignacion-card.selected { border-color: #3b82f6; background-color: #eff6ff; }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- LOGIN -->
+    <div id="login-container" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-[100]">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-6 text-center text-blue-700">Iniciar Sesión</h2>
+            <input type="email" id="login-email" placeholder="Correo electrónico"
+                class="w-full p-3 border rounded-lg mb-4">
+            <input type="password" id="login-password" placeholder="Contraseña"
+                class="w-full p-3 border rounded-lg mb-6">
+            <button onclick="iniciarSesion()"
+                class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">Entrar</button>
+            <p id="login-error" class="text-red-500 text-sm mt-4 hidden text-center"></p>
+        </div>
+    </div>
+
+    <!-- NAV -->
+    <nav class="bg-blue-700 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center gap-2">
+            <div class="flex items-center gap-3">
+                <h1 class="font-bold text-lg md:text-xl tracking-tight">Asistencia PNF</h1>
+                <span class="bg-yellow-400 text-black text-xs px-2 py-1 rounded font-bold hidden md:inline">SIMPLIFICADA</span>
+            </div>
+            <div id="user-info-container" class="flex items-center gap-4">
+                <div class="text-right leading-tight">
+                    <span id="profesor-nombre" class="block text-xs font-semibold md:inline md:text-sm">Cargando...</span>
+                    <span id="profesor-rol" class="block text-xs text-blue-200"></span>
+                </div>
+                <button onclick="cerrarSesion()"
+                    class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded-lg transition font-bold">Salir</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-4">
+
+        <!-- SECCIÓN PRINCIPAL DE ASISTENCIA -->
+        <section class="bg-white rounded-xl shadow-md p-6 mb-6">
+            
+            <!-- Mensaje de bienvenida -->
+            <div id="welcome-banner" class="bg-gradient-to-r from-blue-500 to-blue-700 text-white p-6 rounded-lg mb-6 hidden">
+                <div class="flex items-center gap-4">
+                    <div class="bg-white bg-opacity-20 rounded-full p-3">
+                        <i class="fas fa-user-tie text-3xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold" id="welcome-nombre">Bienvenido</h2>
+                        <p class="text-blue-100" id="welcome-info">Cargando sus asignaciones...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Caso: Sin asignaciones -->
+            <div id="no-asignaciones" class="hidden text-center py-12">
+                <i class="fas fa-exclamation-triangle text-6xl text-yellow-500 mb-4"></i>
+                <h3 class="text-xl font-bold text-gray-700 mb-2">No tiene asignaciones registradas</h3>
+                <p class="text-gray-600 mb-4">Contacte al administrador para que le asigne clases.</p>
+                <button onclick="window.modules.asistenciaSimple.cargarAsignaciones()" 
+                        class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition">
+                    <i class="fas fa-sync mr-2"></i>Reintentar
+                </button>
+            </div>
+
+            <!-- Caso: 1 asignación (automático) -->
+            <div id="una-asignacion" class="hidden fade-in">
+                <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded">
+                    <div class="flex items-start">
+                        <i class="fas fa-check-circle text-green-500 text-2xl mr-3 mt-1"></i>
+                        <div>
+                            <h3 class="font-bold text-green-800 text-lg">¡Detectamos su clase automáticamente!</h3>
+                            <p class="text-green-700 text-sm">Solo necesita seleccionar el ambiente (salón) donde está impartiendo clase ahora.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta de clase detectada -->
+                <div class="bg-blue-50 rounded-lg p-5 mb-6 border-2 border-blue-200">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fas fa-book-open text-blue-600 text-xl"></i>
+                        <h4 class="font-bold text-blue-900">Su clase detectada:</h4>
+                    </div>
+                    <div id="clase-detectada-info" class="space-y-2">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Selector de ambiente -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-bold mb-2">
+                        <i class="fas fa-door-open mr-2"></i>Seleccione el ambiente (salón):
+                    </label>
+                    <select id="ambiente-una" class="w-full p-3 border-2 border-gray-300 rounded-lg text-lg focus:border-blue-500 focus:outline-none">
+                        <!-- Se llena dinámicamente -->
+                    </select>
+                    <p class="text-sm text-gray-500 mt-1">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <span id="total-estudiantes-una">0</span> estudiantes en este ambiente
+                    </p>
+                </div>
+
+                <button onclick="window.modules.asistenciaSimple.cargarListaDesdeSimple()" 
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg text-lg transition pulse-green">
+                    <i class="fas fa-list-check mr-2"></i>CARGAR LISTA DE ASISTENCIA
+                </button>
+            </div>
+
+            <!-- Caso: Múltiples asignaciones -->
+            <div id="multiplas-asignaciones" class="hidden fade-in">
+                <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6 rounded">
+                    <div class="flex items-start">
+                        <i class="fas fa-info-circle text-yellow-600 text-2xl mr-3 mt-1"></i>
+                        <div>
+                            <h3 class="font-bold text-yellow-800 text-lg">Tiene varias clases asignadas</h3>
+                            <p class="text-yellow-700 text-sm">Seleccione cuál clase va a tomar asistencia ahora:</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista de asignaciones -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-bold mb-3">
+                        <i class="fas fa-chalkboard mr-2"></i>Seleccione su clase:
+                    </label>
+                    <div id="lista-asignaciones" class="space-y-3">
+                        <!-- Se llena dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Selector de ambiente (aparece después de seleccionar) -->
+                <div id="selector-ambiente-multi" class="hidden mb-6 fade-in">
+                    <label class="block text-gray-700 font-bold mb-2">
+                        <i class="fas fa-door-open mr-2"></i>Seleccione el ambiente (salón):
+                    </label>
+                    <select id="ambiente-multi" class="w-full p-3 border-2 border-gray-300 rounded-lg text-lg focus:border-blue-500 focus:outline-none">
+                        <!-- Se llena dinámicamente -->
+                    </select>
+                    <p class="text-sm text-gray-500 mt-1">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <span id="total-estudiantes-multi">0</span> estudiantes en este ambiente
+                    </p>
+                </div>
+
+                <button id="btn-cargar-multi" onclick="window.modules.asistenciaSimple.cargarListaDesdeSimple()" 
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg text-lg transition hidden">
+                    <i class="fas fa-list-check mr-2"></i>CARGAR LISTA DE ASISTENCIA
+                </button>
+            </div>
+
+            <!-- Vista completa (solo super_usuario) -->
+            <div id="vista-completa" class="hidden">
+                <div class="bg-indigo-50 border-l-4 border-indigo-500 p-4 mb-6 rounded">
+                    <div class="flex items-start">
+                        <i class="fas fa-cog text-indigo-500 text-2xl mr-3 mt-1"></i>
+                        <div>
+                            <h3 class="font-bold text-indigo-800 text-lg">Vista Administrativa Completa</h3>
+                            <p class="text-indigo-700 text-sm">Como administrador, tiene acceso a todos los filtros.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FILTROS EN CASCADA -->
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3 mb-4">
+                    <select id="select-pnf" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onPnfChangeAsistencia()">
+                        <option value="">Seleccione PNF</option>
+                    </select>
+                    <select id="select-categoria" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onCategoriaChangeAsistencia()">
+                        <option value="">Todas las categorías</option>
+                    </select>
+                    <select id="select-materia" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onMateriaChangeAsistencia()">
+                        <option value="">Seleccione Unidad Curricular</option>
+                    </select>
+                    <select id="select-proceso" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onProcesoChangeAsistencia()">
+                        <option value="">Seleccione Proceso</option>
+                    </select>
+                    <select id="select-trayecto" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onTrayectoChangeAsistencia()">
+                        <option value="">Seleccione Trayecto</option>
+                    </select>
+                    <select id="select-ambiente" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onAmbienteChangeAsistencia()">
+                        <option value="">Seleccione Ambiente</option>
+                    </select>
+                    <select id="select-status-asist" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onStatusChangeAsistencia()">
+                        <option value="">Todos los estados</option>
+                        <option value="Activo">✅ Activos</option>
+                        <option value="Inactivo">❌ Inactivos</option>
+                    </select>
+                    <select id="select-genero" class="border p-2 rounded-lg w-full bg-gray-50 text-sm" onchange="onGeneroChangeAsistencia()">
+                        <option value="">Todos los géneros</option>
+                    </select>
+                </div>
+
+                <!-- BOTONES -->
+                <div class="flex flex-col md:flex-row gap-3 mt-4 border-t pt-4">
+                    <button id="btn-cargar" class="bg-blue-600 text-white py-2 px-4 rounded-lg font-bold text-sm hover:bg-blue-800 transition flex-1">
+                        Cargar Lista
+                    </button>
+                    <button id="btn-reporte" class="bg-purple-600 text-white py-2 px-4 rounded-lg font-bold text-sm hover:bg-purple-800 transition flex-1">
+                        Reporte Matriz
+                    </button>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- LISTA DE ESTUDIANTES -->
+        <section id="lista-contenedor" class="hidden">
+            <div id="resumen-estudiantes"
+                class="flex flex-col sm:flex-row gap-2 sm:gap-6 bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 text-sm font-semibold text-blue-800 shadow-sm">
+                <span>✅ Activos: <span id="count-activos">0</span></span>
+                <span>⛔ Baja: <span id="count-bajas">0</span></span>
+                <span>👥 Total: <span id="count-total">0</span></span>
+            </div>
+            <div id="estudiantes-body" class="bg-white shadow-md rounded-lg divide-y"></div>
+        </section>
+
+    </main>
+
+    <!-- ================= SCRIPTS MODULARES ================= -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/utils.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/components/tablas.js"></script>
+    <script src="assets/js/modules/asistencia-simple.js"></script>
+    <script src="assets/js/modules/reportes.js"></script>
+
+</body>
+
+</html>
