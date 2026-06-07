@@ -184,7 +184,7 @@ window.modules.reportesSimple.generarReporteMatriz = async function() {
 
 doc.autoTable({
     startY: 30,
-    margin: { left: 8, right: 8 }, // Reducir márgenes
+    margin: { left: 5, right: 5 },
     head: [cabeceras],
     body: bodyTabla,
     foot: [
@@ -201,33 +201,44 @@ doc.autoTable({
     ],
     theme: 'grid',
     styles: { 
-        fontSize: 6,        // Reducir tamaño de fuente
-        cellPadding: 0.3,   // Reducir padding
+        fontSize: 5.5,
+        cellPadding: 0.2,
         valign: 'middle', 
         halign: 'center', 
         lineWidth: 0.1,
-        overflow: 'linebreak'  // ✅ Permitir ajuste de texto
+        minCellHeight: 4,    // ✅ Altura mínima fija
+        maxCellHeight: 4,    // ✅ Altura máxima fija (igual a mínima)
+        overflow: 'hidden'   // ✅ Truncar texto que no cabe
     },
     headStyles: {
         fillColor: [220, 235, 245],
         textColor: [0, 0, 0],
         fontStyle: 'bold',
-        minCellHeight: 6,   // Reducir altura mínima
+        minCellHeight: 5,
+        maxCellHeight: 5,    // ✅ Altura fija en header también
         valign: 'middle',
-        fontSize: 6         // Reducir fuente del header
+        fontSize: 5.5,
+        overflow: 'hidden'
     },
     columnStyles: {
-        0: { cellWidth: 6 },   // Reducir
-        1: { cellWidth: 15 },  // Reducir
-        2: { cellWidth: 50, halign: 'left', fontStyle: 'bold' }, // Reducir
-        // Calcular ancho dinámico para las fechas
+        0: { cellWidth: 5 },
+        1: { cellWidth: 14 },
+        2: { 
+            cellWidth: 45, 
+            halign: 'left', 
+            fontStyle: 'bold',
+            overflow: 'hidden'  // ✅ Truncar nombres largos
+        },
         ...Object.fromEntries(fechasUnicas.map((_, i) => {
-            const anchoFecha = fechasUnicas.length > 20 ? 3 : (fechasUnicas.length > 10 ? 3.5 : 4);
-            return [i + 3, { cellWidth: anchoFecha }];
+            let anchoFecha = 3;
+            if (fechasUnicas.length > 30) anchoFecha = 2.5;
+            else if (fechasUnicas.length > 20) anchoFecha = 2.8;
+            else if (fechasUnicas.length > 10) anchoFecha = 3.2;
+            return [i + 3, { cellWidth: anchoFecha, overflow: 'hidden' }];
         })),
-        [cabeceras.length - 3]: { cellWidth: 6, fontStyle: 'bold' },
-        [cabeceras.length - 2]: { cellWidth: 6, fontStyle: 'bold' },
-        [cabeceras.length - 1]: { cellWidth: 9, fontStyle: 'bold' }
+        [cabeceras.length - 3]: { cellWidth: 5, fontStyle: 'bold', overflow: 'hidden' },
+        [cabeceras.length - 2]: { cellWidth: 5, fontStyle: 'bold', overflow: 'hidden' },
+        [cabeceras.length - 1]: { cellWidth: 8, fontStyle: 'bold', overflow: 'hidden' }
     },
     didParseCell: (data) => {
         if (data.section === 'body') {
@@ -236,6 +247,9 @@ doc.autoTable({
                 data.cell.styles.fillColor = [240, 240, 240];
                 data.cell.styles.textColor = [100, 100, 100];
             }
+            // ✅ Forzar altura fija en todas las celdas del body
+            data.cell.styles.minCellHeight = 4;
+            data.cell.styles.maxCellHeight = 4;
         }
         if (data.section === 'head' && data.column.index >= 3 && data.column.index < (cabeceras.length - 3)) {
             data.cell.text = [""];
@@ -248,17 +262,18 @@ doc.autoTable({
         if (data.section === 'head' && data.column.index >= 3 && data.column.index < (cabeceras.length - 3)) {
             const texto = cabeceras[data.column.index];
             doc.saveGraphicsState();
-            const x = data.cell.x + (data.cell.width / 2) + 2.5; // Ajustar posición
-            const y = data.cell.y + data.cell.height - 1.5;
-            doc.setFontSize(5).setFont(undefined, 'bold'); // Reducir fuente
+            const x = data.cell.x + (data.cell.width / 2) + 2;
+            const y = data.cell.y + data.cell.height - 1;
+            doc.setFontSize(4.5).setFont(undefined, 'bold');
             doc.text(texto, x, y, { angle: 90, align: 'center', baseline: 'middle' });
             doc.restoreGraphicsState();
         }
     },
-    pageBreak: 'auto',  // ✅ Permitir saltos de página
-    tableWidth: 'auto'  // ✅ Ajustar automáticamente
+    tableWidth: 'auto',
+    pageBreak: 'auto',
+    horizontalPageBreak: true,
+    horizontalPageBreakRepeat: [0, 1, 2]
 });
-
         // ================= NOMBRE DEL PDF =================
         const pnfPdf = (dataPnf?.nombre || asignacion.pnf?.nombre || "PNF").toUpperCase().trim();
         const unidadPdf = (dataMateria?.nombre || asignacion.unidad?.nombre || "UNIDAD").split(' ')[0].toUpperCase();
