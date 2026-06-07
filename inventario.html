@@ -281,7 +281,7 @@
     <script src="assets/js/auth.js"></script>
     <script src="assets/js/modules/inventario.js"></script>
 
-    <script>
+<script>
     // Inicialización
     document.addEventListener('DOMContentLoaded', async function() {
         if (!window.appState || !window.appState.usuarioActualId) {
@@ -289,8 +289,9 @@
             return;
         }
         
-        // Verificar rol
-        if (window.appState.rolUsuarioActual !== 'inventario_admin') {
+        // Verificar rol - Permitir tanto inventario_admin como super_usuario
+        const rolesPermitidos = ['inventario_admin', 'super_usuario'];
+        if (!rolesPermitidos.includes(window.appState.rolUsuarioActual)) {
             Swal.fire({
                 icon: 'error',
                 title: 'Acceso Denegado',
@@ -305,6 +306,10 @@
         // Mostrar usuario
         document.getElementById('usuario-nombre').textContent = window.appState.nombreProfesorGlobal || 'Usuario';
         
+        // Mostrar rol actual
+        const rolTexto = window.appState.rolUsuarioActual === 'super_usuario' ? 'Administrador' : 'Inventario Admin';
+        document.getElementById('usuario-rol').textContent = rolTexto;
+        
         // Cargar inventario
         await window.modules.inventario.cargarInventario();
     });
@@ -313,7 +318,7 @@
         await window.supabaseClient.auth.signOut();
         window.location.href = 'index.html';
     }
-    </script>
+</script>
 
 </body>
 </html>
