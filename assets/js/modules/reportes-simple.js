@@ -180,92 +180,84 @@ window.modules.reportesSimple.generarReporteMatriz = async function() {
         ];
 
         // ================= MATRIZ DE ASISTENCIA =================
-        doc.autoTable({
-            startY: 30,
-            margin: { left: 10, right: 10 },
-            head: [cabeceras],
-            body: bodyTabla,
-            foot: [
-                [
-                    { 
-                        content: 'TOTAL PRESENTES', 
-                        colSpan: 3, 
-                        styles: { halign: 'right', fontStyle: 'bold', fillColor: [210, 245, 210], textColor: [0, 0, 0] } 
-                    }, 
-                    ...totalesPresentes.map(t => ({ 
-                        content: t, 
-                        styles: { fillColor: [210, 245, 210], textColor: [0, 0, 0] } 
-                    })), 
-                    '', 
-                    '', 
-                    ''
-                ],
-                [
-                    { 
-                        content: 'TOTAL AUSENTES', 
-                        colSpan: 3, 
-                        styles: { halign: 'right', fontStyle: 'bold', fillColor: [250, 230, 230], textColor: [0, 0, 0] } 
-                    }, 
-                    ...totalesAusentes.map(t => ({ 
-                        content: t, 
-                        styles: { fillColor: [250, 230, 230], textColor: [0, 0, 0] } 
-                    })), 
-                    '', 
-                    '', 
-                    ''
-                ]
-            ],
-            theme: 'grid',
-            styles: { 
-                fontSize: 6.5, 
-                cellPadding: 0.5, 
-                valign: 'middle', 
-                halign: 'center', 
-                lineWidth: 0.1 
-            },
-            headStyles: {
-                fillColor: [220, 235, 245],
-                textColor: [0, 0, 0],
-                fontStyle: 'bold',
-                minCellHeight: 8,
-                valign: 'center'
-            },
-            columnStyles: {
-                0: { cellWidth: 7 },
-                1: { cellWidth: 18 },
-                2: { cellWidth: 65, halign: 'left', fontStyle: 'bold' },
-                ...Object.fromEntries(fechasUnicas.map((_, i) => [i + 3, { cellWidth: 4.1 }])),
-                [cabeceras.length - 3]: { cellWidth: 7, fontStyle: 'bold' },
-                [cabeceras.length - 2]: { cellWidth: 7, fontStyle: 'bold' },
-                [cabeceras.length - 1]: { cellWidth: 10, fontStyle: 'bold' }
-            },
-            didParseCell: (data) => {
-                if (data.section === 'body') {
-                    const rowData = data.row.raw;
-                    if (rowData.isInactive) {
-                        data.cell.styles.fillColor = [240, 240, 240];
-                        data.cell.styles.textColor = [100, 100, 100];
-                    }
-                }
-                if (data.section === 'head' && data.column.index >= 3 && data.column.index < (cabeceras.length - 3)) {
-                    data.cell.text = [""];
-                }
-                if (data.section === 'foot' && data.column.index >= (cabeceras.length - 3)) {
-                    data.cell.styles.fillColor = [255, 255, 255];
-                }
-            },
-            didDrawCell: (data) => {
-                if (data.section === 'head' && data.column.index >= 3 && data.column.index < (cabeceras.length - 3)) {
-                    const texto = cabeceras[data.column.index];
-                    doc.saveGraphicsState();
-                    const x = data.cell.x + (data.cell.width / 2) + 3.0;
-                    const y = data.cell.y + data.cell.height - 2;
-                    doc.setFontSize(6).setFont(undefined, 'bold');
-                    doc.text(texto, x, y, { angle: 90, align: 'center', baseline: 'middle' });
-                    doc.restoreGraphicsState();
-                }
+// Busca esta parte en la función generarReporteMatriz y reemplázala:
+
+doc.autoTable({
+    startY: 30,
+    margin: { left: 8, right: 8 }, // Reducir márgenes
+    head: [cabeceras],
+    body: bodyTabla,
+    foot: [
+        [
+            { content: 'TOTAL PRESENTES', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold', fillColor: [210, 245, 210], textColor: [0, 0, 0] } },
+            ...totalesPresentes.map(t => ({ content: t, styles: { fillColor: [210, 245, 210], textColor: [0, 0, 0] } })),
+            '', '', ''
+        ],
+        [
+            { content: 'TOTAL AUSENTES', colSpan: 3, styles: { halign: 'right', fontStyle: 'bold', fillColor: [250, 230, 230], textColor: [0, 0, 0] } },
+            ...totalesAusentes.map(t => ({ content: t, styles: { fillColor: [250, 230, 230], textColor: [0, 0, 0] } })),
+            '', '', ''
+        ]
+    ],
+    theme: 'grid',
+    styles: { 
+        fontSize: 6,        // Reducir tamaño de fuente
+        cellPadding: 0.3,   // Reducir padding
+        valign: 'middle', 
+        halign: 'center', 
+        lineWidth: 0.1,
+        overflow: 'linebreak'  // ✅ Permitir ajuste de texto
+    },
+    headStyles: {
+        fillColor: [220, 235, 245],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold',
+        minCellHeight: 6,   // Reducir altura mínima
+        valign: 'middle',
+        fontSize: 6         // Reducir fuente del header
+    },
+    columnStyles: {
+        0: { cellWidth: 6 },   // Reducir
+        1: { cellWidth: 15 },  // Reducir
+        2: { cellWidth: 50, halign: 'left', fontStyle: 'bold' }, // Reducir
+        // Calcular ancho dinámico para las fechas
+        ...Object.fromEntries(fechasUnicas.map((_, i) => {
+            const anchoFecha = fechasUnicas.length > 20 ? 3 : (fechasUnicas.length > 10 ? 3.5 : 4);
+            return [i + 3, { cellWidth: anchoFecha }];
+        })),
+        [cabeceras.length - 3]: { cellWidth: 6, fontStyle: 'bold' },
+        [cabeceras.length - 2]: { cellWidth: 6, fontStyle: 'bold' },
+        [cabeceras.length - 1]: { cellWidth: 9, fontStyle: 'bold' }
+    },
+    didParseCell: (data) => {
+        if (data.section === 'body') {
+            const rowData = data.row.raw;
+            if (rowData.isInactive) {
+                data.cell.styles.fillColor = [240, 240, 240];
+                data.cell.styles.textColor = [100, 100, 100];
             }
-        });
+        }
+        if (data.section === 'head' && data.column.index >= 3 && data.column.index < (cabeceras.length - 3)) {
+            data.cell.text = [""];
+        }
+        if (data.section === 'foot' && data.column.index >= (cabeceras.length - 3)) {
+            data.cell.styles.fillColor = [255, 255, 255];
+        }
+    },
+    didDrawCell: (data) => {
+        if (data.section === 'head' && data.column.index >= 3 && data.column.index < (cabeceras.length - 3)) {
+            const texto = cabeceras[data.column.index];
+            doc.saveGraphicsState();
+            const x = data.cell.x + (data.cell.width / 2) + 2.5; // Ajustar posición
+            const y = data.cell.y + data.cell.height - 1.5;
+            doc.setFontSize(5).setFont(undefined, 'bold'); // Reducir fuente
+            doc.text(texto, x, y, { angle: 90, align: 'center', baseline: 'middle' });
+            doc.restoreGraphicsState();
+        }
+    },
+    pageBreak: 'auto',  // ✅ Permitir saltos de página
+    tableWidth: 'auto'  // ✅ Ajustar automáticamente
+});
 
         // ================= NOMBRE DEL PDF =================
         const pnfPdf = (dataPnf?.nombre || asignacion.pnf?.nombre || "PNF").toUpperCase().trim();
