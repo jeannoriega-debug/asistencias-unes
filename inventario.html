@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario UNES</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-green { animation: pulseGreen 2s infinite; }
+        @keyframes pulseGreen { 0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); } 50% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } }
+        .toast-success { background: linear-gradient(135deg, #10b981, #059669); }
+        .toast-error { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .toast-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- NAV -->
+    <nav class="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-boxes-stacked text-2xl"></i>
+                <div>
+                    <h1 class="font-bold text-xl">Inventario UNES</h1>
+                    <p class="text-xs text-blue-200">Sistema de Gestión de Inventario</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-right">
+                    <span id="usuario-nombre" class="block text-sm font-semibold">Cargando...</span>
+                    <span id="usuario-rol" class="block text-xs text-blue-200">Inventario Admin</span>
+                </div>
+                <button onclick="cerrarSesionInventario()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm font-bold transition">
+                    <i class="fas fa-sign-out-alt mr-1"></i>Salir
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-6">
+        
+        <!-- RESUMEN ESTADÍSTICO -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 fade-in">
+            <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Total Artículos</p>
+                        <p class="text-3xl font-bold text-blue-700" id="total-articulos">0</p>
+                    </div>
+                    <i class="fas fa-box text-4xl text-blue-200"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Operativos</p>
+                        <p class="text-3xl font-bold text-green-700" id="total-operativos">0</p>
+                    </div>
+                    <i class="fas fa-check-circle text-4xl text-green-200"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Dañados</p>
+                        <p class="text-3xl font-bold text-red-700" id="total-danados">0</p>
+                    </div>
+                    <i class="fas fa-exclamation-triangle text-4xl text-red-200"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600">Ubicaciones</p>
+                        <p class="text-3xl font-bold text-purple-700" id="total-ubicaciones">0</p>
+                    </div>
+                    <i class="fas fa-map-marker-alt text-4xl text-purple-200"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- BARRA DE BÚSQUEDA Y FILTROS -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6 fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">
+                        <i class="fas fa-search mr-1"></i>Buscar por nombre, serial, código o responsable:
+                    </label>
+                    <input type="text" id="buscar-inventario" placeholder="Escriba para buscar..." 
+                           class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+                           oninput="window.modules.inventario.filtrarTabla()">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">
+                        <i class="fas fa-filter mr-1"></i>Filtrar por estado:
+                    </label>
+                    <select id="filtro-estado" class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+                            onchange="window.modules.inventario.filtrarTabla()">
+                        <option value="">Todos los estados</option>
+                        <option value="OPERATIVO">✅ Operativos</option>
+                        <option value="Dañado">❌ Dañados</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">
+                        <i class="fas fa-building mr-1"></i>Filtrar por ubicación:
+                    </label>
+                    <select id="filtro-ubicacion" class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+                            onchange="window.modules.inventario.filtrarTabla()">
+                        <option value="">Todas las ubicaciones</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTONES DE ACCIÓN -->
+        <div class="flex flex-wrap gap-3 mb-6 fade-in">
+            <button onclick="window.modules.inventario.abrirModalNuevo()" 
+                    class="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-bold text-sm hover:from-green-600 hover:to-green-700 transition shadow-md flex items-center gap-2">
+                <i class="fas fa-plus-circle"></i>Nuevo Artículo
+            </button>
+            <button onclick="window.modules.inventario.generarReportePDF()" 
+                    class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-6 py-3 rounded-lg font-bold text-sm hover:from-purple-600 hover:to-purple-700 transition shadow-md flex items-center gap-2">
+                <i class="fas fa-file-pdf"></i>Reporte PDF
+            </button>
+            <button onclick="window.modules.inventario.exportarExcel()" 
+                    class="bg-gradient-to-r from-green-700 to-green-800 text-white px-6 py-3 rounded-lg font-bold text-sm hover:from-green-800 hover:to-green-900 transition shadow-md flex items-center gap-2">
+                <i class="fas fa-file-excel"></i>Exportar Excel
+            </button>
+            <button onclick="window.modules.inventario.cargarInventario()" 
+                    class="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg font-bold text-sm hover:from-blue-600 hover:to-blue-700 transition shadow-md flex items-center gap-2 ml-auto">
+                <i class="fas fa-sync-alt"></i>Actualizar
+            </button>
+        </div>
+
+        <!-- TABLA DE INVENTARIO -->
+        <div class="bg-white rounded-lg shadow overflow-hidden fade-in">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gradient-to-r from-blue-600 to-blue-800 text-white">
+                        <tr>
+                            <th class="p-3 text-left text-xs font-bold">Código</th>
+                            <th class="p-3 text-left text-xs font-bold">Tipo/Descripción</th>
+                            <th class="p-3 text-left text-xs font-bold">Serial</th>
+                            <th class="p-3 text-left text-xs font-bold">Marca/Modelo</th>
+                            <th class="p-3 text-left text-xs font-bold">Ubicación</th>
+                            <th class="p-3 text-left text-xs font-bold">Responsable</th>
+                            <th class="p-3 text-center text-xs font-bold">Estado</th>
+                            <th class="p-3 text-center text-xs font-bold">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-inventario" class="divide-y">
+                        <tr><td colspan="8" class="text-center p-8 text-gray-500">
+                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br>Cargando inventario...
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL: NUEVO/EDITAR ARTÍCULO -->
+    <div id="modal-articulo" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto fade-in">
+            <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4 flex justify-between items-center sticky top-0">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fas fa-box" id="modal-icono"></i>
+                    <span id="modal-titulo">Nuevo Artículo</span>
+                </h2>
+                <button onclick="window.modules.inventario.cerrarModal()" class="text-white hover:text-gray-200 transition">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="form-articulo" class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">
+                            Código de Inventario <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="inv-inventario-id" required class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none" 
+                               placeholder="Ej: a3k9m2xq">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">N° en Depósito</label>
+                        <input type="text" id="inv-nro-deposito" class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none" 
+                               placeholder="Ej: PC24">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">
+                        Tipo/Descripción del Artículo <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" id="inv-tipo" required class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none" 
+                           placeholder="Ej: COMPUTADORA DE ESCRITORIO HP 6200">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Serial</label>
+                        <input type="text" id="inv-serial" class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none" 
+                               placeholder="Ej: MXL2160CQK">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Modelo</label>
+                        <input type="text" id="inv-modelo" class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none" 
+                               placeholder="Ej: 6200">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Marca</label>
+                        <input type="text" id="inv-marca" class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none" 
+                               placeholder="Ej: HP">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">
+                            Estado <span class="text-red-500">*</span>
+                        </label>
+                        <select id="inv-status" required class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none">
+                            <option value="OPERATIVO">✅ OPERATIVO</option>
+                            <option value="Dañado">❌ Dañado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">
+                            Ubicación <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="inv-ubicacion" required class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none" 
+                               placeholder="Ej: DECANATO">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Responsable</label>
+                        <input type="text" id="inv-responsable" class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none" 
+                               placeholder="Ej: RAMON MEDINA">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Observaciones</label>
+                    <textarea id="inv-observaciones" rows="2" class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none" 
+                              placeholder="Observaciones adicionales..."></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Evaluador</label>
+                    <input type="text" id="inv-evaluador" class="w-full border-2 border-gray-300 p-2 rounded-lg text-sm focus:border-blue-500 focus:outline-none" 
+                           placeholder="Ej: CARLOS LOPES Y JEAN L MARIN">
+                </div>
+
+                <input type="hidden" id="inv-id">
+
+                <div class="flex gap-3 pt-4 border-t">
+                    <button type="submit" class="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-lg font-bold text-sm hover:from-blue-700 hover:to-blue-800 transition shadow-md flex items-center justify-center gap-2">
+                        <i class="fas fa-save"></i>Guardar
+                    </button>
+                    <button type="button" onclick="window.modules.inventario.cerrarModal()" class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg font-bold text-sm hover:bg-gray-400 transition flex items-center justify-center gap-2">
+                        <i class="fas fa-times"></i>Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/modules/inventario.js"></script>
+
+    <script>
+    // Inicialización
+    document.addEventListener('DOMContentLoaded', async function() {
+        if (!window.appState || !window.appState.usuarioActualId) {
+            window.location.href = 'index.html';
+            return;
+        }
+        
+        // Verificar rol
+        if (window.appState.rolUsuarioActual !== 'inventario_admin') {
+            Swal.fire({
+                icon: 'error',
+                title: 'Acceso Denegado',
+                text: 'No tiene permisos para acceder al módulo de inventario',
+                confirmButtonColor: '#dc2626'
+            }).then(() => {
+                window.location.href = 'index.html';
+            });
+            return;
+        }
+        
+        // Mostrar usuario
+        document.getElementById('usuario-nombre').textContent = window.appState.nombreProfesorGlobal || 'Usuario';
+        
+        // Cargar inventario
+        await window.modules.inventario.cargarInventario();
+    });
+
+    async function cerrarSesionInventario() {
+        await window.supabaseClient.auth.signOut();
+        window.location.href = 'index.html';
+    }
+    </script>
+
+</body>
+</html>
