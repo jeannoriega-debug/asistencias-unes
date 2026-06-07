@@ -15,27 +15,14 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .pulse-green { animation: pulseGreen 2s infinite; }
         @keyframes pulseGreen { 0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); } 50% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } }
-        .asignacion-card { transition: all 0.3s; }
+        .asignacion-card { transition: all 0.3s; cursor: pointer; }
         .asignacion-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .asignacion-card.selected { border-color: #3b82f6; background-color: #eff6ff; }
+        .asignacion-card.hidden-card { display: none; }
     </style>
 </head>
 
 <body class="bg-gray-100 min-h-screen">
-
-    <!-- LOGIN -->
-    <div id="login-container" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-[100]">
-        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <h2 class="text-2xl font-bold mb-6 text-center text-blue-700">Iniciar Sesión</h2>
-            <input type="email" id="login-email" placeholder="Correo electrónico"
-                class="w-full p-3 border rounded-lg mb-4">
-            <input type="password" id="login-password" placeholder="Contraseña"
-                class="w-full p-3 border rounded-lg mb-6">
-            <button onclick="iniciarSesion()"
-                class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">Entrar</button>
-            <p id="login-error" class="text-red-500 text-sm mt-4 hidden text-center"></p>
-        </div>
-    </div>
 
     <!-- NAV -->
     <nav class="bg-blue-700 text-white p-4 shadow-lg sticky top-0 z-50">
@@ -46,12 +33,10 @@
             </div>
             <div id="user-info-container" class="flex items-center gap-4">
                 <div class="text-right leading-tight">
-                    <span id="profesor-nombre" class="block text-xs font-semibold md:inline md:text-sm">
-                       <span id="display-nombre-profesor">Cargando...</span>
-                    </span>
-                    <span id="profesor-rol" class="block text-xs text-blue-200"></span>
+                    <span id="profesor-nombre" class="block text-xs font-semibold md:inline md:text-sm">Cargando...</span>
+                    <span id="profesor-rol" class="block text-xs text-blue-200">Profesor</span>
                 </div>
-                <button onclick="cerrarSesion()"
+                <button onclick="cerrarSesionSimple()"
                     class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded-lg transition font-bold">Salir</button>
             </div>
         </div>
@@ -136,7 +121,7 @@
                         <i class="fas fa-info-circle text-yellow-600 text-2xl mr-3 mt-1"></i>
                         <div>
                             <h3 class="font-bold text-yellow-800 text-lg">Tiene varias clases asignadas</h3>
-                            <p class="text-yellow-700 text-sm">Seleccione cuál clase va a tomar asistencia ahora:</p>
+                            <p class="text-yellow-700 text-sm">Seleccione cuál clase va a tomar asistencia ahora (click para colapsar/expandir):</p>
                         </div>
                     </div>
                 </div>
@@ -235,6 +220,13 @@
                 <span>👥 Total: <span id="count-total">0</span></span>
             </div>
             <div id="estudiantes-body" class="bg-white shadow-md rounded-lg divide-y"></div>
+            
+            <!-- Botón de Reporte Matriz (aparece después de cargar) -->
+            <button onclick="window.modules.reportes?.generarReporteMatriz()" 
+                    class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg text-lg transition mt-4 hidden"
+                    id="btn-reporte-simple">
+                <i class="fas fa-file-alt mr-2"></i>REPORTE MATRIZ
+            </button>
         </section>
 
     </main>
@@ -248,22 +240,44 @@
     <script src="assets/js/modules/asistencia-simple.js"></script>
     <script src="assets/js/modules/reportes.js"></script>
 
-<script>
-// Inicializar cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('📄 Iniciando Asistencia Simplificada...');
-    if (window.modules && window.modules.asistenciaSimple) {
+    <!-- Script de inicialización -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('📄 Iniciando Asistencia Simplificada...');
+        
+        // Verificar autenticación
+        if (!window.appState || !window.appState.usuarioActualId) {
+            console.warn('⚠️ Usuario no autenticado, redirigiendo...');
+            window.location.href = 'index.html';
+            return;
+        }
+        
+        // Inicializar módulo con delay para asegurar carga
         setTimeout(() => {
-            console.log('✅ Llamando a init()');
-            window.modules.asistenciaSimple.init();
-        }, 500); // Pequeña espera para asegurar que todos los scripts cargaron
+            if (window.modules && window.modules.asistenciaSimple) {
+                console.log('✅ Llamando a init()');
+                window.modules.asistenciaSimple.init();
+            }
+        }, 500);
+    });
+
+    // Función de cierre de sesión mejorada
+    async function cerrarSesionSimple() {
+        console.log('🚪 Cerrando sesión...');
+        // Limpiar estado
+        window.appState = {
+            usuarioActualId: null,
+            rolUsuarioActual: null,
+            nombreUsuarioActual: null,
+            nombreProfesorGlobal: null
+        };
+        // Cerrar sesión en Supabase
+        await window.supabaseClient.auth.signOut();
+        // Redirigir al login
+        window.location.href = 'index.html';
     }
-});
-</script>
-    
+    </script>
 
-
-    
 </body>
 
 </html>
