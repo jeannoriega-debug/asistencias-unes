@@ -224,17 +224,38 @@ window.modules.asistenciaSimple.mostrarMultiplesAsignaciones = function(asignaci
 // ============================================
 // SELECCIONAR ASIGNACIÓN
 // ============================================
+
 window.modules.asistenciaSimple.seleccionarAsignacion = function(idx) {
-    asignacionSeleccionada = asignacionesProfesor[idx];
+    // Si ya está seleccionada, mostrar todas de nuevo
+    if (asignacionSeleccionada === asignacionesProfesor[idx]) {
+        console.log('🔄 Deseleccionando - Mostrando todas las clases');
+        asignacionSeleccionada = null;
+        
+        // Mostrar todas las tarjetas
+        document.querySelectorAll('.asignacion-card').forEach(card => {
+            card.style.display = 'block';
+            card.classList.remove('selected', 'border-blue-500', 'bg-blue-50');
+            card.classList.add('border-gray-200');
+        });
+        
+        // Ocultar selector de ambiente
+        document.getElementById('selector-ambiente-multi').classList.add('hidden');
+        document.getElementById('btn-cargar-multi').classList.add('hidden');
+        return;
+    }
     
-    // Resaltar tarjeta seleccionada
+    // Seleccionar nueva asignación
+    asignacionSeleccionada = asignacionesProfesor[idx];
+    console.log('✅ Asignación seleccionada:', idx);
+    
+    // Ocultar todas las demás tarjetas
     document.querySelectorAll('.asignacion-card').forEach((card, i) => {
         if (i === idx) {
+            card.style.display = 'block';
             card.classList.add('selected', 'border-blue-500', 'bg-blue-50');
             card.classList.remove('border-gray-200');
         } else {
-            card.classList.remove('selected', 'border-blue-500', 'bg-blue-50');
-            card.classList.add('border-gray-200');
+            card.style.display = 'none'; // ✅ OCULTAR las demás
         }
     });
     
