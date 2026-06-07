@@ -1,6 +1,7 @@
 /**
  * MÓDULO DE INVENTARIO UNES
- * Versión: 1.0 - CRUD completo con reporte PDF
+ * Versión: 1.0 - CRUD completo con reporte PDF y exportación Excel
+ * Solo accesible para roles: inventario_admin y super_usuario
  */
 
 window.modules = window.modules || {};
@@ -70,7 +71,7 @@ window.modules.inventario = {
                 <tr class="hover:bg-blue-50 transition">
                     <td class="p-3 font-mono text-xs font-bold text-blue-700">${item.inventario_id || '-'}</td>
                     <td class="p-3 text-sm font-semibold text-gray-800">${item.tipo || '-'}</td>
-                    <td class="p-3 text-xs text-gray-600">${item.serial !== '-----------' ? item.serial : '-'}</td>
+                    <td class="p-3 text-xs text-gray-600">${item.serial !== '-----------' && item.serial ? item.serial : '-'}</td>
                     <td class="p-3 text-xs text-gray-600">
                         ${item.marca ? `<div class="font-semibold">${item.marca}</div>` : ''}
                         ${item.modelo && item.modelo !== '-----------' ? `<div class="text-gray-500">${item.modelo}</div>` : ''}
