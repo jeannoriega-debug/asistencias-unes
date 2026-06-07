@@ -73,6 +73,20 @@ async function iniciarSesion() {
 }
 
 
+// Forzar refresh del token
+async function refreshToken() {
+    const { data, error } = await window.supabaseClient.auth.refreshSession();
+    if (error) console.error('Error refrescando token:', error);
+    return data;
+}
+
+// Llamar después de verificar sesión
+document.addEventListener('DOMContentLoaded', async () => {
+    await verificarSesion();
+    // Refrescar token para obtener rol actualizado
+    await refreshToken();
+});
+
 /**
  * Verificar si hay sesión activa al cargar la página
  */
