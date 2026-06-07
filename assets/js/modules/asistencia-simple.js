@@ -19,6 +19,12 @@ window.modules.asistenciaSimple.init = async function() {
     
     const rol = window.appState.rolUsuarioActual;
     const nombre = window.appState.nombreUsuarioActual || 'Usuario';
+
+    // ✅ MOSTRAR NOMBRE DEL PROFESOR
+    const nombreEl = document.getElementById('display-nombre-profesor') || document.getElementById('profesor-nombre');
+    if (nombreEl) {
+        nombreEl.textContent = nombre.toUpperCase();
+    }
     
     // Mostrar bienvenida
     document.getElementById('welcome-banner').classList.remove('hidden');
