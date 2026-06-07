@@ -288,10 +288,15 @@
             window.location.href = 'index.html';
             return;
         }
-        
+
+            const rol = window.appState.rolUsuarioActual;
+            const rolesPermitidos = ['inventario_admin', 'super_usuario'];
+            
+            if (!rolesPermitidos.includes(rol)) {
+
         // Verificar rol - Permitir tanto inventario_admin como super_usuario
-        const rolesPermitidos = ['inventario_admin', 'super_usuario'];
-        if (!rolesPermitidos.includes(window.appState.rolUsuarioActual)) {
+  //      const rolesPermitidos = ['inventario_admin', 'super_usuario'];
+//        if (!rolesPermitidos.includes(window.appState.rolUsuarioActual)) {
             Swal.fire({
                 icon: 'error',
                 title: 'Acceso Denegado',
