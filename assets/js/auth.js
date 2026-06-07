@@ -54,10 +54,15 @@ async function iniciarSesion() {
             return;
         }
 
-        // 5. Redirección normal según rol
+        // 🔥 5. REDIRECCIÓN SEGÚN ROL
         if (perfil.rol === 'super_usuario') {
+            // Super usuario → Se queda en index.html con panel admin
             window.location.href = 'index.html?panel=admin';
+        } else if (perfil.rol === 'profesor') {
+            // Profesor → Redirige a asistencia-simple.html
+            window.location.href = 'asistencia-simple.html';
         } else {
+            // Otros roles → index.html normal
             window.location.href = 'index.html';
         }
 
@@ -66,6 +71,7 @@ async function iniciarSesion() {
         Swal.fire('Error', error.message || 'No se pudo iniciar sesión', 'error');
     }
 }
+
 
 /**
  * Verificar si hay sesión activa al cargar la página
