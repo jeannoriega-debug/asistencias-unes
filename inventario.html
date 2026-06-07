@@ -337,7 +337,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     console.log('🚀 Iniciando módulo de inventario...');
     
     // Esperar un momento para que auth.js termine de cargar
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Si no hay usuario en appState, obtenerlo directamente
     if (!window.appState || !window.appState.usuarioActualId) {
@@ -355,8 +355,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     const rol = window.appState.rolUsuarioActual;
     const rolesPermitidos = ['inventario_admin', 'super_usuario'];
     
-    console.log('🔐 Rol actual:', rol);
-    console.log('🔐 Roles permitidos:', rolesPermitidos);
+    console.log('🔐 Verificando acceso...');
+    console.log('Rol actual:', rol);
+    console.log('Roles permitidos:', rolesPermitidos);
     
     if (!rol || !rolesPermitidos.includes(rol)) {
         console.error('❌ Acceso denegado. Rol:', rol);
