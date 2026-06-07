@@ -58,7 +58,12 @@ window.modules.asistenciaSimple.inicializarVistaCompleta = async function() {
 // ============================================
 window.modules.asistenciaSimple.cargarAsignaciones = async function() {
     const profesorId = window.appState.usuarioActualId;
-    
+// ✅ VALIDAR QUE EXISTA EL USUARIO
+    if (!profesorId || profesorId === 'null' || profesorId === null) {
+        console.warn('⚠️ No hay usuario autenticado');
+        return; // Solo retorna, no muestra error
+    }
+   
     try {
         // Ocultar todos los paneles
         document.getElementById('no-asignaciones').classList.add('hidden');
