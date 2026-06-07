@@ -17,11 +17,18 @@ let asignacionSeleccionada = null;
 window.modules.asistenciaSimple.init = async function() {
     console.log('🚀 Iniciando Asistencia Simplificada v1.0...');
     
+    // VALIDAR AUTENTICACIÓN
+    if (!window.appState || !window.appState.usuarioActualId) {
+        console.warn('⚠️ Usuario no autenticado, redirigiendo...');
+        window.location.href = 'index.html';
+        return;
+    }
+    
     const rol = window.appState.rolUsuarioActual;
-    const nombre = window.appState.nombreUsuarioActual || 'Usuario';
-
-    // ✅ MOSTRAR NOMBRE DEL PROFESOR
-    const nombreEl = document.getElementById('display-nombre-profesor') || document.getElementById('profesor-nombre');
+    const nombre = window.appState.nombreProfesorGlobal || window.appState.nombreUsuarioActual || 'Usuario';
+    
+    // MOSTRAR NOMBRE DEL PROFESOR
+    const nombreEl = document.getElementById('profesor-nombre');
     if (nombreEl) {
         nombreEl.textContent = nombre.toUpperCase();
     }
@@ -29,7 +36,7 @@ window.modules.asistenciaSimple.init = async function() {
     // Mostrar bienvenida
     document.getElementById('welcome-banner').classList.remove('hidden');
     document.getElementById('welcome-nombre').textContent = `👋 ${nombre}`;
-    document.getElementById('profesor-nombre').textContent = nombre;
+    document.getElementById('profesor-nombre').textContent = nombre.toUpperCase();
     document.getElementById('profesor-rol').textContent = rol === 'super_usuario' ? 'Administrador' : 'Profesor';
     
     if (rol === 'super_usuario') {
@@ -39,6 +46,15 @@ window.modules.asistenciaSimple.init = async function() {
         // Vista simplificada para profesores
         await this.cargarAsignaciones();
     }
+    
+    // Forzar actualización del nombre después de cargar
+    setTimeout(() => {
+        const nombreActual = window.appState.nombreProfesorGlobal || 'Usuario';
+        const nombreElement = document.getElementById('profesor-nombre');
+        if (nombreElement) {
+            nombreElement.textContent = nombreActual.toUpperCase();
+        }
+    }, 100);
 };
 
 // ============================================
@@ -64,12 +80,13 @@ window.modules.asistenciaSimple.inicializarVistaCompleta = async function() {
 // ============================================
 window.modules.asistenciaSimple.cargarAsignaciones = async function() {
     const profesorId = window.appState.usuarioActualId;
-// ✅ VALIDAR QUE EXISTA EL USUARIO
+    
+    // VALIDAR QUE EXISTA EL USUARIO
     if (!profesorId || profesorId === 'null' || profesorId === null) {
-        console.warn('⚠️ No hay usuario autenticado');
-        return; // Solo retorna, no muestra error
+        console.warn('⚠️ No hay usuario autenticado o ID es inválido:', profesorId);
+        return;
     }
-   
+    
     try {
         // Ocultar todos los paneles
         document.getElementById('no-asignaciones').classList.add('hidden');
@@ -93,7 +110,10 @@ window.modules.asistenciaSimple.cargarAsignaciones = async function() {
             `)
             .eq('profesor_id', profesorId);
         
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Error cargando asignaciones:', error);
+            throw error;
+        }
         
         if (!asignaciones || asignaciones.length === 0) {
             console.warn('⚠️ El profesor no tiene asignaciones');
@@ -120,7 +140,12 @@ window.modules.asistenciaSimple.cargarAsignaciones = async function() {
         
     } catch (e) {
         console.error('❌ Error cargando asignaciones:', e);
-        Swal.fire('Error', 'No se pudieron cargar sus asignaciones: ' + e.message, 'error');
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudieron cargar sus asignaciones: ' + e.message,
+            confirmButtonText: 'Aceptar'
+        });
     }
 };
 
@@ -184,7 +209,7 @@ window.modules.asistenciaSimple.mostrarUnaAsignacion = function(asignacion) {
 // MOSTRAR MÚLTIPLES ASIGNACIONES
 // ============================================
 window.modules.asistenciaSimple.mostrarMultiplesAsignaciones = function(asignaciones) {
-    document.getElementById('welcome-info').textContent = `${asignaciones.length} clases detectadas - Seleccione una`;
+    document.getElementById('welcome-info').textContent = `${asignaciones.length} clases detectadas - Seleccione una (click para colapsar/expandir)`;
     document.getElementById('multiplas-asignaciones').classList.remove('hidden');
     document.getElementById('selector-ambiente-multi').classList.add('hidden');
     document.getElementById('btn-cargar-multi').classList.add('hidden');
@@ -194,7 +219,7 @@ window.modules.asistenciaSimple.mostrarMultiplesAsignaciones = function(asignaci
     
     asignaciones.forEach((asig, idx) => {
         const card = document.createElement('div');
-        card.className = 'asignacion-card border-2 border-gray-200 rounded-lg p-4 hover:border-blue-400 cursor-pointer transition';
+        card.className = 'asignacion-card border-2 border-gray-200 rounded-lg p-4';
         card.onclick = () => this.seleccionarAsignacion(idx);
         card.id = `asignacion-card-${idx}`;
         card.innerHTML = `
@@ -222,9 +247,8 @@ window.modules.asistenciaSimple.mostrarMultiplesAsignaciones = function(asignaci
 };
 
 // ============================================
-// SELECCIONAR ASIGNACIÓN
+// SELECCIONAR ASIGNACIÓN (con toggle)
 // ============================================
-
 window.modules.asistenciaSimple.seleccionarAsignacion = function(idx) {
     // Si ya está seleccionada, mostrar todas de nuevo
     if (asignacionSeleccionada === asignacionesProfesor[idx]) {
@@ -255,7 +279,7 @@ window.modules.asistenciaSimple.seleccionarAsignacion = function(idx) {
             card.classList.add('selected', 'border-blue-500', 'bg-blue-50');
             card.classList.remove('border-gray-200');
         } else {
-            card.style.display = 'none'; // ✅ OCULTAR las demás
+            card.style.display = 'none'; // OCULTAR las demás
         }
     });
     
@@ -306,8 +330,8 @@ window.modules.asistenciaSimple.contarEstudiantes = async function(asignacion, a
             .eq('pnf_id', asignacion.pnf?.id)
             .eq('proceso', asignacion.proceso)
             .eq('trayecto_id', asignacion.trayecto?.id)
-            .eq('ambiente', ambiente)
-            .eq('status', 'Activo');
+            .eq('ambiente', ambiente);
+            // SIN FILTRO DE STATUS para incluir activos e inactivos
         
         if (asignacion.categoria) {
             query = query.eq('categoria', asignacion.categoria);
@@ -347,15 +371,15 @@ window.modules.asistenciaSimple.cargarListaDesdeSimple = async function() {
     }
     
     try {
-        // Construir consulta
+        // Construir consulta (SIN FILTRO DE STATUS para incluir bajas)
         let query = window.supabaseClient
             .from('estudiantes')
             .select(`*, tipos_trayecto(id, codigo, nombre, orden)`)
             .eq('pnf_id', asignacionSeleccionada.pnf?.id)
             .eq('proceso', asignacionSeleccionada.proceso)
             .eq('trayecto_id', asignacionSeleccionada.trayecto?.id)
-            .eq('ambiente', ambiente)
-            .eq('status', 'Activo');
+            .eq('ambiente', ambiente);
+            // .eq('status', 'Activo'); ← COMENTADO para incluir todos
         
         if (asignacionSeleccionada.categoria) {
             query = query.eq('categoria', asignacionSeleccionada.categoria);
@@ -385,8 +409,10 @@ window.modules.asistenciaSimple.cargarListaDesdeSimple = async function() {
         
         // Mostrar resumen
         document.getElementById('lista-contenedor').classList.remove('hidden');
+        document.getElementById('btn-reporte-simple')?.classList.remove('hidden'); // Mostrar botón de reporte
+        
         const activos = data.filter(e => e.status === 'Activo').length;
-        const bajas = data.filter(e => e.status === 'Inactivo').length;
+        const bajas = data.filter(e => e.status === 'Inactivo' || e.status === 'Baja').length;
         document.getElementById('count-activos').textContent = activos;
         document.getElementById('count-bajas').textContent = bajas;
         document.getElementById('count-total').textContent = data.length;
