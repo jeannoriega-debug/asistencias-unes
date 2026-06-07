@@ -48,19 +48,19 @@ async function iniciarSesion() {
         window.appState.rolUsuarioActual = perfil.rol;
         window.appState.nombreProfesorGlobal = `${perfil.nombre} ${perfil.apellido}`.trim();
 
-        // 🔥 4. REDIRECCIÓN ESPECIAL PARA USUARIO DISCIPLINA
-        if (email.toLowerCase() === 'controlydisciplina@gmail.com' || perfil.rol === 'disciplina_admin') {
-            window.location.href = 'disciplina.html';
-            return;
-        }
-
-        // 🔥 5. REDIRECCIÓN SEGÚN ROL
+        // 4. REDIRECCIÓN SEGÚN ROL
         if (perfil.rol === 'super_usuario') {
             // Super usuario → Se queda en index.html con panel admin
             window.location.href = 'index.html?panel=admin';
         } else if (perfil.rol === 'profesor') {
-            // Profesor → Redirige a asistencia-simple.html
+            // Profesor → Redirige a asistencia simplificada
             window.location.href = 'asistencia-simple.html';
+        } else if (perfil.rol === 'inventario_admin') {
+            // Inventario Admin → Redirige a módulo de inventario
+            window.location.href = 'inventario.html';
+        } else if (email.toLowerCase() === 'controlydisciplina@gmail.com' || perfil.rol === 'disciplina_admin') {
+            // Disciplina → Redirige a módulo de disciplina
+            window.location.href = 'disciplina.html';
         } else {
             // Otros roles → index.html normal
             window.location.href = 'index.html';
