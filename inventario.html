@@ -282,47 +282,138 @@
     <script src="assets/js/modules/inventario.js"></script>
 
 <script>
-    // Inicialización
-    document.addEventListener('DOMContentLoaded', async function() {
-        if (!window.appState || !window.appState.usuarioActualId) {
+/**
+ * FUNCIÓN PARA OBTENER EL ROL DEL USUARIO DIRECTAMENTE DESDE SUPABASE
+ * Esto evita la condición de carrera con auth.js
+ */
+async function obtenerRolUsuarioDirecto() {
+    try {
+        console.log('🔍 Obteniendo rol directamente desde Supabase...');
+        
+        // Verificar sesión
+        const { data: sessionData, error: sessionError } = await window.supabaseClient.auth.getSession();
+        
+        if (sessionError || !sessionData?.session) {
+            console.warn('⚠️ No hay sesión activa');
+            return null;
+        }
+        
+        const userId = sessionData.session.user.id;
+        console.log('✅ Usuario autenticado:', userId);
+        
+        // Obtener perfil directamente
+        const { data: perfil, error: perfilError } = await window.supabaseClient
+            .from('perfiles_profesores')
+            .select('rol, nombre, apellido, status')
+            .eq('id', userId)
+            .single();
+        
+        if (perfilError || !perfil) {
+            console.error('❌ Error obteniendo perfil:', perfilError);
+            return null;
+        }
+        
+        console.log('✅ Perfil obtenido:', perfil);
+        
+        // Actualizar appState con los datos
+        window.appState = window.appState || {};
+        window.appState.usuarioActualId = userId;
+        window.appState.rolUsuarioActual = perfil.rol;
+        window.appState.nombreProfesorGlobal = `${perfil.nombre} ${perfil.apellido}`.trim();
+        window.appState.statusUsuario = perfil.status;
+        
+        return perfil;
+        
+    } catch (e) {
+        console.error('❌ Error en obtenerRolUsuarioDirecto:', e);
+        return null;
+    }
+}
+
+/**
+ * INICIALIZACIÓN DEL MÓDULO DE INVENTARIO
+ */
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('🚀 Iniciando módulo de inventario...');
+    
+    // Esperar un momento para que auth.js termine de cargar
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Si no hay usuario en appState, obtenerlo directamente
+    if (!window.appState || !window.appState.usuarioActualId) {
+        console.log('⚠️ appState vacío, obteniendo datos directamente...');
+        const perfil = await obtenerRolUsuarioDirecto();
+        
+        if (!perfil) {
+            console.warn('⚠️ No se pudo obtener el perfil, redirigiendo al login');
             window.location.href = 'index.html';
             return;
         }
-
-            const rol = window.appState.rolUsuarioActual;
-            const rolesPermitidos = ['inventario_admin', 'super_usuario'];
-            
-            if (!rolesPermitidos.includes(rol)) {
-
-        // Verificar rol - Permitir tanto inventario_admin como super_usuario
-  //      const rolesPermitidos = ['inventario_admin', 'super_usuario'];
-//        if (!rolesPermitidos.includes(window.appState.rolUsuarioActual)) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Acceso Denegado',
-                text: 'No tiene permisos para acceder al módulo de inventario',
-                confirmButtonColor: '#dc2626'
-            }).then(() => {
-                window.location.href = 'index.html';
-            });
-            return;
-        }
-        
-        // Mostrar usuario
-        document.getElementById('usuario-nombre').textContent = window.appState.nombreProfesorGlobal || 'Usuario';
-        
-        // Mostrar rol actual
-        const rolTexto = window.appState.rolUsuarioActual === 'super_usuario' ? 'Administrador' : 'Inventario Admin';
-        document.getElementById('usuario-rol').textContent = rolTexto;
-        
-        // Cargar inventario
+    }
+    
+    // Verificar rol - Permitir tanto inventario_admin como super_usuario
+    const rol = window.appState.rolUsuarioActual;
+    const rolesPermitidos = ['inventario_admin', 'super_usuario'];
+    
+    console.log('🔐 Rol actual:', rol);
+    console.log('🔐 Roles permitidos:', rolesPermitidos);
+    
+    if (!rol || !rolesPermitidos.includes(rol)) {
+        console.error('❌ Acceso denegado. Rol:', rol);
+        Swal.fire({
+            icon: 'error',
+            title: 'Acceso Denegado',
+            html: `
+                <div class="text-left text-sm">
+                    <p class="mb-2">No tiene permisos para acceder al módulo de inventario.</p>
+                    <p><strong>Rol actual:</strong> <span class="text-red-600">${rol || 'No definido'}</span></p>
+                    <p><strong>Roles permitidos:</strong> inventario_admin, super_usuario</p>
+                </div>
+            `,
+            confirmButtonColor: '#dc2626'
+        }).then(() => {
+            window.location.href = 'index.html';
+        });
+        return;
+    }
+    
+    // Mostrar usuario
+    const nombre = window.appState.nombreProfesorGlobal || 'Usuario';
+    document.getElementById('usuario-nombre').textContent = nombre.toUpperCase();
+    
+    // Mostrar rol actual
+    const rolTexto = rol === 'super_usuario' ? 'Administrador' : 'Inventario Admin';
+    document.getElementById('usuario-rol').textContent = rolTexto;
+    
+    console.log('✅ Usuario autorizado:', nombre, '-', rolTexto);
+    
+    // Cargar inventario
+    if (window.modules && window.modules.inventario) {
         await window.modules.inventario.cargarInventario();
-    });
+    } else {
+        console.error('❌ Módulo de inventario no cargado');
+        Swal.fire('Error', 'No se pudo cargar el módulo de inventario', 'error');
+    }
+});
 
-    async function cerrarSesionInventario() {
+async function cerrarSesionInventario() {
+    const result = await Swal.fire({
+        title: '¿Cerrar sesión?',
+        text: 'Se cerrará su sesión actual',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Sí, cerrar sesión',
+        cancelButtonText: 'Cancelar'
+    });
+    
+    if (result.isConfirmed) {
         await window.supabaseClient.auth.signOut();
+        window.appState = {};
         window.location.href = 'index.html';
     }
+}
 </script>
 
 </body>
