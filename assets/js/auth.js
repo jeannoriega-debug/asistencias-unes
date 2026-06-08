@@ -44,48 +44,36 @@ async function iniciarSesion() {
         }
 
         // 3. Guardar datos en appState
+        window.appState = window.appState || {};
         window.appState.usuarioActualId = authData.user.id;
         window.appState.rolUsuarioActual = perfil.rol;
         window.appState.nombreProfesorGlobal = `${perfil.nombre} ${perfil.apellido}`.trim();
 
-        // 4. REDIRECCIÓN SEGÚN ROL
-        if (perfil.rol === 'super_usuario') {
-            // Super usuario → Se queda en index.html con panel admin
+        console.log('✅ Login exitoso:', {
+            email,
+            rol: perfil.rol,
+            nombre: window.appState.nombreProfesorGlobal
+        });
+
+        // 4. REDIRECCIÓN SEGÚN ROL (orden corregido)
+        if (email.toLowerCase() === 'controlydisciplina@gmail.com' || perfil.rol === 'disciplina_admin') {
+            // ⚠️ IMPORTANTE: Disciplina PRIMERO (antes que otros roles)
+            window.location.href = 'disciplina.html';
+        } else if (perfil.rol === 'inventario_admin') {
+            window.location.href = 'inventario.html';
+        } else if (perfil.rol === 'super_usuario') {
             window.location.href = 'index.html?panel=admin';
         } else if (perfil.rol === 'profesor') {
-            // Profesor → Redirige a asistencia simplificada
             window.location.href = 'asistencia-simple.html';
-        } else if (perfil.rol === 'inventario_admin') {
-            // Inventario Admin → Redirige a módulo de inventario
-            window.location.href = 'inventario.html';
-        } else if (email.toLowerCase() === 'controlydisciplina@gmail.com' || perfil.rol === 'disciplina_admin') {
-            // Disciplina → Redirige a módulo de disciplina
-            window.location.href = 'disciplina.html';
         } else {
-            // Otros roles → index.html normal
             window.location.href = 'index.html';
         }
 
     } catch (error) {
-        console.error('Error login:', error);
+        console.error('❌ Error login:', error);
         Swal.fire('Error', error.message || 'No se pudo iniciar sesión', 'error');
     }
 }
-
-
-// Forzar refresh del token
-async function refreshToken() {
-    const { data, error } = await window.supabaseClient.auth.refreshSession();
-    if (error) console.error('Error refrescando token:', error);
-    return data;
-}
-
-// Llamar después de verificar sesión
-document.addEventListener('DOMContentLoaded', async () => {
-    await verificarSesion();
-    // Refrescar token para obtener rol actualizado
-    await refreshToken();
-});
 
 /**
  * Verificar si hay sesión activa al cargar la página
@@ -106,6 +94,7 @@ async function verificarSesion() {
         if (loginContainer) loginContainer.classList.add('hidden');
         
         // Guardar datos del usuario
+        window.appState = window.appState || {};
         window.appState.usuarioActualId = session.user.id;
         
         // Cargar datos del profesor
@@ -141,6 +130,7 @@ async function obtenerDatosProfesor() {
     }
 
     window.appState.nombreProfesorGlobal = data ? `${data.nombre} ${data.apellido}` : userData.user.email;
+    window.appState.rolUsuarioActual = data?.rol || 'profesor';
     
     const nombreEl = document.getElementById('profesor-nombre');
     if (nombreEl) {
@@ -178,7 +168,6 @@ async function verificarRolUsuario() {
         if (filtroReporte) filtroReporte.classList.remove('hidden');
         if (filtroContainer) filtroContainer.classList.remove('hidden');
         
-        // Cargar profesores para filtro de reporte
         if (typeof window.modules?.admin?.cargarProfesoresParaFiltroReporte === 'function') {
             await window.modules.admin.cargarProfesoresParaFiltroReporte();
         }
@@ -204,12 +193,12 @@ async function cerrarSesion() {
     }
 }
 
-// Exportar funciones al scope global para que funcionen los onclick del HTML
+// Exportar funciones al scope global
 window.iniciarSesion = iniciarSesion;
 window.verificarSesion = verificarSesion;
 window.cerrarSesion = cerrarSesion;
 
-// Inicializar al cargar la página
+// Inicializar UNA SOLA VEZ al cargar la página
 document.addEventListener('DOMContentLoaded', verificarSesion);
 
 console.log('✅ Módulo de autenticación cargado');
