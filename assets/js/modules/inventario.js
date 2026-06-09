@@ -1,6 +1,6 @@
 /**
  * MÓDULO DE INVENTARIO UNES
- * Versión: 5.0 - ExcelJS + Corrección robusta de dañados
+ * Versión: 6.0 - Completa con ExcelJS, PDF por ubicación, numeración local
  * Solo accesible para roles: inventario_admin y super_usuario
  */
 
@@ -11,14 +11,12 @@ window.modules.inventario = {
     filtroActual: { texto: '', estado: '', ubicacion: '' },
 
     // ============================================
-    // 🔧 FUNCIONES AUXILIARES ROBUSTAS
+    // FUNCIONES AUXILIARES
     // ============================================
-    
-    // Normaliza el status para comparación (maneja todas las variantes)
     normalizarStatus: function(status) {
         if (!status) return '';
         return status.toString().trim().toUpperCase()
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, ''); // Quita tildes (Ñ → N)
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, '');
     },
 
     esOperativo: function(status) {
@@ -27,10 +25,9 @@ window.modules.inventario = {
 
     esDanado: function(status) {
         const norm = this.normalizarStatus(status);
-        return norm === 'DANADO' || norm === 'DANADO' || norm.includes('DAN');
+        return norm === 'DANADO' || norm.includes('DAN');
     },
 
-    // Debug: Ver valores únicos de status
     debugStatus: function() {
         const valores = [...new Set(this.datosCache.map(i => i.status))];
         console.log('🔍 Valores únicos de status:', valores);
@@ -71,10 +68,7 @@ window.modules.inventario = {
 
             this.datosCache = todosLosDatos;
             this.datosFiltradosActuales = this.datosCache;
-            
-            // 🔍 DEBUG: Mostrar valores de status al cargar
             this.debugStatus();
-            
             this.actualizarEstadisticas();
             this.renderizarTabla(this.datosCache);
             this.actualizarContadorResultados(this.datosCache, this.datosCache.length);
@@ -117,7 +111,7 @@ window.modules.inventario = {
         if (elDan) elDan.textContent = danados;
         if (elUb) elUb.textContent = ubicaciones;
 
-        console.log('📊 Estadísticas actualizadas:', { total, operativos, danados, ubicaciones });
+        console.log('📊 Estadísticas:', { total, operativos, danados, ubicaciones });
     },
 
     // ============================================
@@ -253,7 +247,7 @@ window.modules.inventario = {
         this.renderizarTabla(filtrados);
         this.actualizarContadorResultados(filtrados, this.datosCache.length);
 
-        console.log(`📊 ${filtrados.length} de ${this.datosCache.length} artículos mostrados`);
+        console.log(` ${filtrados.length} de ${this.datosCache.length} artículos mostrados`);
     },
 
     // ============================================
@@ -368,7 +362,7 @@ window.modules.inventario = {
                     <p class="mb-2">Se eliminará el artículo:</p>
                     <p class="font-bold">${item.tipo}</p>
                     <p class="text-sm text-gray-600">Código: ${item.inventario_id}</p>
-                    <p class="text-sm text-red-600 mt-2">⚠️ Esta acción no se puede deshacer</p>
+                    <p class="text-sm text-red-600 mt-2">️ Esta acción no se puede deshacer</p>
                 </div>
             `,
             showCancelButton: true,
@@ -429,7 +423,7 @@ window.modules.inventario = {
     },
 
     // ============================================
-    // 📄 GENERAR REPORTE PDF
+    // 📄 GENERAR REPORTE PDF (NUMERACIÓN POR UBICACIÓN)
     // ============================================
     generarReportePDF: function() {
         const datosSinOrdenar = this.datosFiltradosActuales && this.datosFiltradosActuales.length > 0 
@@ -469,6 +463,18 @@ window.modules.inventario = {
             const operativos = datos.filter(i => this.esOperativo(i.status)).length;
             const danados = datos.filter(i => this.esDanado(i.status)).length;
 
+            // AGRUPAR POR UBICACIÓN
+            const agrupadoPorUbicacion = {};
+            datos.forEach(item => {
+                const ubic = item.ubicacion || 'SIN UBICACIÓN';
+                if (!agrupadoPorUbicacion[ubic]) {
+                    agrupadoPorUbicacion[ubic] = [];
+                }
+                agrupadoPorUbicacion[ubic].push(item);
+            });
+
+            const ubicaciones = Object.keys(agrupadoPorUbicacion).sort();
+
             // ENCABEZADO
             doc.setFontSize(14); 
             doc.setFont('helvetica', 'bold'); 
@@ -494,19 +500,19 @@ window.modules.inventario = {
             doc.setFont('helvetica', 'bold'); 
             doc.text('TABLA DINÁMICA: BIENES POR TIPO', 20, 52);
 
-            const agrupadoPorTipo = {};
+            const tipoStats = {};
             datos.forEach(item => {
                 const tipo = item.tipo || 'SIN TIPO';
-                if (!agrupadoPorTipo[tipo]) {
-                    agrupadoPorTipo[tipo] = { total: 0, operativos: 0, danados: 0 };
+                if (!tipoStats[tipo]) {
+                    tipoStats[tipo] = { total: 0, operativos: 0, danados: 0 };
                 }
-                agrupadoPorTipo[tipo].total++;
-                if (this.esOperativo(item.status)) agrupadoPorTipo[tipo].operativos++;
-                else if (this.esDanado(item.status)) agrupadoPorTipo[tipo].danados++;
+                tipoStats[tipo].total++;
+                if (this.esOperativo(item.status)) tipoStats[tipo].operativos++;
+                else if (this.esDanado(item.status)) tipoStats[tipo].danados++;
             });
 
             const tiposColumn = ['Tipo de Artículo', 'Total', 'Operativos', 'Dañados'];
-            const tiposRows = Object.entries(agrupadoPorTipo)
+            const tiposRows = Object.entries(tipoStats)
                 .sort((a, b) => b[1].total - a[1].total)
                 .map(([tipo, stats]) => [
                     tipo.length > 45 ? tipo.substring(0, 45) + '...' : tipo,
@@ -538,19 +544,19 @@ window.modules.inventario = {
             doc.setFont('helvetica', 'bold'); 
             doc.text('TABLA DINÁMICA: BIENES POR UBICACIÓN', 20, startYUbicacion);
 
-            const agrupadoPorUbicacion = {};
+            const ubicStats = {};
             datos.forEach(item => {
                 const ubic = item.ubicacion || 'SIN UBICACIÓN';
-                if (!agrupadoPorUbicacion[ubic]) {
-                    agrupadoPorUbicacion[ubic] = { total: 0, operativos: 0, danados: 0 };
+                if (!ubicStats[ubic]) {
+                    ubicStats[ubic] = { total: 0, operativos: 0, danados: 0 };
                 }
-                agrupadoPorUbicacion[ubic].total++;
-                if (this.esOperativo(item.status)) agrupadoPorUbicacion[ubic].operativos++;
-                else if (this.esDanado(item.status)) agrupadoPorUbicacion[ubic].danados++;
+                ubicStats[ubic].total++;
+                if (this.esOperativo(item.status)) ubicStats[ubic].operativos++;
+                else if (this.esDanado(item.status)) ubicStats[ubic].danados++;
             });
 
             const ubicacionColumn = ['Ubicación', 'Total', 'Operativos', 'Dañados'];
-            const ubicacionRows = Object.entries(agrupadoPorUbicacion)
+            const ubicacionRows = Object.entries(ubicStats)
                 .sort((a, b) => b[1].total - a[1].total)
                 .map(([ubic, stats]) => [
                     ubic.length > 50 ? ubic.substring(0, 50) + '...' : ubic,
@@ -574,92 +580,128 @@ window.modules.inventario = {
                 }
             });
 
-            // LISTADO DETALLADO
+            // ============================================
+            // LISTADO DETALLADO POR UBICACIÓN (NUMERACIÓN REINICIADA)
+            // ============================================
             let startYListado = doc.lastAutoTable.finalY + 8;
             if (startYListado > 240) { doc.addPage(); startYListado = 20; }
 
             doc.setFontSize(10); 
             doc.setFont('helvetica', 'bold'); 
-            doc.text(`LISTADO DETALLADO DE BIENES - ORDENADO POR UBICACIÓN (${totalArticulos} registros)`, 20, startYListado);
+            doc.text(`LISTADO DETALLADO DE BIENES POR UBICACIÓN (${totalArticulos} registros)`, 20, startYListado);
 
             const detalleColumn = ["#", "Código", "Tipo/Descripción", "Serial", "Marca", "Modelo", "Ubicación", "Responsable", "Estado"];
-            
-            const detalleRows = datos.map((item, index) => [
-                (index + 1).toString(),
-                item.inventario_id || '-',
-                (item.tipo || '-').length > 35 ? (item.tipo || '-').substring(0, 35) + '...' : (item.tipo || '-'),
-                item.serial && item.serial !== '-----------' ? item.serial : '-',
-                item.marca || '-',
-                item.modelo && item.modelo !== '-----------' ? item.modelo : '-',
-                item.ubicacion || '-',
-                item.responsable || '-',
-                item.status || '-'
-            ]);
 
-            let ubicacionAnterior = '';
+            ubicaciones.forEach((ubicacion, ubicIdx) => {
+                const itemsEnUbicacion = agrupadoPorUbicacion[ubicacion];
+                const totalEnUbicacion = itemsEnUbicacion.length;
+                const operativosEnUbicacion = itemsEnUbicacion.filter(i => this.esOperativo(i.status)).length;
+                const danadosEnUbicacion = itemsEnUbicacion.filter(i => this.esDanado(i.status)).length;
 
-            doc.autoTable({ 
-                head: [detalleColumn], 
-                body: detalleRows, 
-                startY: startYListado + 3, 
-                theme: 'striped', 
-                fontSize: 6, 
-                margin: { left: 20, right: 20, top: 20, bottom: 20 }, 
-                headStyles: { 
-                    fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold', halign: 'center' 
-                }, 
-                styles: { 
-                    cellPadding: 0.8, overflow: 'linebreak', fontSize: 6, valign: 'middle', minCellHeight: 4 
-                }, 
-                columnStyles: { 
-                    0: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
-                    1: { cellWidth: 18, halign: 'center', fontStyle: 'bold', textColor: [37, 99, 235] },
-                    2: { cellWidth: 42, halign: 'left' },
-                    3: { cellWidth: 22, halign: 'center', fontSize: 5.5 },
-                    4: { cellWidth: 18, halign: 'center' },
-                    5: { cellWidth: 18, halign: 'center' },
-                    6: { cellWidth: 22, halign: 'left', fontStyle: 'bold' },
-                    7: { cellWidth: 22, halign: 'left' },
-                    8: { cellWidth: 17, halign: 'center', fontStyle: 'bold' }
-                },
-                didParseCell: function(data) {
-                    if (data.section === 'head') {
-                        data.cell.styles.fontStyle = 'bold';
-                    }
-                    if (data.section === 'body' && data.column.index === 8) {
-                        const estado = data.cell.raw;
-                        const estadoNorm = estado ? estado.toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, '') : '';
-                        if (estadoNorm === 'OPERATIVO') {
-                            data.cell.styles.textColor = [0, 100, 0];
-                            data.cell.styles.fillColor = [210, 245, 210];
-                        } else if (estadoNorm === 'DANADO' || estadoNorm.includes('DAN')) {
-                            data.cell.styles.textColor = [150, 0, 0];
-                            data.cell.styles.fillColor = [250, 230, 230];
-                        }
-                    }
-                    if (data.section === 'body' && data.column.index === 0) {
-                        const filaIndex = data.row.index;
-                        const ubicacionActual = datos[filaIndex]?.ubicacion || '';
-                        if (filaIndex > 0 && ubicacionActual !== ubicacionAnterior && ubicacionAnterior !== '') {
-                            data.cell.styles.lineWidth = { top: 0.8, bottom: 0.1, left: 0.1, right: 0.1 };
-                            data.cell.styles.lineColor = { top: [37, 99, 235], bottom: [200, 200, 200], left: [200, 200, 200], right: [200, 200, 200] };
-                        }
-                        ubicacionAnterior = ubicacionActual;
-                    }
-                },
-                didDrawPage: function(data) {
-                    if (data.pageNumber > 1) {
-                        doc.setFontSize(8);
-                        doc.setFont('helvetica', 'italic');
-                        doc.text(`REPORTE DE INVENTARIO UNES - Página ${data.pageNumber}`, 105, 10, { align: 'center' });
-                    }
-                    const pageCount = doc.internal.getNumberOfPages();
-                    doc.setFontSize(7);
-                    doc.setFont('helvetica', 'italic');
-                    doc.text(`Página ${data.pageNumber} de ${pageCount}`, 105, 280, { align: 'center' });
+                if (startYListado > 250) {
+                    doc.addPage();
+                    startYListado = 20;
                 }
+
+                // Encabezado de ubicación con fondo azul
+                doc.setFillColor(37, 99, 235);
+                doc.rect(20, startYListado - 5, 175, 7, 'F');
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(255, 255, 255);
+                doc.text(`📍 ${ubicacion} (${totalEnUbicacion} items - ${operativosEnUbicacion} operativos - ${danadosEnUbicacion} dañados)`, 22, startYListado);
+
+                startYListado += 3;
+
+                // Filas de items con numeración reiniciada
+                const detalleRows = itemsEnUbicacion.map((item, index) => [
+                    (index + 1).toString(),
+                    item.inventario_id || '-',
+                    (item.tipo || '-').length > 35 ? (item.tipo || '-').substring(0, 35) + '...' : (item.tipo || '-'),
+                    item.serial && item.serial !== '-----------' ? item.serial : '-',
+                    item.marca || '-',
+                    item.modelo && item.modelo !== '-----------' ? item.modelo : '-',
+                    item.ubicacion || '-',
+                    item.responsable || '-',
+                    item.status || '-'
+                ]);
+
+                doc.autoTable({ 
+                    head: [detalleColumn], 
+                    body: detalleRows, 
+                    startY: startYListado, 
+                    theme: 'striped', 
+                    fontSize: 6, 
+                    margin: { left: 20, right: 20, top: 20, bottom: 20 }, 
+                    headStyles: { 
+                        fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold', halign: 'center' 
+                    }, 
+                    styles: { 
+                        cellPadding: 0.8, overflow: 'linebreak', fontSize: 6, valign: 'middle', minCellHeight: 4 
+                    }, 
+                    columnStyles: { 
+                        0: { cellWidth: 8, halign: 'center', fontStyle: 'bold', fillColor: [240, 240, 240] },
+                        1: { cellWidth: 18, halign: 'center', fontStyle: 'bold', textColor: [37, 99, 235] },
+                        2: { cellWidth: 42, halign: 'left' },
+                        3: { cellWidth: 22, halign: 'center', fontSize: 5.5 },
+                        4: { cellWidth: 18, halign: 'center' },
+                        5: { cellWidth: 18, halign: 'center' },
+                        6: { cellWidth: 22, halign: 'left', fontStyle: 'bold' },
+                        7: { cellWidth: 22, halign: 'left' },
+                        8: { cellWidth: 17, halign: 'center', fontStyle: 'bold' }
+                    },
+                    didParseCell: function(data) {
+                        if (data.section === 'head') {
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                        if (data.section === 'body' && data.column.index === 8) {
+                            const estado = data.cell.raw;
+                            const estadoNorm = estado ? estado.toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, '') : '';
+                            if (estadoNorm === 'OPERATIVO') {
+                                data.cell.styles.textColor = [0, 100, 0];
+                                data.cell.styles.fillColor = [210, 245, 210];
+                            } else if (estadoNorm === 'DANADO' || estadoNorm.includes('DAN')) {
+                                data.cell.styles.textColor = [150, 0, 0];
+                                data.cell.styles.fillColor = [250, 230, 230];
+                            }
+                        }
+                    },
+                    didDrawPage: function(data) {
+                        if (data.pageNumber > 1) {
+                            doc.setFontSize(8);
+                            doc.setFont('helvetica', 'italic');
+                            doc.text(`REPORTE DE INVENTARIO UNES - Página ${data.pageNumber}`, 105, 10, { align: 'center' });
+                        }
+                        const pageCount = doc.internal.getNumberOfPages();
+                        doc.setFontSize(7);
+                        doc.setFont('helvetica', 'italic');
+                        doc.text(`Página ${data.pageNumber} de ${pageCount}`, 105, 280, { align: 'center' });
+                    }
+                });
+
+                startYListado = doc.lastAutoTable.finalY + 5;
             });
 
+            // TOTAL GENERAL AL FINAL
+            if (startYListado > 250) {
+                doc.addPage();
+                startYListado = 30;
+            }
+
+            doc.setFillColor(16, 185, 129);
+            doc.rect(20, startYListado - 5, 175, 10, 'F');
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(255, 255, 255);
+            doc.text(`📊 TOTAL GENERAL: ${totalArticulos} BIENES REGISTRADOS`, 105, startYListado + 2, { align: 'center' });
+
+            startYListado += 8;
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Operativos: ${operativos} (${((operativos/totalArticulos)*100).toFixed(1)}%) | Dañados: ${danados} (${((danados/totalArticulos)*100).toFixed(1)}%)`, 105, startYListado, { align: 'center' });
+
+            // GUARDAR PDF
             let nombreArchivo = 'Inventario_UNES';
             if (filtros.estado) nombreArchivo += `_${filtros.estado}`;
             if (filtros.ubicacion) nombreArchivo += `_${filtros.ubicacion.replace(/\s+/g, '_')}`;
@@ -673,13 +715,15 @@ window.modules.inventario = {
                 html: `
                     <div class="text-left text-sm">
                         <p><strong>Total de bienes:</strong> ${totalArticulos}</p>
+                        <p><strong>Ubicaciones:</strong> ${ubicaciones.length}</p>
                         <p><strong>Ordenado por:</strong> Ubicación → Tipo → Código</p>
+                        <p><strong>Numeración:</strong> Reiniciada por ubicación</p>
                         <p><strong>Operativos:</strong> <span class="text-green-600">${operativos}</span></p>
                         <p><strong>Dañados:</strong> <span class="text-red-600">${danados}</span></p>
                         <p><strong>Páginas:</strong> ${doc.internal.getNumberOfPages()}</p>
                     </div>
                 `,
-                timer: 3500,
+                timer: 4000,
                 showConfirmButton: false
             });
 
@@ -690,7 +734,7 @@ window.modules.inventario = {
     },
 
     // ============================================
-    // 📊 EXPORTAR EXCEL CON EXCELJS (ESTILOS PROFESIONALES)
+    // 📊 EXPORTAR EXCEL CON EXCELJS (NUMERACIÓN POR UBICACIÓN)
     // ============================================
     exportarExcel: async function() {
         const datosSinOrdenar = this.datosFiltradosActuales && this.datosFiltradosActuales.length > 0 
@@ -705,7 +749,6 @@ window.modules.inventario = {
         const datos = this.ordenarDatos(datosSinOrdenar);
 
         try {
-            // Verificar que ExcelJS esté disponible
             if (typeof ExcelJS === 'undefined') {
                 Swal.fire('Error', 'La librería ExcelJS no está cargada. Verifica el HTML.', 'error');
                 return;
@@ -716,12 +759,22 @@ window.modules.inventario = {
             const danados = datos.filter(i => this.esDanado(i.status)).length;
             const ubicaciones = [...new Set(datos.map(i => i.ubicacion).filter(Boolean))].length;
 
-            // Crear libro de Excel
+            // AGRUPAR POR UBICACIÓN
+            const agrupadoPorUbicacion = {};
+            datos.forEach(item => {
+                const ubic = item.ubicacion || 'SIN UBICACIÓN';
+                if (!agrupadoPorUbicacion[ubic]) {
+                    agrupadoPorUbicacion[ubic] = [];
+                }
+                agrupadoPorUbicacion[ubic].push(item);
+            });
+
+            const ubicacionesOrdenadas = Object.keys(agrupadoPorUbicacion).sort();
+
             const workbook = new ExcelJS.Workbook();
             workbook.creator = window.appState?.nombreProfesorGlobal || 'Sistema UNES';
             workbook.created = new Date();
 
-            // ============ COLORES INSTITUCIONALES ============
             const colores = {
                 azulOscuro: 'FF1E3A5F',
                 azulClaro: 'FFB4D4F4',
@@ -733,7 +786,8 @@ window.modules.inventario = {
                 rojoTexto: 'FF721C24',
                 grisBorde: 'FFCCCCCC',
                 blanco: 'FFFFFFFF',
-                amarillo: 'FFFFF4CC'
+                amarillo: 'FFFFF4CC',
+                headerUbicacion: 'FF2563EB'
             };
 
             const bordeGenerico = {
@@ -755,7 +809,6 @@ window.modules.inventario = {
                 properties: { tabColor: { argb: colores.azulMedio } }
             });
 
-            // Título principal
             wsResumen.mergeCells('A1:B1');
             const titleCell = wsResumen.getCell('A1');
             titleCell.value = 'REPORTE DE INVENTARIO - UNES';
@@ -768,7 +821,6 @@ window.modules.inventario = {
             };
             wsResumen.getRow(1).height = 30;
 
-            // Fecha
             wsResumen.mergeCells('A3:B3');
             wsResumen.getCell('A3').value = `Generado: ${new Date().toLocaleDateString('es-VE', { 
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -780,7 +832,6 @@ window.modules.inventario = {
             wsResumen.getCell('A4').font = { name: 'Calibri', size: 10, bold: true };
             wsResumen.getCell('B4').value = window.appState?.nombreProfesorGlobal || 'Sistema UNES';
 
-            // Resumen
             wsResumen.mergeCells('A6:B6');
             wsResumen.getCell('A6').value = '📊 RESUMEN EJECUTIVO';
             wsResumen.getCell('A6').font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -808,15 +859,14 @@ window.modules.inventario = {
                 wsResumen.getCell(`B${rowNum}`).font = { name: 'Calibri', size: 12, bold: true };
                 wsResumen.getCell(`B${rowNum}`).alignment = { horizontal: 'center' };
                 
-                // Colores específicos
-                if (idx === 1) { // Operativos
+                if (idx === 1) {
                     wsResumen.getCell(`B${rowNum}`).fill = {
                         type: 'pattern', pattern: 'solid', fgColor: { argb: colores.verdeClaro }
                     };
                     wsResumen.getCell(`B${rowNum}`).font = { 
                         name: 'Calibri', size: 12, bold: true, color: { argb: colores.verdeTexto } 
                     };
-                } else if (idx === 2) { // Dañados
+                } else if (idx === 2) {
                     wsResumen.getCell(`B${rowNum}`).fill = {
                         type: 'pattern', pattern: 'solid', fgColor: { argb: colores.rojoClaro }
                     };
@@ -830,7 +880,6 @@ window.modules.inventario = {
                 });
             });
 
-            // Filtros aplicados
             const rowFiltros = 13;
             wsResumen.mergeCells(`A${rowFiltros}:B${rowFiltros}`);
             wsResumen.getCell(`A${rowFiltros}`).value = '🔍 FILTROS APLICADOS';
@@ -862,13 +911,12 @@ window.modules.inventario = {
                 { width: 50 }
             ];
 
-            // ============ HOJA 2: INVENTARIO DETALLADO ============
+            // ============ HOJA 2: INVENTARIO DETALLADO (NUMERACIÓN POR UBICACIÓN) ============
             const wsDetalle = workbook.addWorksheet('📦 Inventario Detallado', {
                 properties: { tabColor: { argb: 'FF2563EB' } },
-                views: [{ state: 'frozen', ySplit: 1 }] // Header congelado
+                views: [{ state: 'frozen', ySplit: 1 }]
             });
 
-            // Definir columnas
             wsDetalle.columns = [
                 { header: '#', key: 'num', width: 6 },
                 { header: 'Código', key: 'codigo', width: 18 },
@@ -885,8 +933,9 @@ window.modules.inventario = {
                 { header: 'Última Actualización', key: 'fecha', width: 18 }
             ];
 
-            // Estilo de encabezados
-            const headerRow = wsDetalle.getRow(1);
+            let currentRow = 1;
+
+            const headerRow = wsDetalle.getRow(currentRow);
             headerRow.height = 25;
             headerRow.eachCell((cell) => {
                 cell.fill = {
@@ -908,111 +957,213 @@ window.modules.inventario = {
                 cell.border = bordeHeader;
             });
 
-            // Agregar datos
-            let ubicacionAnterior = '';
-            datos.forEach((item, index) => {
-                const ubicacionActual = item.ubicacion || '';
-                const cambioUbicacion = index > 0 && ubicacionActual !== ubicacionAnterior;
-                ubicacionAnterior = ubicacionActual;
+            currentRow++;
 
-                const row = wsDetalle.addRow({
-                    num: index + 1,
-                    codigo: item.inventario_id || '',
-                    deposito: item.nro_deposito || '',
-                    tipo: item.tipo || '',
-                    serial: item.serial !== '-----------' ? item.serial : '',
-                    marca: item.marca || '',
-                    modelo: item.modelo !== '-----------' ? item.modelo : '',
-                    ubicacion: item.ubicacion || '',
-                    responsable: item.responsable || '',
-                    estado: item.status || '',
-                    observaciones: item.observaciones || '',
-                    evaluador: item.evaluador || '',
-                    fecha: item.ultima_actualizacion 
-                        ? new Date(item.ultima_actualizacion).toLocaleDateString('es-VE') 
-                        : ''
-                });
+            // Procesar cada ubicación
+            ubicacionesOrdenadas.forEach((ubicacion, ubicIdx) => {
+                const itemsEnUbicacion = agrupadoPorUbicacion[ubicacion];
+                const totalEnUbicacion = itemsEnUbicacion.length;
+                const operativosEnUbicacion = itemsEnUbicacion.filter(i => this.esOperativo(i.status)).length;
+                const danadosEnUbicacion = itemsEnUbicacion.filter(i => this.esDanado(i.status)).length;
 
-                row.height = 18;
-                const esFilaAlterna = index % 2 === 1;
+                // Encabezado de ubicación
+                const ubicHeaderRow = wsDetalle.getRow(currentRow);
+                wsDetalle.mergeCells(`A${currentRow}:M${currentRow}`);
+                
+                const ubicCell = wsDetalle.getCell(`A${currentRow}`);
+                ubicCell.value = `📍 ${ubicacion} (${totalEnUbicacion} items - ${operativosEnUbicacion} operativos - ${danadosEnUbicacion} dañados)`;
+                ubicCell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: colores.headerUbicacion }
+                };
+                ubicCell.font = {
+                    name: 'Calibri',
+                    size: 11,
+                    bold: true,
+                    color: { argb: 'FFFFFFFF' }
+                };
+                ubicCell.alignment = { horizontal: 'left', vertical: 'middle' };
+                ubicCell.border = {
+                    top: { style: 'medium', color: { argb: colores.azulMedio } },
+                    left: { style: 'thin', color: { argb: colores.azulMedio } },
+                    bottom: { style: 'medium', color: { argb: colores.azulMedio } },
+                    right: { style: 'thin', color: { argb: colores.azulMedio } }
+                };
+                ubicHeaderRow.height = 22;
 
-                row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                    // Borde genérico
-                    cell.border = { ...bordeGenerico };
+                currentRow++;
+
+                // Items con numeración reiniciada
+                itemsEnUbicacion.forEach((item, index) => {
+                    const numeroLocal = index + 1;
                     
-                    // Borde superior más grueso al cambiar ubicación
-                    if (cambioUbicacion) {
-                        cell.border.top = { 
-                            style: 'medium', 
-                            color: { argb: colores.azulMedio } 
-                        };
-                    }
+                    const row = wsDetalle.addRow({
+                        num: numeroLocal,
+                        codigo: item.inventario_id || '',
+                        deposito: item.nro_deposito || '',
+                        tipo: item.tipo || '',
+                        serial: item.serial !== '-----------' ? item.serial : '',
+                        marca: item.marca || '',
+                        modelo: item.modelo !== '-----------' ? item.modelo : '',
+                        ubicacion: item.ubicacion || '',
+                        responsable: item.responsable || '',
+                        estado: item.status || '',
+                        observaciones: item.observaciones || '',
+                        evaluador: item.evaluador || '',
+                        fecha: item.ultima_actualizacion 
+                            ? new Date(item.ultima_actualizacion).toLocaleDateString('es-VE') 
+                            : ''
+                    });
 
-                    // Fuente base
-                    cell.font = { name: 'Calibri', size: 10 };
-                    cell.alignment = { vertical: 'middle', wrapText: true };
+                    row.height = 18;
+                    const esFilaAlterna = index % 2 === 1;
 
-                    // Fondo alternado
-                    if (esFilaAlterna) {
-                        cell.fill = {
-                            type: 'pattern',
-                            pattern: 'solid',
-                            fgColor: { argb: colores.azulMuyClaro }
-                        };
-                    }
+                    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                        cell.border = { ...bordeGenerico };
+                        cell.font = { name: 'Calibri', size: 10 };
+                        cell.alignment = { vertical: 'middle', wrapText: true };
 
-                    // Estilos específicos por columna
-                    switch(colNumber) {
-                        case 1: // #
-                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                            cell.font = { name: 'Calibri', size: 10, bold: true };
-                            break;
-                        case 2: // Código
-                            cell.font = { 
-                                name: 'Consolas', size: 10, bold: true, 
-                                color: { argb: colores.azulMedio } 
+                        if (esFilaAlterna) {
+                            cell.fill = {
+                                type: 'pattern',
+                                pattern: 'solid',
+                                fgColor: { argb: colores.azulMuyClaro }
                             };
-                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                            break;
-                        case 3: // N° Depósito
-                        case 5: // Serial
-                        case 6: // Marca
-                        case 7: // Modelo
-                        case 13: // Fecha
-                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                            break;
-                        case 10: // Estado
-                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                            cell.font = { name: 'Calibri', size: 10, bold: true };
-                            
-                            if (this.esOperativo(item.status)) {
+                        }
+
+                        switch(colNumber) {
+                            case 1:
+                                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                                cell.font = { name: 'Calibri', size: 10, bold: true };
                                 cell.fill = {
                                     type: 'pattern', pattern: 'solid',
-                                    fgColor: { argb: colores.verdeClaro }
+                                    fgColor: { argb: 'FFE8F0FE' }
                                 };
+                                break;
+                            case 2:
                                 cell.font = { 
-                                    name: 'Calibri', size: 10, bold: true, 
-                                    color: { argb: colores.verdeTexto } 
+                                    name: 'Consolas', size: 10, bold: true, 
+                                    color: { argb: colores.azulMedio } 
                                 };
-                            } else if (this.esDanado(item.status)) {
-                                cell.fill = {
-                                    type: 'pattern', pattern: 'solid',
-                                    fgColor: { argb: colores.rojoClaro }
-                                };
-                                cell.font = { 
-                                    name: 'Calibri', size: 10, bold: true, 
-                                    color: { argb: colores.rojoTexto } 
-                                };
-                            }
-                            break;
-                    }
+                                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                                break;
+                            case 3:
+                            case 5:
+                            case 6:
+                            case 7:
+                            case 13:
+                                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                                break;
+                            case 10:
+                                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                                cell.font = { name: 'Calibri', size: 10, bold: true };
+                                
+                                if (this.esOperativo(item.status)) {
+                                    cell.fill = {
+                                        type: 'pattern', pattern: 'solid',
+                                        fgColor: { argb: colores.verdeClaro }
+                                    };
+                                    cell.font = { 
+                                        name: 'Calibri', size: 10, bold: true, 
+                                        color: { argb: colores.verdeTexto } 
+                                    };
+                                } else if (this.esDanado(item.status)) {
+                                    cell.fill = {
+                                        type: 'pattern', pattern: 'solid',
+                                        fgColor: { argb: colores.rojoClaro }
+                                    };
+                                    cell.font = { 
+                                        name: 'Calibri', size: 10, bold: true, 
+                                        color: { argb: colores.rojoTexto } 
+                                    };
+                                }
+                                break;
+                        }
+                    });
+
+                    currentRow++;
                 });
+
+                // Subtotal por ubicación
+                const subtotalRow = wsDetalle.getRow(currentRow);
+                wsDetalle.mergeCells(`A${currentRow}:D${currentRow}`);
+                
+                const subtotalCell = wsDetalle.getCell(`A${currentRow}`);
+                subtotalCell.value = `SUBTOTAL ${ubicacion}:`;
+                subtotalCell.font = { name: 'Calibri', size: 10, bold: true, italic: true };
+                subtotalCell.alignment = { horizontal: 'right', vertical: 'middle' };
+                subtotalCell.fill = {
+                    type: 'pattern', pattern: 'solid',
+                    fgColor: { argb: colores.amarillo }
+                };
+                subtotalCell.border = {
+                    top: { style: 'medium', color: { argb: colores.azulMedio } },
+                    bottom: { style: 'thin', color: { argb: colores.grisBorde } }
+                };
+
+                wsDetalle.getCell(`E${currentRow}`).value = totalEnUbicacion;
+                wsDetalle.getCell(`E${currentRow}`).font = { name: 'Calibri', size: 10, bold: true };
+                wsDetalle.getCell(`E${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                wsDetalle.getCell(`E${currentRow}`).fill = {
+                    type: 'pattern', pattern: 'solid',
+                    fgColor: { argb: colores.amarillo }
+                };
+                wsDetalle.getCell(`E${currentRow}`).border = {
+                    top: { style: 'medium', color: { argb: colores.azulMedio } },
+                    bottom: { style: 'thin', color: { argb: colores.grisBorde } }
+                };
+
+                wsDetalle.getCell(`F${currentRow}`).value = `${operativosEnUbicacion} operativos`;
+                wsDetalle.getCell(`F${currentRow}`).font = { name: 'Calibri', size: 10, bold: true, color: { argb: colores.verdeTexto } };
+                wsDetalle.getCell(`F${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                wsDetalle.getCell(`F${currentRow}`).fill = {
+                    type: 'pattern', pattern: 'solid',
+                    fgColor: { argb: colores.amarillo }
+                };
+
+                wsDetalle.getCell(`G${currentRow}`).value = `${danadosEnUbicacion} dañados`;
+                wsDetalle.getCell(`G${currentRow}`).font = { name: 'Calibri', size: 10, bold: true, color: { argb: colores.rojoTexto } };
+                wsDetalle.getCell(`G${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+                wsDetalle.getCell(`G${currentRow}`).fill = {
+                    type: 'pattern', pattern: 'solid',
+                    fgColor: { argb: colores.amarillo }
+                };
+
+                subtotalRow.height = 20;
+                currentRow++;
+
+                // Fila en blanco entre ubicaciones
+                currentRow++;
             });
 
-            // Auto-filtros
+            // TOTAL GENERAL
+            const totalRow = wsDetalle.getRow(currentRow);
+            wsDetalle.mergeCells(`A${currentRow}:M${currentRow}`);
+            
+            const totalCell = wsDetalle.getCell(`A${currentRow}`);
+            totalCell.value = `📊 TOTAL GENERAL: ${totalArticulos} BIENES REGISTRADOS (${operativos} operativos - ${danados} dañados)`;
+            totalCell.font = { 
+                name: 'Calibri', size: 12, bold: true, 
+                color: { argb: 'FFFFFFFF' } 
+            };
+            totalCell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF10B981' }
+            };
+            totalCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            totalCell.border = {
+                top: { style: 'thick', color: { argb: 'FF10B981' } },
+                left: { style: 'thick', color: { argb: 'FF10B981' } },
+                bottom: { style: 'thick', color: { argb: 'FF10B981' } },
+                right: { style: 'thick', color: { argb: 'FF10B981' } }
+            };
+            totalRow.height = 25;
+
             wsDetalle.autoFilter = {
                 from: { row: 1, column: 1 },
-                to: { row: datos.length + 1, column: 13 }
+                to: { row: currentRow, column: 13 }
             };
 
             // ============ HOJA 3: RESUMEN POR UBICACIÓN ============
@@ -1029,7 +1180,6 @@ window.modules.inventario = {
             wsUbicacion.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
             wsUbicacion.getRow(1).height = 28;
 
-            // Encabezados
             const ubicHeaders = ['Ubicación', 'Total', 'Operativos', 'Dañados', '% Operativo'];
             const ubicHeaderRow = wsUbicacion.getRow(3);
             ubicHeaders.forEach((h, idx) => {
@@ -1044,29 +1194,20 @@ window.modules.inventario = {
             });
             ubicHeaderRow.height = 22;
 
-            // Datos agrupados
-            const agrupadoPorUbicacion = {};
-            datos.forEach(item => {
-                const ubic = item.ubicacion || 'SIN UBICACIÓN';
-                if (!agrupadoPorUbicacion[ubic]) {
-                    agrupadoPorUbicacion[ubic] = { total: 0, operativos: 0, danados: 0 };
-                }
-                agrupadoPorUbicacion[ubic].total++;
-                if (this.esOperativo(item.status)) agrupadoPorUbicacion[ubic].operativos++;
-                else if (this.esDanado(item.status)) agrupadoPorUbicacion[ubic].danados++;
-            });
-
             let rowNum = 4;
             Object.entries(agrupadoPorUbicacion)
                 .sort((a, b) => b[1].total - a[1].total)
-                .forEach(([ubic, stats], idx) => {
+                .forEach(([ubic, items], idx) => {
+                    const total = items.length;
+                    const op = items.filter(i => this.esOperativo(i.status)).length;
+                    const dan = items.filter(i => this.esDanado(i.status)).length;
+                    const pctOp = total > 0 ? (op/total)*100 : 0;
+
                     const row = wsUbicacion.getRow(rowNum);
-                    const pctOp = stats.total > 0 ? (stats.operativos/stats.total)*100 : 0;
-                    
                     row.getCell(1).value = ubic;
-                    row.getCell(2).value = stats.total;
-                    row.getCell(3).value = stats.operativos;
-                    row.getCell(4).value = stats.danados;
+                    row.getCell(2).value = total;
+                    row.getCell(3).value = op;
+                    row.getCell(4).value = dan;
                     row.getCell(5).value = pctOp.toFixed(1) + '%';
 
                     row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -1080,7 +1221,6 @@ window.modules.inventario = {
                             cell.alignment = { horizontal: 'center', vertical: 'middle' };
                         }
 
-                        // Colores para operativos/dañados
                         if (colNumber === 3) {
                             cell.fill = {
                                 type: 'pattern', pattern: 'solid',
@@ -1101,7 +1241,6 @@ window.modules.inventario = {
                             };
                         }
 
-                        // Fila alternada
                         if (idx % 2 === 1 && colNumber !== 3 && colNumber !== 4) {
                             cell.fill = {
                                 type: 'pattern', pattern: 'solid',
@@ -1113,15 +1252,14 @@ window.modules.inventario = {
                     rowNum++;
                 });
 
-            // Fila de totales
-            const totalRow = wsUbicacion.getRow(rowNum);
-            totalRow.getCell(1).value = 'TOTAL GENERAL';
-            totalRow.getCell(2).value = totalArticulos;
-            totalRow.getCell(3).value = operativos;
-            totalRow.getCell(4).value = danados;
-            totalRow.getCell(5).value = ((operativos/totalArticulos)*100).toFixed(1) + '%';
+            const totalRowUbic = wsUbicacion.getRow(rowNum);
+            totalRowUbic.getCell(1).value = 'TOTAL GENERAL';
+            totalRowUbic.getCell(2).value = totalArticulos;
+            totalRowUbic.getCell(3).value = operativos;
+            totalRowUbic.getCell(4).value = danados;
+            totalRowUbic.getCell(5).value = ((operativos/totalArticulos)*100).toFixed(1) + '%';
 
-            totalRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            totalRowUbic.eachCell({ includeEmpty: true }, (cell, colNumber) => {
                 cell.fill = {
                     type: 'pattern', pattern: 'solid',
                     fgColor: { argb: colores.azulClaro }
@@ -1135,7 +1273,7 @@ window.modules.inventario = {
                     ? { horizontal: 'left', vertical: 'middle' }
                     : { horizontal: 'center', vertical: 'middle' };
             });
-            totalRow.height = 22;
+            totalRowUbic.height = 22;
 
             wsUbicacion.columns = [
                 { width: 40 },
@@ -1145,7 +1283,9 @@ window.modules.inventario = {
                 { width: 14 }
             ];
 
-            // ============ GENERAR Y DESCARGAR ============
+            // ============================================
+            // GENERAR Y DESCARGAR
+            // ============================================
             const buffer = await workbook.xlsx.writeBuffer();
             const blob = new Blob([buffer], { 
                 type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
@@ -1156,7 +1296,6 @@ window.modules.inventario = {
             if (this.filtroActual?.ubicacion) nombreArchivo += `_${this.filtroActual.ubicacion.replace(/\s+/g, '_')}`;
             nombreArchivo += `_${new Date().toISOString().split('T')[0]}.xlsx`;
 
-            // Descargar
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1173,12 +1312,13 @@ window.modules.inventario = {
                     <div class="text-left text-sm">
                         <p><strong>📊 Hoja 1:</strong> Resumen Ejecutivo</p>
                         <p><strong>📦 Hoja 2:</strong> Inventario Detallado (${totalArticulos} registros)</p>
-                        <p><strong>📍 Hoja 3:</strong> Resumen por Ubicación</p>
-                        <p class="mt-2 text-xs text-gray-600">✨ Con estilos profesionales (ExcelJS)</p>
-                        <p class="text-xs text-gray-600">🔢 Ordenado por Ubicación → Tipo → Código</p>
+                        <p><strong>📍 Hoja 3:</strong> Resumen por Ubicación (${ubicaciones.length} ubicaciones)</p>
+                        <p class="mt-2 text-xs text-gray-600">✨ Numeración reiniciada por ubicación</p>
+                        <p class="text-xs text-gray-600">🔢 Subtotales por área</p>
+                        <p class="text-xs text-gray-600"> Ordenado por Ubicación → Tipo → Código</p>
                     </div>
                 `,
-                timer: 4000,
+                timer: 4500,
                 showConfirmButton: false
             });
 
@@ -1197,4 +1337,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-console.log('✅ Módulo de Inventario v5.0 cargado (con ExcelJS)');
+console.log('✅ Módulo de Inventario v6.0 cargado (ExcelJS + PDF por ubicación)');
