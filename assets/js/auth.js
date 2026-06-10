@@ -1,5 +1,5 @@
 /**
- * MÓDULO DE AUTENTICACIÓN - VERSIÓN CORREGIDA
+ * MÓDULO DE AUTENTICACIÓN - VERSIÓN FINAL CON BOTÓN ADMIN
  */
 
 async function iniciarSesion() {
@@ -19,14 +19,8 @@ async function iniciarSesion() {
             password
         });
 
-        if (authError) {
-            console.error('❌ Error de autenticación:', authError);
-            throw authError;
-        }
-        
+        if (authError) throw authError;
         if (!authData.user) throw new Error('Usuario no encontrado');
-
-        console.log('✅ Autenticación exitosa, buscando perfil...');
 
         const { data: perfil, error: perfilError } = await window.supabaseClient
             .from('perfiles_profesores')
@@ -34,57 +28,43 @@ async function iniciarSesion() {
             .eq('id', authData.user.id)
             .single();
 
-        if (perfilError || !perfil) {
-            console.error('❌ Error obteniendo perfil:', perfilError);
-            await window.supabaseClient.auth.signOut();
-            throw new Error('Perfil no encontrado');
-        }
-
-        console.log('✅ Perfil encontrado:', perfil);
-
+        if (perfilError || !perfil) throw new Error('Perfil no encontrado');
         if (perfil.status !== 'Activo') {
-            await window.supabaseClient.auth.signOut();
             Swal.fire('Acceso denegado', 'Su cuenta no está activada', 'error');
             return;
         }
 
-        window.appState = window.appState || {};
-        window.appState.usuarioActualId = authData.user.id;
-        window.appState.rolUsuarioActual = perfil.rol;
-        window.appState.nombreProfesorGlobal = `${perfil.nombre} ${perfil.apellido}`.trim();
+        window.appState = {
+            usuarioActualId: authData.user.id,
+            rolUsuarioActual: perfil.rol,
+            nombreProfesorGlobal: `${perfil.nombre} ${perfil.apellido}`.trim()
+        };
 
-        console.log('📋 AppState configurado:', window.appState);
+        console.log('✅ Login exitoso:', window.appState);
 
-        // Redirección según rol
+        // Redirección
         const rol = perfil.rol.toLowerCase().trim();
-        console.log('🎯 Rol normalizado:', rol);
-
         if (rol.includes('disciplina')) {
-            console.log('➡️ Redirigiendo a: disciplina.html');
             window.location.href = 'disciplina.html';
         } else if (rol.includes('inventario')) {
-            console.log('➡️ Redirigiendo a: inventario.html');
             window.location.href = 'inventario.html';
         } else if (rol.includes('super') || rol.includes('admin')) {
-            console.log('➡️ Redirigiendo a: index.html?panel=admin');
             window.location.href = 'index.html?panel=admin';
         } else if (rol.includes('profesor')) {
-            console.log('➡️ Redirigiendo a: asistencia-simple.html');
             window.location.href = 'asistencia-simple.html';
         } else {
-            console.log('➡️ Redirigiendo a: index.html (rol desconocido)');
             window.location.href = 'index.html';
         }
 
     } catch (error) {
-        console.error('❌ Error en iniciarSesion:', error);
+        console.error('❌ Error login:', error);
         Swal.fire('Error', error.message || 'No se pudo iniciar sesión', 'error');
     }
 }
 
 async function verificarSesion() {
     try {
-        const { data, error } = await window.supabaseClient.auth.getSession();
+        const { data } = await window.supabaseClient.auth.getSession();
         const session = data?.session;
         
         if (!session) {
@@ -95,29 +75,75 @@ async function verificarSesion() {
         const loginContainer = document.getElementById('login-container');
         if (loginContainer) loginContainer.classList.add('hidden');
         
-        window.appState = window.appState || {};
-        window.appState.usuarioActualId = session.user.id;
-        
-        const { data: perfilData } = await window.supabaseClient
+        const { data: perfil } = await window.supabaseClient
             .from('perfiles_profesores')
             .select('nombre, apellido, rol')
             .eq('id', session.user.id)
             .single();
 
-        if (perfilData) {
-            window.appState.nombreProfesorGlobal = `${perfilData.nombre} ${perfilData.apellido}`.trim();
-            window.appState.rolUsuarioActual = perfilData.rol;
+        if (perfil) {
+            window.appState = {
+                usuarioActualId: session.user.id,
+                rolUsuarioActual: perfil.rol,
+                nombreProfesorGlobal: `${perfil.nombre} ${perfil.apellido}`.trim()
+            };
             
             const nombreEl = document.getElementById('profesor-nombre');
-            if (nombreEl) {
-                nombreEl.innerText = window.appState.nombreProfesorGlobal.toUpperCase();
-            }
+            if (nombreEl) nombreEl.innerText = window.appState.nombreProfesorGlobal.toUpperCase();
             
             console.log('✅ Sesión verificada:', window.appState);
+            
+            // ⭐ MOSTRAR BOTÓN ADMIN SI ES SUPER_USUARIO
+            await verificarRolUsuario();
         }
         
     } catch (e) {
         console.error('❌ Error verificando sesión:', e);
+    }
+}
+
+// ⭐ NUEVA FUNCIÓN: Verificar rol y mostrar elementos según permisos
+async function verificarRolUsuario() {
+    try {
+        const rol = window.appState?.rolUsuarioActual || '';
+        console.log('🔍 Verificando rol:', rol);
+
+        // Mostrar elementos de super usuario
+        if (rol === 'super_usuario' || rol.toLowerCase().includes('super')) {
+            console.log('🔧 Usuario es super_usuario, mostrando elementos de admin...');
+            
+            const btnAdmin = document.getElementById('btn-admin');
+            if (btnAdmin) {
+                btnAdmin.classList.remove('hidden');
+                console.log('✅ Botón admin mostrado');
+            } else {
+                console.warn('⚠️ Botón admin NO encontrado en el DOM. Buscando...');
+                // Buscar en todo el documento
+                const todosLosBotones = document.querySelectorAll('button, a, div');
+                todosLosBotones.forEach((el, index) => {
+                    if (el.id && el.id.toLowerCase().includes('admin')) {
+                        console.log(`🔍 Encontrado elemento con ID: ${el.id}`, el);
+                    }
+                });
+            }
+            
+            // Mostrar otros elementos de admin si existen
+            const filtroReporte = document.getElementById('filtro-profesor-reporte');
+            const filtroContainer = document.getElementById('filtro-reporte-container');
+            
+            if (filtroReporte) filtroReporte.classList.remove('hidden');
+            if (filtroContainer) filtroContainer.classList.remove('hidden');
+            
+            // Cargar profesores para filtro de reporte si el módulo existe
+            if (typeof window.modules?.admin?.cargarProfesoresParaFiltroReporte === 'function') {
+                await window.modules.admin.cargarProfesoresParaFiltroReporte();
+            }
+        } else {
+            console.log('ℹ️ Usuario NO es super_usuario. Rol:', rol);
+        }
+        
+    } catch (e) {
+        console.error('❌ Error en verificarRolUsuario:', e);
     }
 }
 
@@ -129,8 +155,14 @@ async function cerrarSesion() {
 
 window.iniciarSesion = iniciarSesion;
 window.verificarSesion = verificarSesion;
+window.verificarRolUsuario = verificarRolUsuario;
 window.cerrarSesion = cerrarSesion;
 
-document.addEventListener('DOMContentLoaded', verificarSesion);
+// Ejecutar al cargar
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', verificarSesion);
+} else {
+    verificarSesion();
+}
 
 console.log('✅ auth.js cargado');
