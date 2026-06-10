@@ -82,11 +82,37 @@ async function verificarSesion() {
                 const btnAdmin = document.getElementById('btn-admin');
                 if (btnAdmin) btnAdmin.classList.remove('hidden');
             }
+            
+            // ⭐ NUEVO: Redirigir según el rol si está en página incorrecta
+            const paginaActual = window.location.pathname.split('/').pop() || 'index.html';
+            const esIndex = paginaActual === 'index.html' || paginaActual === '';
+            
+            // Si es PROFESOR y está en index.html → redirigir a asistencia
+            if (perfil.rol === 'profesor' && esIndex) {
+                console.log('🎓 Profesor detectado en index, redirigiendo a asistencia-simple.html');
+                window.location.href = 'asistencia-simple.html';
+                return;
+            }
+            
+            // Si es DISCIPLINA y está en index.html → redirigir
+            if (perfil.rol === 'disciplina_admin' && esIndex) {
+                console.log('🛡️ Disciplina detectado en index, redirigiendo a disciplina.html');
+                window.location.href = 'disciplina.html';
+                return;
+            }
+            
+            // Si es INVENTARIO y está en index.html → redirigir
+            if (perfil.rol === 'inventario_admin' && esIndex) {
+                console.log('📦 Inventario detectado en index, redirigiendo a inventario.html');
+                window.location.href = 'inventario.html';
+                return;
+            }
         }
     } catch (e) {
         console.error('Error en verificarSesion:', e);
     }
 }
+
 
 async function cerrarSesion() {
     await window.supabaseClient.auth.signOut();
