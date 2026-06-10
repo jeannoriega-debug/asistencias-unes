@@ -83,8 +83,29 @@ async function verificarSesion() {
                 if (btnAdmin) btnAdmin.classList.remove('hidden');
             }
             
-            // ⚠️ NO REDIRIGIR AQUÍ - Solo verificar sesión
-            console.log('✅ Sesión verificada - Rol:', perfil.rol);
+            // ⭐ REDIRECCIÓN SOLO EN INDEX.HTML
+            const paginaActual = window.location.pathname.split('/').pop();
+            const esPaginaPrincipal = paginaActual === 'index.html' || paginaActual === '' || paginaActual === '/';
+            
+            if (esPaginaPrincipal) {
+                console.log('📄 Página principal detectada');
+                console.log('🎯 Rol:', perfil.rol);
+                
+                // Redirigir según rol
+                if (perfil.rol === 'profesor') {
+                    console.log('➡️ Redirigiendo profesor a asistencia-simple.html');
+                    window.location.replace('asistencia-simple.html');
+                } else if (perfil.rol === 'disciplina_admin') {
+                    console.log('➡️ Redirigiendo disciplina a disciplina.html');
+                    window.location.replace('disciplina.html');
+                } else if (perfil.rol === 'inventario_admin') {
+                    console.log('➡️ Redirigiendo inventario a inventario.html');
+                    window.location.replace('inventario.html');
+                } else if (perfil.rol === 'super_usuario') {
+                    console.log('➡️ Redirigiendo super_usuario a index.html?panel=admin');
+                    window.location.replace('index.html?panel=admin');
+                }
+            }
         }
     } catch (e) {
         console.error('Error en verificarSesion:', e);
