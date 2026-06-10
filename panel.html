@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Principal - Asistencia PNF</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-graduation-cap text-3xl"></i>
+                <h1 class="text-2xl font-bold">Asistencia PNF</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span id="profesor-nombre" class="font-semibold"></span>
+                <button onclick="cerrarSesion()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Salir
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido principal -->
+    <div class="container mx-auto px-6 py-10">
+        
+        <!-- Bienvenida -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <div class="flex items-center space-x-4">
+                <div class="bg-blue-100 p-4 rounded-full">
+                    <i class="fas fa-user-circle text-5xl text-blue-600"></i>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-800">Bienvenido, <span id="nombre-usuario">Usuario</span></h2>
+                    <p class="text-gray-600 mt-1">Selecciona una opción para comenzar. Solo verás las opciones habilitadas según tu rol.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjetas de módulos -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="modulos-container">
+            
+            <!-- Módulo Asistencia -->
+            <div id="modulo-asistencia" class="hidden">
+                <div onclick="window.location.href='asistencia-simple.html'" 
+                     class="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-2 border-b-4 border-blue-500">
+                    <div class="p-6">
+                        <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-clipboard-check text-3xl text-blue-600"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">Asistencia</h3>
+                        <p class="text-gray-600 text-sm">Registra y consulta tu puntualidad y registros diarios.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo Control y Disciplina -->
+            <div id="modulo-disciplina" class="hidden">
+                <div onclick="window.location.href='disciplina.html'" 
+                     class="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-2 border-b-4 border-purple-500">
+                    <div class="p-6">
+                        <div class="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-shield-alt text-3xl text-purple-600"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">Control y Disciplina</h3>
+                        <p class="text-gray-600 text-sm">Gestiona el seguimiento de normas y conductas.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo Inventario -->
+            <div id="modulo-inventario" class="hidden">
+                <div onclick="window.location.href='inventario.html'" 
+                     class="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-2 border-b-4 border-green-500">
+                    <div class="p-6">
+                        <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-boxes text-3xl text-green-600"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">Inventario</h3>
+                        <p class="text-gray-600 text-sm">Controla existencias, entradas y salidas de materiales.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo Reportes -->
+            <div id="modulo-reportes" class="hidden">
+                <div onclick="window.location.href='reportes.html'" 
+                     class="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-2 border-b-4 border-orange-500">
+                    <div class="p-6">
+                        <div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-chart-bar text-3xl text-orange-600"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">Reportes</h3>
+                        <p class="text-gray-600 text-sm">Genera y visualiza informes de actividad.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Módulo Administración (solo super_usuario) -->
+            <div id="modulo-admin" class="hidden">
+                <div onclick="window.location.href='index.html?panel=admin'" 
+                     class="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-2 border-b-4 border-red-500">
+                    <div class="p-6">
+                        <div class="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                            <i class="fas fa-cog text-3xl text-red-600"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">Administración</h3>
+                        <p class="text-gray-600 text-sm">Gestiona usuarios, configuraciones y permisos.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Mensaje si no hay módulos disponibles -->
+        <div id="no-modulos" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-6 rounded-lg mt-8">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-triangle text-2xl mr-4"></i>
+                <div>
+                    <p class="font-bold">No hay módulos disponibles</p>
+                    <p class="text-sm">Contacta al administrador para asignar permisos.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/auth.js"></script>
+    
+    <script>
+        // Configuración de módulos por rol
+        const modulosPorRol = {
+            'profesor': ['asistencia'],
+            'disciplina_admin': ['disciplina', 'reportes'],
+            'inventario_admin': ['inventario', 'reportes'],
+            'super_usuario': ['asistencia', 'disciplina', 'inventario', 'reportes', 'admin']
+        };
+
+        // Mostrar módulos según el rol
+        function mostrarModulosSegunRol(rol) {
+            const modulos = modulosPorRol[rol.toLowerCase()] || [];
+            
+            if (modulos.length === 0) {
+                document.getElementById('no-modulos').classList.remove('hidden');
+                return;
+            }
+
+            modulos.forEach(modulo => {
+                const elemento = document.getElementById(`modulo-${modulo}`);
+                if (elemento) {
+                    elemento.classList.remove('hidden');
+                }
+            });
+        }
+
+        // Inicializar dashboard
+        async function inicializarDashboard() {
+            try {
+                const { data } = await window.supabaseClient.auth.getSession();
+                const session = data?.session;
+                
+                if (!session) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                const { data: perfil } = await window.supabaseClient
+                    .from('perfiles_profesores')
+                    .select('nombre, apellido, rol')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (perfil) {
+                    // Mostrar nombre
+                    const nombreCompleto = `${perfil.nombre} ${perfil.apellido}`.trim();
+                    document.getElementById('nombre-usuario').textContent = nombreCompleto;
+                    document.getElementById('profesor-nombre').textContent = nombreCompleto.toUpperCase();
+                    
+                    // Mostrar módulos según rol
+                    mostrarModulosSegunRol(perfil.rol);
+                    
+                    console.log('✅ Dashboard inicializado - Rol:', perfil.rol);
+                }
+
+            } catch (e) {
+                console.error('❌ Error inicializando dashboard:', e);
+            }
+        }
+
+        // Ejecutar al cargar
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', inicializarDashboard);
+        } else {
+            inicializarDashboard();
+        }
+    </script>
+
+</body>
+</html>
