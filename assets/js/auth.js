@@ -1,5 +1,6 @@
 /**
- * MÓDULO DE AUTENTICACIÓN - VERSIÓN SIMPLE
+ * MÓDULO DE AUTENTICACIÓN - VERSIÓN PANEL
+ * Todos los usuarios van al dashboard principal
  */
 
 async function iniciarSesion() {
@@ -12,13 +13,21 @@ async function iniciarSesion() {
     }
 
     try {
+        console.log(' Intentando login con:', email);
+
         const { data: authData, error: authError } = await window.supabaseClient.auth.signInWithPassword({
             email,
             password
         });
 
-        if (authError) throw authError;
+        if (authError) {
+            console.error('❌ Error de autenticación:', authError);
+            throw authError;
+        }
+        
         if (!authData.user) throw new Error('Usuario no encontrado');
+
+        console.log('✅ Autenticación exitosa, buscando perfil...');
 
         const { data: perfil, error: perfilError } = await window.supabaseClient
             .from('perfiles_profesores')
@@ -26,8 +35,16 @@ async function iniciarSesion() {
             .eq('id', authData.user.id)
             .single();
 
-        if (perfilError || !perfil) throw new Error('Perfil no encontrado');
+        if (perfilError || !perfil) {
+            console.error('❌ Error obteniendo perfil:', perfilError);
+            await window.supabaseClient.auth.signOut();
+            throw new Error('Perfil no encontrado');
+        }
+
+        console.log('✅ Perfil encontrado:', perfil);
+
         if (perfil.status !== 'Activo') {
+            await window.supabaseClient.auth.signOut();
             Swal.fire('Acceso denegado', 'Su cuenta no está activada', 'error');
             return;
         }
@@ -38,15 +55,15 @@ async function iniciarSesion() {
             nombreProfesorGlobal: `${perfil.nombre} ${perfil.apellido}`.trim()
         };
 
-        // Redirección
-        if (perfil.rol === 'disciplina_admin') window.location.href = 'disciplina.html';
-        else if (perfil.rol === 'inventario_admin') window.location.href = 'inventario.html';
-        else if (perfil.rol === 'super_usuario') window.location.href = 'index.html?panel=admin';
-        else if (perfil.rol === 'profesor') window.location.href = 'asistencia-simple.html';
-        else window.location.href = 'index.html';
+        console.log('📋 AppState configurado:', window.appState);
+        console.log('🎯 Rol:', perfil.rol);
+
+        // ⭐ REDIRECCIÓN AL PANEL (todos los usuarios)
+        console.log('➡️ Redirigiendo a panel.html');
+        window.location.href = 'panel.html';
 
     } catch (error) {
-        console.error('Error login:', error);
+        console.error('❌ Error en iniciarSesion:', error);
         Swal.fire('Error', error.message || 'No se pudo iniciar sesión', 'error');
     }
 }
@@ -56,7 +73,10 @@ async function verificarSesion() {
         const { data } = await window.supabaseClient.auth.getSession();
         const session = data?.session;
         
-        if (!session) return;
+        if (!session) {
+            console.log('⚠️ No hay sesión activa');
+            return;
+        }
         
         const loginContainer = document.getElementById('login-container');
         if (loginContainer) loginContainer.classList.add('hidden');
@@ -83,32 +103,11 @@ async function verificarSesion() {
                 if (btnAdmin) btnAdmin.classList.remove('hidden');
             }
             
-            // ⭐ REDIRECCIÓN SOLO EN INDEX.HTML
-            const paginaActual = window.location.pathname.split('/').pop();
-            const esPaginaPrincipal = paginaActual === 'index.html' || paginaActual === '' || paginaActual === '/';
-            
-            if (esPaginaPrincipal) {
-                console.log('📄 Página principal detectada');
-                console.log('🎯 Rol:', perfil.rol);
-                
-                // Redirigir según rol
-                if (perfil.rol === 'profesor') {
-                    console.log('➡️ Redirigiendo profesor a asistencia-simple.html');
-                    window.location.replace('asistencia-simple.html');
-                } else if (perfil.rol === 'disciplina_admin') {
-                    console.log('➡️ Redirigiendo disciplina a disciplina.html');
-                    window.location.replace('disciplina.html');
-                } else if (perfil.rol === 'inventario_admin') {
-                    console.log('➡️ Redirigiendo inventario a inventario.html');
-                    window.location.replace('inventario.html');
-                } else if (perfil.rol === 'super_usuario') {
-                    console.log('➡️ Redirigiendo super_usuario a index.html?panel=admin');
-                    window.location.replace('index.html?panel=admin');
-                }
-            }
+            console.log('✅ Sesión verificada - Rol:', perfil.rol);
         }
+        
     } catch (e) {
-        console.error('Error en verificarSesion:', e);
+        console.error('❌ Error verificando sesión:', e);
     }
 }
 
@@ -122,11 +121,11 @@ window.iniciarSesion = iniciarSesion;
 window.verificarSesion = verificarSesion;
 window.cerrarSesion = cerrarSesion;
 
-// Ejecutar sin bloquear
+// Ejecutar al cargar
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', verificarSesion);
 } else {
     verificarSesion();
 }
 
-console.log('✅ auth.js cargado');
+console.log('✅ auth.js cargado (versión Panel)');
