@@ -93,14 +93,36 @@ async function verificarSesion() {
             
             console.log('✅ Sesión verificada:', window.appState);
             
-            // ⭐ MOSTRAR BOTÓN ADMIN SI ES SUPER_USUARIO
+            // ⭐ VERIFICAR ROL Y REDIRIGIR SI CORRESPONDE
             await verificarRolUsuario();
+            
+            // ⭐ AGREGAR: Redirección si está en la página incorrecta
+            const rol = perfil.rol.toLowerCase().trim();
+            const paginaActual = window.location.pathname.split('/').pop();
+            
+            console.log(' Página actual:', paginaActual);
+            console.log('🎯 Rol:', rol);
+            
+            // Si es profesor y está en index.html, redirigir a asistencia-simple.html
+            if (rol.includes('profesor') && (paginaActual === 'index.html' || paginaActual === '' || paginaActual === '/')) {
+                console.log('⚠️ Profesor en página incorrecta, redirigiendo a asistencia-simple.html');
+                window.location.href = 'asistencia-simple.html';
+                return;
+            }
+            
+            // Si es super_usuario y está en index.html sin panel=admin, redirigir
+            if (rol.includes('super') && paginaActual === 'index.html' && !window.location.search.includes('panel=admin')) {
+                console.log('⚠️ Super usuario sin panel=admin, redirigiendo');
+                window.location.href = 'index.html?panel=admin';
+                return;
+            }
         }
         
     } catch (e) {
         console.error('❌ Error verificando sesión:', e);
     }
 }
+
 
 // ⭐ NUEVA FUNCIÓN: Verificar rol y mostrar elementos según permisos
 async function verificarRolUsuario() {
