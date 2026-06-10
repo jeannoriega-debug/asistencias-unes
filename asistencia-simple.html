@@ -243,44 +243,83 @@
     <script src="assets/js/modules/reportes.js"></script>
     <script src="assets/js/modules/reportes-simple.js"></script>
 
-    <!-- Script de inicialización -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('📄 Iniciando Asistencia Simplificada...');
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('📄 Iniciando Asistencia Simplificada...');
+    
+    // ⭐ ESPERAR a que auth.js cargue y configure la sesión
+    let intentos = 0;
+    const maxIntentos = 20;
+    
+    const esperarSesion = setInterval(async () => {
+        intentos++;
         
-        // Verificar autenticación
-        if (!window.appState || !window.appState.usuarioActualId) {
-            console.warn('⚠️ Usuario no autenticado, redirigiendo...');
-            window.location.href = 'index.html';
-            return;
-        }
-        
-        // Inicializar módulo con delay para asegurar carga
-        setTimeout(() => {
+        // Verificar si ya hay sesión configurada
+        if (window.appState && window.appState.usuarioActualId) {
+            clearInterval(esperarSesion);
+            console.log('✅ Sesión detectada:', window.appState.nombreProfesorGlobal);
+            
+            // Mostrar nombre del profesor
+            const nombreEl = document.getElementById('profesor-nombre');
+            if (nombreEl) nombreEl.innerText = window.appState.nombreProfesorGlobal;
+            
+            // Inicializar módulo
             if (window.modules && window.modules.asistenciaSimple) {
                 console.log('✅ Llamando a init()');
                 window.modules.asistenciaSimple.init();
             }
-        }, 500);
-    });
+            return;
+        }
+        
+        // Si auth.js no ha cargado aún, esperar
+        if (intentos >= maxIntentos) {
+            clearInterval(esperarSesion);
+            console.warn('⚠️ Timeout: No se detectó sesión después de', maxIntentos, 'intentos');
+            
+            // Último intento: verificar directamente con Supabase
+            if (window.supabaseClient) {
+                const { data } = await window.supabaseClient.auth.getSession();
+                if (data?.session) {
+                    console.log('✅ Sesión encontrada en Supabase, configurando...');
+                    const { data: perfil } = await window.supabaseClient
+                        .from('perfiles_profesores')
+                        .select('nombre, apellido, rol')
+                        .eq('id', data.session.user.id)
+                        .single();
+                    
+                    if (perfil) {
+                        window.appState = {
+                            usuarioActualId: data.session.user.id,
+                            rolUsuarioActual: perfil.rol,
+                            nombreProfesorGlobal: `${perfil.nombre} ${perfil.apellido}`.trim()
+                        };
+                        
+                        const nombreEl = document.getElementById('profesor-nombre');
+                        if (nombreEl) nombreEl.innerText = window.appState.nombreProfesorGlobal;
+                        
+                        if (window.modules && window.modules.asistenciaSimple) {
+                            window.modules.asistenciaSimple.init();
+                        }
+                        return;
+                    }
+                }
+            }
+            
+            // Si todo falla, redirigir al panel
+            console.error('❌ No se pudo autenticar, redirigiendo al panel');
+            window.location.href = 'panel.html';
+        }
+    }, 200);
+});
 
-    // Función de cierre de sesión mejorada
-    async function cerrarSesionSimple() {
-        console.log('🚪 Cerrando sesión...');
-        // Limpiar estado
-        window.appState = {
-            usuarioActualId: null,
-            rolUsuarioActual: null,
-            nombreUsuarioActual: null,
-            nombreProfesorGlobal: null
-        };
-        // Cerrar sesión en Supabase
-        await window.supabaseClient.auth.signOut();
-        // Redirigir al login
-        window.location.href = 'index.html';
-    }
-    </script>
-
+// Función de cierre de sesión mejorada
+async function cerrarSesionSimple() {
+    console.log('🚪 Cerrando sesión...');
+    window.appState = {};
+    await window.supabaseClient.auth.signOut();
+    window.location.href = 'index.html';
+}
+</script>
 </body>
 
 </html>
