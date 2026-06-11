@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistencia de Personal - UNES</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- NAV -->
+    <nav class="bg-gradient-to-r from-indigo-700 to-purple-700 text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-users text-3xl"></i>
+                <div>
+                    <h1 class="text-2xl font-bold">Asistencia de Personal</h1>
+                    <p class="text-sm text-indigo-200">Sistema de Control en Tiempo Real</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span id="profesor-nombre" class="font-semibold"></span>
+                <button onclick="cerrarSesion()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Salir
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="container mx-auto px-6 py-8">
+
+        <!-- RESUMEN DEL DÍA -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-semibold">Presentes Hoy</p>
+                        <h3 class="text-3xl font-bold text-green-600 mt-1" id="count-presentes">0</h3>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-full">
+                        <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-semibold">Ausentes</p>
+                        <h3 class="text-3xl font-bold text-red-600 mt-1" id="count-ausentes">0</h3>
+                    </div>
+                    <div class="bg-red-100 p-3 rounded-full">
+                        <i class="fas fa-times-circle text-red-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-yellow-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-semibold">Permisos/Retardos</p>
+                        <h3 class="text-3xl font-bold text-yellow-600 mt-1" id="count-permisos">0</h3>
+                    </div>
+                    <div class="bg-yellow-100 p-3 rounded-full">
+                        <i class="fas fa-exclamation-triangle text-yellow-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-semibold">Total Personal</p>
+                        <h3 class="text-3xl font-bold text-blue-600 mt-1" id="count-total">0</h3>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <i class="fas fa-users text-blue-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTROLES PRINCIPALES -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label class="block text-gray-700 font-bold mb-2">
+                        <i class="fas fa-calendar mr-2"></i>Fecha:
+                    </label>
+                    <input type="date" id="fecha-asistencia" 
+                           class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-bold mb-2">
+                        <i class="fas fa-layer-group mr-2"></i>Tipo de Personal:
+                    </label>
+                    <select id="filtro-tipo-personal" 
+                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
+                        <option value="">Todos los tipos</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-bold mb-2">
+                        <i class="fas fa-search mr-2"></i>Buscar:
+                    </label>
+                    <input type="text" id="buscar-personal" placeholder="Nombre o cédula..."
+                           class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
+                </div>
+
+                <div class="flex items-end">
+                    <button onclick="cargarRegistroAsistencia()" 
+                            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                        <i class="fas fa-sync mr-2"></i>Actualizar
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+                <button onclick="mostrarModalRegistro()" 
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition">
+                    <i class="fas fa-plus mr-2"></i>Registrar Asistencia
+                </button>
+                <button onclick="generarReporteDiario()" 
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg transition">
+                    <i class="fas fa-file-alt mr-2"></i>Reporte Diario
+                </button>
+                <button onclick="mostrarModalReportesAvanzados()" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition">
+                    <i class="fas fa-chart-bar mr-2"></i>Reportes Avanzados
+                </button>
+                <button onclick="cargarDatosPersonales()" 
+                        class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition">
+                    <i class="fas fa-users-cog mr-2"></i>Gestionar Personal
+                </button>
+            </div>
+        </div>
+
+        <!-- LISTA DE ASISTENCIA POR TIPO DE PERSONAL -->
+        <div id="lista-asistencia-container">
+            <!-- Se llena dinámicamente -->
+        </div>
+
+    </div>
+
+    <!-- MODAL: Registrar Asistencia Individual -->
+    <div id="modal-registro" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-user-check text-indigo-600 mr-2"></i>
+                    Registrar Asistencia
+                </h2>
+                <button onclick="cerrarModal('modal-registro')" class="text-gray-500 hover:text-gray-700 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 font-bold mb-2">Personal:</label>
+                    <select id="reg-personal" class="w-full p-3 border-2 rounded-lg">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-bold mb-2">Fecha:</label>
+                    <input type="date" id="reg-fecha" class="w-full p-3 border-2 rounded-lg">
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-bold mb-2">Tipo de Registro:</label>
+                    <select id="reg-tipo" class="w-full p-3 border-2 rounded-lg" onchange="cambiarTipoRegistro()">
+                        <!-- Se llena dinámicamente -->
+                    </select>
+                </div>
+
+                <div id="reg-hora-container">
+                    <label class="block text-gray-700 font-bold mb-2">Hora de Registro:</label>
+                    <input type="time" id="reg-hora" class="w-full p-3 border-2 rounded-lg">
+                </div>
+
+                <div id="reg-observaciones-container">
+                    <label class="block text-gray-700 font-bold mb-2">Observaciones:</label>
+                    <textarea id="reg-observaciones" rows="3" class="w-full p-3 border-2 rounded-lg" 
+                              placeholder="Diligencias personales, justificación, etc."></textarea>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button onclick="guardarRegistroAsistencia()" 
+                            class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg">
+                        <i class="fas fa-save mr-2"></i>Guardar
+                    </button>
+                    <button onclick="cerrarModal('modal-registro')" 
+                            class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 rounded-lg">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Reportes Avanzados -->
+    <div id="modal-reportes" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-chart-line text-blue-600 mr-2"></i>
+                    Reportes Avanzados
+                </h2>
+                <button onclick="cerrarModal('modal-reportes')" class="text-gray-500 hover:text-gray-700 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="generarReporteInasistencias()" 
+                        class="bg-red-100 hover:bg-red-200 p-6 rounded-xl text-left transition">
+                    <i class="fas fa-user-times text-red-600 text-3xl mb-2"></i>
+                    <h3 class="font-bold text-lg">Personal con más Inasistencias</h3>
+                    <p class="text-sm text-gray-600">Top 10 de personal con más ausencias</p>
+                </button>
+
+                <button onclick="generarReportePermisos()" 
+                        class="bg-yellow-100 hover:bg-yellow-200 p-6 rounded-xl text-left transition">
+                    <i class="fas fa-file-alt text-yellow-600 text-3xl mb-2"></i>
+                    <h3 class="font-bold text-lg">Personal con más Permisos</h3>
+                    <p class="text-sm text-gray-600">Análisis de permisos obligatorios y potestativos</p>
+                </button>
+
+                <button onclick="generarReporteRetardos()" 
+                        class="bg-orange-100 hover:bg-orange-200 p-6 rounded-xl text-left transition">
+                    <i class="fas fa-clock text-orange-600 text-3xl mb-2"></i>
+                    <h3 class="font-bold text-lg">Personal con Retardos</h3>
+                    <p class="text-sm text-gray-600">Registro de llegadas tarde</p>
+                </button>
+
+                <button onclick="generarReporteVacaciones()" 
+                        class="bg-blue-100 hover:bg-blue-200 p-6 rounded-xl text-left transition">
+                    <i class="fas fa-plane text-blue-600 text-3xl mb-2"></i>
+                    <h3 class="font-bold text-lg">Personal de Vacaciones</h3>
+                    <p class="text-sm text-gray-600">Personal en período vacacional</p>
+                </button>
+            </div>
+
+            <div class="mt-6 flex gap-3">
+                <button onclick="cerrarModal('modal-reportes')" 
+                        class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 rounded-lg">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/modules/asistencia-personal.js"></script>
+
+    <script>
+    // Inicialización
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Verificar autenticación
+        if (!window.appState || !window.appState.usuarioActualId) {
+            window.location.href = 'panel.html';
+            return;
+        }
+
+        // Mostrar nombre
+        const nombreEl = document.getElementById('profesor-nombre');
+        if (nombreEl) nombreEl.innerText = window.appState.nombreProfesorGlobal;
+
+        // Establecer fecha de hoy
+        document.getElementById('fecha-asistencia').valueAsDate = new Date();
+        document.getElementById('reg-fecha').valueAsDate = new Date();
+        
+        const now = new Date();
+        document.getElementById('reg-hora').value = now.toTimeString().slice(0, 5);
+
+        // Cargar datos iniciales
+        await cargarTiposPersonal();
+        await cargarTiposAsistencia();
+        await cargarRegistroAsistencia();
+    });
+
+    function cerrarModal(modalId) {
+        document.getElementById(modalId).classList.add('hidden');
+    }
+
+    function mostrarModalRegistro() {
+        document.getElementById('modal-registro').classList.remove('hidden');
+        cargarPersonalParaRegistro();
+    }
+
+    function mostrarModalReportesAvanzados() {
+        document.getElementById('modal-reportes').classList.remove('hidden');
+    }
+
+    function cambiarTipoRegistro() {
+        const tipo = document.getElementById('reg-tipo').value;
+        const obsContainer = document.getElementById('reg-observaciones-container');
+        
+        if (tipo === 'ASISTENCIA') {
+            obsContainer.classList.add('hidden');
+        } else {
+            obsContainer.classList.remove('hidden');
+        }
+    }
+
+    async function cerrarSesion() {
+        await window.supabaseClient.auth.signOut();
+        window.location.href = 'panel.html';
+    }
+    </script>
+
+</body>
+</html>
