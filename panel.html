@@ -137,12 +137,13 @@
     
     <script>
         // Configuración de módulos por rol
-        const modulosPorRol = {
-            'profesor': ['asistencia'],
-            'disciplina_admin': ['disciplina'],
-            'inventario_admin': ['inventario'],
-            'super_usuario': ['asistencia', 'disciplina', 'inventario', 'admin']
-        };
+            const modulosPorRol = {
+                'profesor': ['asistencia'],
+                'disciplina_admin': ['disciplina'],
+                'inventario_admin': ['inventario'],
+                'talentohumano_admin': ['asistencia-personal'],  // ⭐ NUEVO
+                'super_usuario': ['asistencia', 'disciplina', 'inventario', 'asistencia-personal', 'admin']
+            };
 
         // Mostrar módulos según el rol
         function mostrarModulosSegunRol(rol) {
