@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
 
@@ -265,29 +264,118 @@
     <script src="assets/js/modules/asistencia-personal.js"></script>
 
     <script>
-    // Inicialización
     document.addEventListener('DOMContentLoaded', async function() {
-        // Verificar autenticación
-        if (!window.appState || !window.appState.usuarioActualId) {
-            window.location.href = 'panel.html';
-            return;
-        }
-
-        // Mostrar nombre
-        const nombreEl = document.getElementById('profesor-nombre');
-        if (nombreEl) nombreEl.innerText = window.appState.nombreProfesorGlobal;
-
-        // Establecer fecha de hoy
-        document.getElementById('fecha-asistencia').valueAsDate = new Date();
-        document.getElementById('reg-fecha').valueAsDate = new Date();
+        console.log('👥 Iniciando Asistencia de Personal...');
         
-        const now = new Date();
-        document.getElementById('reg-hora').value = now.toTimeString().slice(0, 5);
-
-        // Cargar datos iniciales
-        await cargarTiposPersonal();
-        await cargarTiposAsistencia();
-        await cargarRegistroAsistencia();
+        // ESPERAR a que auth.js cargue y configure la sesión
+        let intentos = 0;
+        const maxIntentos = 20;
+        
+        const esperarSesion = setInterval(async () => {
+            intentos++;
+            console.log(`⏳ Intento ${intentos}/${maxIntentos} - Verificando sesión...`);
+            
+            // Verificar si ya hay sesión configurada
+            if (window.appState && window.appState.usuarioActualId) {
+                clearInterval(esperarSesion);
+                console.log('✅ Sesión detectada:', window.appState.nombreProfesorGlobal);
+                console.log('🎯 Rol:', window.appState.rolUsuarioActual);
+                
+                // Mostrar nombre del usuario
+                const nombreEl = document.getElementById('profesor-nombre');
+                if (nombreEl) nombreEl.innerText = window.appState.nombreProfesorGlobal;
+                
+                // Verificar permisos
+                const rol = window.appState.rolUsuarioActual?.toLowerCase() || '';
+                if (!rol.includes('talentohumano') && !rol.includes('super')) {
+                    console.warn('⚠️ Usuario sin permisos para este módulo');
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Acceso Restringido',
+                        text: 'No tiene permisos para acceder a este módulo',
+                        timer: 2500
+                    }).then(() => {
+                        window.location.href = 'panel.html';
+                    });
+                    return;
+                }
+                
+                // Establecer fecha de hoy
+                document.getElementById('fecha-asistencia').valueAsDate = new Date();
+                document.getElementById('reg-fecha').valueAsDate = new Date();
+                
+                const now = new Date();
+                document.getElementById('reg-hora').value = now.toTimeString().slice(0, 5);
+                
+                // Inicializar datos
+                try {
+                    if (typeof cargarTiposPersonal === 'function') {
+                        await cargarTiposPersonal();
+                        await cargarTiposAsistencia();
+                        await cargarRegistroAsistencia();
+                        console.log('✅ Módulo inicializado correctamente');
+                    } else {
+                        console.error('❌ Las funciones del módulo no están cargadas');
+                    }
+                } catch (e) {
+                    console.error('❌ Error inicializando:', e);
+                    Swal.fire('Error', 'Error al cargar datos: ' + e.message, 'error');
+                }
+                
+                return;
+            }
+            
+            // Si auth.js no ha cargado aún, esperar
+            if (intentos >= maxIntentos) {
+                clearInterval(esperarSesion);
+                console.warn('⚠️ Timeout: No se detectó sesión');
+                
+                // Último intento: verificar directamente con Supabase
+                if (window.supabaseClient) {
+                    try {
+                        const { data } = await window.supabaseClient.auth.getSession();
+                        if (data?.session) {
+                            console.log('✅ Sesión encontrada en Supabase, configurando...');
+                            const { data: perfil } = await window.supabaseClient
+                                .from('perfiles_profesores')
+                                .select('nombre, apellido, rol')
+                                .eq('id', data.session.user.id)
+                                .single();
+                            
+                            if (perfil) {
+                                window.appState = {
+                                    usuarioActualId: data.session.user.id,
+                                    rolUsuarioActual: perfil.rol,
+                                    nombreProfesorGlobal: `${perfil.nombre} ${perfil.apellido}`.trim()
+                                };
+                                
+                                const nombreEl = document.getElementById('profesor-nombre');
+                                if (nombreEl) nombreEl.innerText = window.appState.nombreProfesorGlobal;
+                                
+                                // Inicializar datos
+                                await cargarTiposPersonal();
+                                await cargarTiposAsistencia();
+                                await cargarRegistroAsistencia();
+                                return;
+                            }
+                        }
+                    } catch (err) {
+                        console.error('❌ Error verificando Supabase:', err);
+                    }
+                }
+                
+                // Si todo falla, redirigir al panel
+                console.error('❌ No se pudo autenticar, redirigiendo al panel');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Sesión no válida',
+                    text: 'Por favor inicie sesión nuevamente',
+                    timer: 2000
+                }).then(() => {
+                    window.location.href = 'panel.html';
+                });
+            }
+        }, 200);
     });
 
     function cerrarModal(modalId) {
@@ -296,7 +384,9 @@
 
     function mostrarModalRegistro() {
         document.getElementById('modal-registro').classList.remove('hidden');
-        cargarPersonalParaRegistro();
+        if (typeof cargarPersonalParaRegistro === 'function') {
+            cargarPersonalParaRegistro();
+        }
     }
 
     function mostrarModalReportesAvanzados() {
