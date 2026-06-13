@@ -132,58 +132,63 @@ window.modules.asistenciaPersonal = {
     // ============================================
     // CARGAR Y MOSTRAR ASISTENCIA (FUNCIÓN PRINCIPAL)
     // ============================================
-    cargarRegistroAsistencia: async function() {
-        try {
-            const fecha = document.getElementById('fecha-asistencia')?.value;
-            const tipoPersonalId = document.getElementById('filtro-tipo-personal')?.value;
-            const busqueda = document.getElementById('buscar-personal')?.value?.toLowerCase() || '';
+cargarRegistroAsistencia: async function() {
+    try {
+        const fecha = document.getElementById('fecha-asistencia')?.value;
+        const selectTipo = document.getElementById('filtro-tipo-personal');
+        const tipoPersonalId = selectTipo ? selectTipo.value : '';
+        const busqueda = document.getElementById('buscar-personal')?.value?.toLowerCase() || '';
 
- // 🔍 DEBUG: Verificar el filtro
+        // 🔍 DEBUG
         console.log('🔍 Filtro tipo personal:', tipoPersonalId || '(vacío - todos)');
-        console.log('🔍 Select value:', selectTipo?.value);
-        console.log('🔍 Select options:', selectTipo?.options.length);
-            
-            if (!fecha) {
-                Swal.fire('Atención', 'Seleccione una fecha', 'warning');
-                return;
-            }
+        console.log('🔍 Select existe:', !!selectTipo);
 
-            this.datosCache.fechaActual = fecha;
-
-            const [personal, registros] = await Promise.all([
-                this.cargarPersonal(tipoPersonalId || null),
-                this.cargarRegistrosAsistencia(fecha)
-            ]);
-
-            const registrosMap = {};
-            registros.forEach(r => {
-                registrosMap[r.personal_id] = r;
-            });
-
-            let personalFiltrado = personal;
-            if (busqueda) {
-                personalFiltrado = personal.filter(p => 
-                    p.nombre_completo.toLowerCase().includes(busqueda) ||
-                    p.cedula.toLowerCase().includes(busqueda)
-                );
-            }
-
-            const pendientes = personalFiltrado.filter(p => !registrosMap[p.id]);
-            const registrados = personalFiltrado.filter(p => registrosMap[p.id]);
-
-            this.renderizarPendientes(pendientes);
-            this.renderizarRegistrados(registrados, registrosMap);
-            this.actualizarEstadisticas(personalFiltrado, registros);
-
-            console.log('✅ Asistencia cargada para:', fecha);
-
-        } catch (e) {
-            console.error('❌ Error en cargarRegistroAsistencia:', e);
-            console.error('Stack trace:', e.stack);
-            Swal.fire('Error', 'No se pudo cargar la asistencia: ' + e.message, 'error');
+        if (!fecha) {
+            Swal.fire('Atención', 'Seleccione una fecha', 'warning');
+            return;
         }
-    },
 
+        this.datosCache.fechaActual = fecha;
+
+        const [personal, registros] = await Promise.all([
+            this.cargarPersonal(tipoPersonalId || null),
+            this.cargarRegistrosAsistencia(fecha)
+        ]);
+
+        console.log('✅ Personal cargado:', personal.length, 'empleados');
+
+        // Crear mapa de registros por personal_id
+        const registrosMap = {};
+        registros.forEach(r => {
+            registrosMap[r.personal_id] = r;
+        });
+
+        // Filtrar por búsqueda
+        let personalFiltrado = personal;
+        if (busqueda) {
+            personalFiltrado = personal.filter(p => 
+                p.nombre_completo.toLowerCase().includes(busqueda) ||
+                p.cedula.toLowerCase().includes(busqueda)
+            );
+        }
+
+        // Separar en pendientes y registrados
+        const pendientes = personalFiltrado.filter(p => !registrosMap[p.id]);
+        const registrados = personalFiltrado.filter(p => registrosMap[p.id]);
+
+        // Renderizar
+        this.renderizarPendientes(pendientes);
+        this.renderizarRegistrados(registrados, registrosMap);
+        this.actualizarEstadisticas(personalFiltrado, registros);
+
+        console.log('✅ Asistencia cargada para:', fecha);
+
+    } catch (e) {
+        console.error('❌ Error en cargarRegistroAsistencia:', e);
+        console.error('Stack trace:', e.stack);
+        Swal.fire('Error', 'No se pudo cargar la asistencia: ' + e.message, 'error');
+    }
+},
     // ============================================
     // RENDERIZAR PENDIENTES
     // ============================================
