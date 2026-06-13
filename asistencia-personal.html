@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
     <style>
         .badge-card {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -16,10 +17,6 @@
         .badge-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        .badge-card.moving {
-            opacity: 0;
-            transform: scale(0.9);
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -36,13 +33,6 @@
             top: 0;
             z-index: 10;
             backdrop-filter: blur(8px);
-        }
-        .dropdown-menu {
-            animation: slideDown 0.2s ease-out;
-        }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
@@ -83,7 +73,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-600 mb-1">Tipo de Personal:</label>
-                    <select id="filtro-tipo-personal" 
+                    <select id="filtro-tipo-personal" onchange="cargarRegistroAsistencia()"
                             class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm">
                         <option value="">Todos los tipos</option>
                     </select>
@@ -91,6 +81,7 @@
                 <div>
                     <label class="block text-xs font-bold text-gray-600 mb-1">Buscar:</label>
                     <input type="text" id="buscar-personal" placeholder="Nombre o cédula..."
+                           onkeyup="if(event.key==='Enter') cargarRegistroAsistencia()"
                            class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm">
                 </div>
                 <div class="flex items-end gap-2">
@@ -98,11 +89,27 @@
                             class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3 rounded-lg transition text-sm">
                         <i class="fas fa-sync mr-1"></i><span class="hidden sm:inline">Actualizar</span>
                     </button>
-                    <button onclick="mostrarModalRegistroManual()" 
-                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg transition text-sm">
-                        <i class="fas fa-plus"></i>
+                    <button onclick="cargarDatosPersonales()" 
+                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg transition text-sm" title="Agregar Personal">
+                        <i class="fas fa-user-plus"></i>
                     </button>
                 </div>
+            </div>
+
+            <!-- BOTONES DE ACCIÓN Y REPORTES -->
+            <div class="flex flex-wrap gap-2 pt-3 border-t mb-3">
+                <button onclick="generarReporteDiario()" 
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition text-sm">
+                    <i class="fas fa-file-alt mr-1"></i>Reporte Diario
+                </button>
+                <button onclick="mostrarModalReportesAvanzados()" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition text-sm">
+                    <i class="fas fa-chart-bar mr-1"></i>Reportes Avanzados
+                </button>
+                <button onclick="exportarExcel()" 
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition text-sm">
+                    <i class="fas fa-file-excel mr-1"></i>Exportar Excel
+                </button>
             </div>
 
             <!-- ESTADÍSTICAS RÁPIDAS -->
@@ -158,7 +165,7 @@
 
     </div>
 
-    <!-- MODAL: REGISTRO RÁPIDO/COMPLETO -->
+    <!-- MODAL: REGISTRO DE ASISTENCIA -->
     <div id="modal-registro" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
@@ -211,7 +218,6 @@
                     <select id="reg-tipo" onchange="cambiarTipoRegistro()" 
                             class="w-full p-2 border-2 rounded-lg focus:border-indigo-500 focus:outline-none">
                         <option value="">Seleccione...</option>
-                        <!-- Se llena dinámicamente -->
                     </select>
                 </div>
 
@@ -263,6 +269,58 @@
                         Cancelar
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: REPORTES AVANZADOS -->
+    <div id="modal-reportes" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-2xl">
+                <h2 class="text-xl font-bold text-gray-800">
+                    <i class="fas fa-chart-line text-blue-600 mr-2"></i>
+                    Reportes Avanzados
+                </h2>
+                <button onclick="cerrarModal('modal-reportes')" class="text-gray-500 hover:text-gray-700 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="generarReporteInasistencias()" 
+                        class="bg-red-100 hover:bg-red-200 p-6 rounded-xl text-left transition">
+                    <i class="fas fa-user-times text-red-600 text-3xl mb-2"></i>
+                    <h3 class="font-bold text-lg">Personal con más Inasistencias</h3>
+                    <p class="text-sm text-gray-600">Top 10 de personal con más ausencias</p>
+                </button>
+
+                <button onclick="generarReportePermisos()" 
+                        class="bg-yellow-100 hover:bg-yellow-200 p-6 rounded-xl text-left transition">
+                    <i class="fas fa-file-alt text-yellow-600 text-3xl mb-2"></i>
+                    <h3 class="font-bold text-lg">Personal con más Permisos</h3>
+                    <p class="text-sm text-gray-600">Análisis de permisos obligatorios y potestativos</p>
+                </button>
+
+                <button onclick="generarReporteRetardos()" 
+                        class="bg-orange-100 hover:bg-orange-200 p-6 rounded-xl text-left transition">
+                    <i class="fas fa-clock text-orange-600 text-3xl mb-2"></i>
+                    <h3 class="font-bold text-lg">Personal con Retardos</h3>
+                    <p class="text-sm text-gray-600">Registro de llegadas tarde</p>
+                </button>
+
+                <button onclick="generarReporteVacaciones()" 
+                        class="bg-blue-100 hover:bg-blue-200 p-6 rounded-xl text-left transition">
+                    <i class="fas fa-plane text-blue-600 text-3xl mb-2"></i>
+                    <h3 class="font-bold text-lg">Personal de Vacaciones</h3>
+                    <p class="text-sm text-gray-600">Personal en período vacacional</p>
+                </button>
+            </div>
+
+            <div class="p-4 border-t flex justify-end">
+                <button onclick="cerrarModal('modal-reportes')" 
+                        class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">
+                    Cerrar
+                </button>
             </div>
         </div>
     </div>
@@ -335,39 +393,8 @@
         document.getElementById(modalId).classList.add('hidden');
     }
 
-    function mostrarModalRegistroManual() {
-        Swal.fire({
-            title: 'Registro Manual',
-            input: 'select',
-            inputOptions: async () => {
-                const { data } = await window.supabaseClient
-                    .from('personal')
-                    .select('id, nombre_completo, cedula')
-                    .eq('activo', true)
-                    .order('nombre_completo');
-                
-                const options = {};
-                data.forEach(p => {
-                    options[p.id] = `${p.nombre_completo} (${p.cedula})`;
-                });
-                return options;
-            },
-            inputPlaceholder: 'Seleccione el personal...',
-            showCancelButton: true,
-            confirmButtonText: 'Continuar',
-            cancelButtonText: 'Cancelar'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                window.modules.asistenciaPersonal.personalSeleccionado = result.value;
-                window.modules.asistenciaPersonal.abrirModalRegistro();
-            }
-        });
-    }
-
     function seleccionarAccionRapida(tipoCodigo) {
-        document.getElementById('reg-tipo').value = '';
-        window.modules.asistenciaPersonal.accionRapidaSeleccionada = tipoCodigo;
-        window.modules.asistenciaPersonal.guardarRegistroAsistencia();
+        window.modules.asistenciaPersonal.seleccionarAccionRapida(tipoCodigo);
     }
 
     function cambiarTipoRegistro() {
@@ -387,13 +414,21 @@
     window.cargarTiposPersonal = () => window.modules.asistenciaPersonal.cargarTiposPersonal();
     window.cargarTiposAsistencia = () => window.modules.asistenciaPersonal.cargarTiposAsistencia();
     window.cargarRegistroAsistencia = () => window.modules.asistenciaPersonal.cargarRegistroAsistencia();
+    window.abrirModalRegistro = (id) => window.modules.asistenciaPersonal.abrirModalRegistro(id);
     window.guardarRegistroAsistencia = () => window.modules.asistenciaPersonal.guardarRegistroAsistencia();
     window.cerrarModal = cerrarModal;
-    window.mostrarModalRegistroManual = mostrarModalRegistroManual;
     window.seleccionarAccionRapida = seleccionarAccionRapida;
     window.cambiarTipoRegistro = cambiarTipoRegistro;
     window.calcularDias = calcularDias;
     window.cerrarSesion = cerrarSesion;
+    window.generarReporteDiario = () => window.modules.asistenciaPersonal.generarReporteDiario();
+    window.mostrarModalReportesAvanzados = () => window.modules.asistenciaPersonal.mostrarModalReportesAvanzados();
+    window.generarReporteInasistencias = () => window.modules.asistenciaPersonal.generarReporteInasistencias();
+    window.generarReportePermisos = () => window.modules.asistenciaPersonal.generarReportePermisos();
+    window.generarReporteRetardos = () => window.modules.asistenciaPersonal.generarReporteRetardos();
+    window.generarReporteVacaciones = () => window.modules.asistenciaPersonal.generarReporteVacaciones();
+    window.cargarDatosPersonales = () => window.modules.asistenciaPersonal.cargarDatosPersonales();
+    window.exportarExcel = () => window.modules.asistenciaPersonal.exportarExcel();
     </script>
 
 </body>
