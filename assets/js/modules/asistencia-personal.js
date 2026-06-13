@@ -60,7 +60,6 @@ window.modules.asistenciaPersonal = {
 
             this.datosCache.tiposAsistencia = data || [];
             
-            // Llenar select de opciones avanzadas (excluir P, R, A que son botones rápidos)
             const select = document.getElementById('reg-tipo');
             if (select) {
                 const opcionesAvanzadas = data.filter(t => 
@@ -151,13 +150,11 @@ window.modules.asistenciaPersonal = {
                 this.cargarRegistrosAsistencia(fecha)
             ]);
 
-            // Crear mapa de registros por personal_id
             const registrosMap = {};
             registros.forEach(r => {
                 registrosMap[r.personal_id] = r;
             });
 
-            // Filtrar por búsqueda
             let personalFiltrado = personal;
             if (busqueda) {
                 personalFiltrado = personal.filter(p => 
@@ -166,11 +163,9 @@ window.modules.asistenciaPersonal = {
                 );
             }
 
-            // Separar en pendientes y registrados
             const pendientes = personalFiltrado.filter(p => !registrosMap[p.id]);
             const registrados = personalFiltrado.filter(p => registrosMap[p.id]);
 
-            // Renderizar
             this.renderizarPendientes(pendientes);
             this.renderizarRegistrados(registrados, registrosMap);
             this.actualizarEstadisticas(personalFiltrado, registros);
@@ -258,7 +253,6 @@ window.modules.asistenciaPersonal = {
         const tieneRegistro = registro !== null;
         const estado = tieneRegistro ? registro.tipo_asistencia : null;
         
-        // Determinar color del badge según estado
         let badgeColor = 'bg-gray-200 text-gray-600';
         let badgeIcon = 'fa-question-circle';
         let badgeText = 'Sin registro';
@@ -281,7 +275,6 @@ window.modules.asistenciaPersonal = {
             badgeText = estado.nombre;
         }
 
-        // Iniciales para avatar
         const iniciales = personal.nombre_completo
             .split(' ')
             .map(n => n[0])
@@ -289,7 +282,6 @@ window.modules.asistenciaPersonal = {
             .join('')
             .toUpperCase();
 
-        // Información adicional (edad si hay fecha_nacimiento, género)
         let infoExtra = '';
         if (personal.fecha_nacimiento) {
             const edad = this.calcularEdad(personal.fecha_nacimiento);
@@ -300,7 +292,6 @@ window.modules.asistenciaPersonal = {
             infoExtra += ` <span class="text-xs">${generoIcon}</span>`;
         }
 
-        // Info adicional del registro (para permisos prolongados)
         let infoRegistro = '';
         if (tieneRegistro && registro.fecha_inicio && registro.fecha_fin) {
             infoRegistro = `
@@ -413,7 +404,6 @@ window.modules.asistenciaPersonal = {
                 registrado_por: window.appState.usuarioActualId
             };
 
-            // UPSERT: Insertar o actualizar
             const { data: existente, error: errorExiste } = await window.supabaseClient
                 .from('registro_asistencia')
                 .select('id')
@@ -435,7 +425,6 @@ window.modules.asistenciaPersonal = {
 
             if (result.error) throw result.error;
 
-            // Notificación toast
             const personal = this.datosCache.personal.find(p => p.id === personalId);
             const nombres = {
                 'ASISTENCIA': '✅ Presente',
@@ -453,7 +442,6 @@ window.modules.asistenciaPersonal = {
                 toast: true
             });
 
-            // Recargar
             await this.cargarRegistroAsistencia();
 
         } catch (e) {
@@ -475,7 +463,6 @@ window.modules.asistenciaPersonal = {
         this.personalSeleccionado = personalId;
         this.accionRapidaSeleccionada = null;
 
-        // Llenar información del modal
         document.getElementById('modal-personal-info').textContent = personal.nombre_completo;
         document.getElementById('modal-personal-cedula').textContent = `C.I: ${personal.cedula}`;
         document.getElementById('reg-fecha').value = this.datosCache.fechaActual;
@@ -487,12 +474,10 @@ window.modules.asistenciaPersonal = {
         document.getElementById('reg-observaciones').value = '';
         document.getElementById('reg-documento').value = '';
 
-        // Ocultar campos condicionales
         document.getElementById('campos-hora').classList.add('hidden');
         document.getElementById('campos-periodo').classList.add('hidden');
         document.getElementById('campos-observaciones').classList.add('hidden');
 
-        // Mostrar modal
         document.getElementById('modal-registro').classList.remove('hidden');
     },
 
@@ -503,14 +488,12 @@ window.modules.asistenciaPersonal = {
         const tipoId = document.getElementById('reg-tipo').value;
         const tipo = this.datosCache.tiposAsistencia.find(t => t.id === tipoId);
 
-        // Ocultar todos los campos condicionales
         document.getElementById('campos-hora').classList.add('hidden');
         document.getElementById('campos-periodo').classList.add('hidden');
         document.getElementById('campos-observaciones').classList.add('hidden');
 
         if (!tipo) return;
 
-        // Mostrar campos según tipo
         if (['EGRESO', 'INGRESO', 'RETARDO'].includes(tipo.codigo)) {
             document.getElementById('campos-hora').classList.remove('hidden');
             document.getElementById('campos-observaciones').classList.remove('hidden');
@@ -560,7 +543,6 @@ window.modules.asistenciaPersonal = {
             const observaciones = document.getElementById('reg-observaciones').value;
             const documento = document.getElementById('reg-documento').value;
 
-            // Determinar tipo_asistencia_id
             let tipoAsistenciaId = tipoId;
             if (this.accionRapidaSeleccionada) {
                 const tipo = this.datosCache.tiposAsistencia.find(t => t.codigo === this.accionRapidaSeleccionada);
@@ -572,7 +554,6 @@ window.modules.asistenciaPersonal = {
                 return;
             }
 
-            // Validar fechas
             if (fechaInicio && fechaFin && new Date(fechaFin) < new Date(fechaInicio)) {
                 Swal.fire('Error', 'La fecha fin no puede ser menor que la fecha inicio', 'error');
                 return;
@@ -591,7 +572,6 @@ window.modules.asistenciaPersonal = {
                 registrado_por: window.appState.usuarioActualId
             };
 
-            // UPSERT
             const { data: existente } = await window.supabaseClient
                 .from('registro_asistencia')
                 .select('id')
@@ -613,10 +593,8 @@ window.modules.asistenciaPersonal = {
 
             if (result.error) throw result.error;
 
-            // Cerrar modal
             document.getElementById('modal-registro').classList.add('hidden');
 
-            // Notificación
             const personal = this.datosCache.personal.find(p => p.id === personalId);
             const tipo = this.datosCache.tiposAsistencia.find(t => t.id === tipoAsistenciaId);
 
@@ -630,7 +608,6 @@ window.modules.asistenciaPersonal = {
                 toast: true
             });
 
-            // Recargar
             await this.cargarRegistroAsistencia();
 
         } catch (e) {
@@ -674,10 +651,8 @@ window.modules.asistenciaPersonal = {
             document.getElementById('reg-observaciones').value = registro.observaciones || '';
             document.getElementById('reg-documento').value = registro.documento_soporte || '';
 
-            // Mostrar campos condicionales según tipo
             this.cambiarTipoRegistro();
 
-            // Mostrar modal
             document.getElementById('modal-registro').classList.remove('hidden');
 
         } catch (e) {
@@ -742,7 +717,6 @@ window.modules.asistenciaPersonal = {
             const personal = await this.cargarPersonal();
             const registros = await this.cargarRegistrosAsistencia(fecha);
 
-            // Agrupar por tipo de personal
             const agrupado = {};
             personal.forEach(p => {
                 const tipo = p.tipo_personal?.nombre || 'Sin tipo';
@@ -1186,176 +1160,166 @@ window.modules.asistenciaPersonal = {
     mostrarModalReportesAvanzados: function() {
         const modal = document.getElementById('modal-reportes');
         if (modal) modal.classList.remove('hidden');
+    },
+
+    // ============================================
+    // EXPORTAR A EXCEL
+    // ============================================
+    exportarExcel: async function() {
+        try {
+            const fecha = this.datosCache.fechaActual;
+            if (!fecha) {
+                Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
+                return;
+            }
+
+            const personal = await this.cargarPersonal();
+            const registros = await this.cargarRegistrosAsistencia(fecha);
+
+            const registrosMap = {};
+            registros.forEach(r => {
+                registrosMap[r.personal_id] = r;
+            });
+
+            const datosExcel = personal.map(p => {
+                const registro = registrosMap[p.id];
+                const estado = registro?.tipo_asistencia;
+                
+                return {
+                    'Cédula': p.cedula,
+                    'Nombre Completo': p.nombre_completo,
+                    'Tipo Personal': p.tipo_personal?.nombre || '',
+                    'Género': p.genero === 'M' ? 'Masculino' : p.genero === 'F' ? 'Femenino' : '',
+                    'Fecha Nacimiento': p.fecha_nacimiento || '',
+                    'Estado': estado?.nombre || 'Sin registro',
+                    'Hora Registro': registro?.hora_registro || '',
+                    'Fecha Inicio': registro?.fecha_inicio || '',
+                    'Fecha Fin': registro?.fecha_fin || '',
+                    'Días': registro?.dias || '',
+                    'Observaciones': registro?.observaciones || '',
+                    'Documento': registro?.documento_soporte || ''
+                };
+            });
+
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = window.appState?.nombreProfesorGlobal || 'Sistema UNES';
+            workbook.created = new Date();
+
+            const ws = workbook.addWorksheet('Asistencia');
+
+            ws.columns = [
+                { header: 'Cédula', key: 'Cédula', width: 15 },
+                { header: 'Nombre Completo', key: 'Nombre Completo', width: 35 },
+                { header: 'Tipo Personal', key: 'Tipo Personal', width: 25 },
+                { header: 'Género', key: 'Género', width: 12 },
+                { header: 'Fecha Nacimiento', key: 'Fecha Nacimiento', width: 15 },
+                { header: 'Estado', key: 'Estado', width: 20 },
+                { header: 'Hora Registro', key: 'Hora Registro', width: 12 },
+                { header: 'Fecha Inicio', key: 'Fecha Inicio', width: 12 },
+                { header: 'Fecha Fin', key: 'Fecha Fin', width: 12 },
+                { header: 'Días', key: 'Días', width: 8 },
+                { header: 'Observaciones', key: 'Observaciones', width: 30 },
+                { header: 'Documento', key: 'Documento', width: 20 }
+            ];
+
+            const headerRow = ws.getRow(1);
+            headerRow.height = 25;
+            headerRow.eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFB4D4F4' }
+                };
+                cell.font = {
+                    name: 'Calibri',
+                    size: 11,
+                    bold: true,
+                    color: { argb: 'FF1E3A5F' }
+                };
+                cell.alignment = {
+                    horizontal: 'center',
+                    vertical: 'middle',
+                    wrapText: true
+                };
+                cell.border = {
+                    top: { style: 'medium', color: { argb: 'FF1E3A5F' } },
+                    bottom: { style: 'medium', color: { argb: 'FF1E3A5F' } }
+                };
+            });
+
+            datosExcel.forEach((item, index) => {
+                const row = ws.addRow(item);
+                row.height = 18;
+                
+                row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                    cell.font = { name: 'Calibri', size: 10 };
+                    cell.alignment = { vertical: 'middle', wrapText: true };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+                        bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+                    };
+
+                    if (index % 2 === 1) {
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFF5F9FF' }
+                        };
+                    }
+
+                    if (colNumber === 6) {
+                        const estado = item['Estado'];
+                        if (estado === 'Asistencia') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } };
+                            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF155724' } };
+                        } else if (estado === 'Ausencia Injustificada') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8D7DA' } };
+                            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF721C24' } };
+                        } else if (estado === 'Retardo') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4CC' } };
+                            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF856404' } };
+                        }
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    }
+                });
+            });
+
+            ws.autoFilter = {
+                from: { row: 1, column: 1 },
+                to: { row: datosExcel.length + 1, column: 12 }
+            };
+
+            ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            });
+
+            const nombreArchivo = `Asistencia_Personal_${fecha}.xlsx`;
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombreArchivo;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            Swal.fire({
+                icon: 'success',
+                title: '✅ Excel Exportado',
+                text: `Se exportaron ${datosExcel.length} registros`,
+                timer: 2000,
+                showConfirmButton: false
+            });
+
+        } catch (e) {
+            console.error('❌ Error exportando Excel:', e);
+            Swal.fire('Error', 'No se pudo exportar: ' + e.message, 'error');
+        }
     }
 };
-// ============================================
-// EXPORTAR A EXCEL
-// ============================================
-exportarExcel: async function() {
-    try {
-        const fecha = this.datosCache.fechaActual;
-        if (!fecha) {
-            Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
-            return;
-        }
-
-        const personal = await this.cargarPersonal();
-        const registros = await this.cargarRegistrosAsistencia(fecha);
-
-        // Crear mapa de registros
-        const registrosMap = {};
-        registros.forEach(r => {
-            registrosMap[r.personal_id] = r;
-        });
-
-        // Preparar datos para Excel
-        const datosExcel = personal.map(p => {
-            const registro = registrosMap[p.id];
-            const estado = registro?.tipo_asistencia;
-            
-            return {
-                'Cédula': p.cedula,
-                'Nombre Completo': p.nombre_completo,
-                'Tipo Personal': p.tipo_personal?.nombre || '',
-                'Género': p.genero === 'M' ? 'Masculino' : p.genero === 'F' ? 'Femenino' : '',
-                'Fecha Nacimiento': p.fecha_nacimiento || '',
-                'Estado': estado?.nombre || 'Sin registro',
-                'Hora Registro': registro?.hora_registro || '',
-                'Fecha Inicio': registro?.fecha_inicio || '',
-                'Fecha Fin': registro?.fecha_fin || '',
-                'Días': registro?.dias || '',
-                'Observaciones': registro?.observaciones || '',
-                'Documento': registro?.documento_soporte || ''
-            };
-        });
-
-        // Crear libro de Excel
-        const workbook = new ExcelJS.Workbook();
-        workbook.creator = window.appState?.nombreProfesorGlobal || 'Sistema UNES';
-        workbook.created = new Date();
-
-        const ws = workbook.addWorksheet('Asistencia');
-
-        // Definir columnas
-        ws.columns = [
-            { header: 'Cédula', key: 'Cédula', width: 15 },
-            { header: 'Nombre Completo', key: 'Nombre Completo', width: 35 },
-            { header: 'Tipo Personal', key: 'Tipo Personal', width: 25 },
-            { header: 'Género', key: 'Género', width: 12 },
-            { header: 'Fecha Nacimiento', key: 'Fecha Nacimiento', width: 15 },
-            { header: 'Estado', key: 'Estado', width: 20 },
-            { header: 'Hora Registro', key: 'Hora Registro', width: 12 },
-            { header: 'Fecha Inicio', key: 'Fecha Inicio', width: 12 },
-            { header: 'Fecha Fin', key: 'Fecha Fin', width: 12 },
-            { header: 'Días', key: 'Días', width: 8 },
-            { header: 'Observaciones', key: 'Observaciones', width: 30 },
-            { header: 'Documento', key: 'Documento', width: 20 }
-        ];
-
-        // Estilo de encabezados
-        const headerRow = ws.getRow(1);
-        headerRow.height = 25;
-        headerRow.eachCell((cell) => {
-            cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFB4D4F4' }
-            };
-            cell.font = {
-                name: 'Calibri',
-                size: 11,
-                bold: true,
-                color: { argb: 'FF1E3A5F' }
-            };
-            cell.alignment = {
-                horizontal: 'center',
-                vertical: 'middle',
-                wrapText: true
-            };
-            cell.border = {
-                top: { style: 'medium', color: { argb: 'FF1E3A5F' } },
-                bottom: { style: 'medium', color: { argb: 'FF1E3A5F' } }
-            };
-        });
-
-        // Agregar datos
-        datosExcel.forEach((item, index) => {
-            const row = ws.addRow(item);
-            row.height = 18;
-            
-            row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                cell.font = { name: 'Calibri', size: 10 };
-                cell.alignment = { vertical: 'middle', wrapText: true };
-                cell.border = {
-                    top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
-                    bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } }
-                };
-
-                // Filas alternadas
-                if (index % 2 === 1) {
-                    cell.fill = {
-                        type: 'pattern',
-                        pattern: 'solid',
-                        fgColor: { argb: 'FFF5F9FF' }
-                    };
-                }
-
-                // Colorear columna de estado
-                if (colNumber === 6) {
-                    const estado = item['Estado'];
-                    if (estado === 'Asistencia') {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } };
-                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF155724' } };
-                    } else if (estado === 'Ausencia Injustificada') {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8D7DA' } };
-                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF721C24' } };
-                    } else if (estado === 'Retardo') {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4CC' } };
-                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF856404' } };
-                    }
-                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                }
-            });
-        });
-
-        // Auto-filtros
-        ws.autoFilter = {
-            from: { row: 1, column: 1 },
-            to: { row: datosExcel.length + 1, column: 12 }
-        };
-
-        // Congelar paneles
-        ws.views = [{ state: 'frozen', ySplit: 1 }];
-
-        // Generar y descargar
-        const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-        });
-
-        const nombreArchivo = `Asistencia_Personal_${fecha}.xlsx`;
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = nombreArchivo;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-
-        Swal.fire({
-            icon: 'success',
-            title: '✅ Excel Exportado',
-            text: `Se exportaron ${datosExcel.length} registros`,
-            timer: 2000,
-            showConfirmButton: false
-        });
-
-    } catch (e) {
-        console.error('❌ Error exportando Excel:', e);
-        Swal.fire('Error', 'No se pudo exportar: ' + e.message, 'error');
-    }
-}
 
 // ============================================
 // EXPORTAR FUNCIONES GLOBALES
