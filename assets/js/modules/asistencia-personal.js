@@ -138,6 +138,11 @@ window.modules.asistenciaPersonal = {
             const tipoPersonalId = document.getElementById('filtro-tipo-personal')?.value;
             const busqueda = document.getElementById('buscar-personal')?.value?.toLowerCase() || '';
 
+ // 🔍 DEBUG: Verificar el filtro
+        console.log('🔍 Filtro tipo personal:', tipoPersonalId || '(vacío - todos)');
+        console.log('🔍 Select value:', selectTipo?.value);
+        console.log('🔍 Select options:', selectTipo?.options.length);
+            
             if (!fecha) {
                 Swal.fire('Atención', 'Seleccione una fecha', 'warning');
                 return;
