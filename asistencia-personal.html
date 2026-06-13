@@ -90,21 +90,17 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">Buscar:</label>
-                    <input type="text" id="buscar-personal" placeholder="Nombre o cédula..."
-                           onkeyup="if(event.key==='Enter') cargarRegistroAsistencia()"
-                           class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm">
+                   <label class="block text-xs font-bold text-gray-600 mb-1">Buscar:</label>
+                     <input type="text" id="buscar-personal" placeholder="Escribe para buscar..."
+                     oninput="buscarEnTiempoReal()"
+                     class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm">                
                 </div>
-                <div class="flex items-end gap-2">
-                    <button onclick="cargarRegistroAsistencia()" 
-                            class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-3 rounded-lg transition text-sm">
-                        <i class="fas fa-sync mr-1"></i><span class="hidden sm:inline">Actualizar</span>
-                    </button>
-                    <button onclick="cargarDatosPersonales()" 
-                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg transition text-sm" title="Agregar Personal">
-                        <i class="fas fa-user-plus"></i>
-                    </button>
-                </div>
+                    <div class="flex items-end gap-2">
+                        <button onclick="cargarDatosPersonales()" 
+                                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg transition text-sm" title="Agregar Personal">
+                            <i class="fas fa-user-plus"></i>
+                        </button>
+                    </div>            
             </div>
 
             <!-- BOTONES DE ACCIÓN Y REPORTES -->
