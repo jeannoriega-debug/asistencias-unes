@@ -73,10 +73,21 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-600 mb-1">Tipo de Personal:</label>
-                    <select id="filtro-tipo-personal" onchange="cargarRegistroAsistencia()"
-                            class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm">
-                        <option value="">Todos los tipos</option>
-                    </select>
+<select id="filtro-tipo-personal" onchange="cargarRegistroAsistencia()"
+        class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm">
+    <option value="">Todos los tipos</option>
+</select>
+
+<script>
+// Forzar "Todos los tipos" al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    const select = document.getElementById('filtro-tipo-personal');
+    if (select) {
+        select.value = ''; // Forzar valor vacío
+        console.log('✅ Filtro forzado a "Todos los tipos"');
+    }
+});
+</script>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-600 mb-1">Buscar:</label>
