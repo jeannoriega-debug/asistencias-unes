@@ -1188,6 +1188,174 @@ window.modules.asistenciaPersonal = {
         if (modal) modal.classList.remove('hidden');
     }
 };
+// ============================================
+// EXPORTAR A EXCEL
+// ============================================
+exportarExcel: async function() {
+    try {
+        const fecha = this.datosCache.fechaActual;
+        if (!fecha) {
+            Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
+            return;
+        }
+
+        const personal = await this.cargarPersonal();
+        const registros = await this.cargarRegistrosAsistencia(fecha);
+
+        // Crear mapa de registros
+        const registrosMap = {};
+        registros.forEach(r => {
+            registrosMap[r.personal_id] = r;
+        });
+
+        // Preparar datos para Excel
+        const datosExcel = personal.map(p => {
+            const registro = registrosMap[p.id];
+            const estado = registro?.tipo_asistencia;
+            
+            return {
+                'Cédula': p.cedula,
+                'Nombre Completo': p.nombre_completo,
+                'Tipo Personal': p.tipo_personal?.nombre || '',
+                'Género': p.genero === 'M' ? 'Masculino' : p.genero === 'F' ? 'Femenino' : '',
+                'Fecha Nacimiento': p.fecha_nacimiento || '',
+                'Estado': estado?.nombre || 'Sin registro',
+                'Hora Registro': registro?.hora_registro || '',
+                'Fecha Inicio': registro?.fecha_inicio || '',
+                'Fecha Fin': registro?.fecha_fin || '',
+                'Días': registro?.dias || '',
+                'Observaciones': registro?.observaciones || '',
+                'Documento': registro?.documento_soporte || ''
+            };
+        });
+
+        // Crear libro de Excel
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = window.appState?.nombreProfesorGlobal || 'Sistema UNES';
+        workbook.created = new Date();
+
+        const ws = workbook.addWorksheet('Asistencia');
+
+        // Definir columnas
+        ws.columns = [
+            { header: 'Cédula', key: 'Cédula', width: 15 },
+            { header: 'Nombre Completo', key: 'Nombre Completo', width: 35 },
+            { header: 'Tipo Personal', key: 'Tipo Personal', width: 25 },
+            { header: 'Género', key: 'Género', width: 12 },
+            { header: 'Fecha Nacimiento', key: 'Fecha Nacimiento', width: 15 },
+            { header: 'Estado', key: 'Estado', width: 20 },
+            { header: 'Hora Registro', key: 'Hora Registro', width: 12 },
+            { header: 'Fecha Inicio', key: 'Fecha Inicio', width: 12 },
+            { header: 'Fecha Fin', key: 'Fecha Fin', width: 12 },
+            { header: 'Días', key: 'Días', width: 8 },
+            { header: 'Observaciones', key: 'Observaciones', width: 30 },
+            { header: 'Documento', key: 'Documento', width: 20 }
+        ];
+
+        // Estilo de encabezados
+        const headerRow = ws.getRow(1);
+        headerRow.height = 25;
+        headerRow.eachCell((cell) => {
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFB4D4F4' }
+            };
+            cell.font = {
+                name: 'Calibri',
+                size: 11,
+                bold: true,
+                color: { argb: 'FF1E3A5F' }
+            };
+            cell.alignment = {
+                horizontal: 'center',
+                vertical: 'middle',
+                wrapText: true
+            };
+            cell.border = {
+                top: { style: 'medium', color: { argb: 'FF1E3A5F' } },
+                bottom: { style: 'medium', color: { argb: 'FF1E3A5F' } }
+            };
+        });
+
+        // Agregar datos
+        datosExcel.forEach((item, index) => {
+            const row = ws.addRow(item);
+            row.height = 18;
+            
+            row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                cell.font = { name: 'Calibri', size: 10 };
+                cell.alignment = { vertical: 'middle', wrapText: true };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+                    bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+                };
+
+                // Filas alternadas
+                if (index % 2 === 1) {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFF5F9FF' }
+                    };
+                }
+
+                // Colorear columna de estado
+                if (colNumber === 6) {
+                    const estado = item['Estado'];
+                    if (estado === 'Asistencia') {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } };
+                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF155724' } };
+                    } else if (estado === 'Ausencia Injustificada') {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8D7DA' } };
+                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF721C24' } };
+                    } else if (estado === 'Retardo') {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4CC' } };
+                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF856404' } };
+                    }
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                }
+            });
+        });
+
+        // Auto-filtros
+        ws.autoFilter = {
+            from: { row: 1, column: 1 },
+            to: { row: datosExcel.length + 1, column: 12 }
+        };
+
+        // Congelar paneles
+        ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+        // Generar y descargar
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+
+        const nombreArchivo = `Asistencia_Personal_${fecha}.xlsx`;
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nombreArchivo;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        Swal.fire({
+            icon: 'success',
+            title: '✅ Excel Exportado',
+            text: `Se exportaron ${datosExcel.length} registros`,
+            timer: 2000,
+            showConfirmButton: false
+        });
+
+    } catch (e) {
+        console.error('❌ Error exportando Excel:', e);
+        Swal.fire('Error', 'No se pudo exportar: ' + e.message, 'error');
+    }
+}
 
 // ============================================
 // EXPORTAR FUNCIONES GLOBALES
@@ -1208,5 +1376,6 @@ window.generarReporteRetardos = () => window.modules.asistenciaPersonal.generarR
 window.generarReporteVacaciones = () => window.modules.asistenciaPersonal.generarReporteVacaciones();
 window.cargarDatosPersonales = () => window.modules.asistenciaPersonal.cargarDatosPersonales();
 window.seleccionarAccionRapida = (codigo) => window.modules.asistenciaPersonal.seleccionarAccionRapida(codigo);
+window.exportarExcel = () => window.modules.asistenciaPersonal.exportarExcel();
 
 console.log('✅ Módulo de Asistencia de Personal v2.0 cargado');
