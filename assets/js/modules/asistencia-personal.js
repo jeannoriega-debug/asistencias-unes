@@ -14,6 +14,7 @@ window.modules.asistenciaPersonal = {
     },
     personalSeleccionado: null,
     accionRapidaSeleccionada: null,
+    debounceTimer: null,  // ⭐ AGREGAR ESTA LÍNEA
 
     // ============================================
     // CARGAR TIPOS DE PERSONAL
@@ -141,7 +142,7 @@ cargarRegistroAsistencia: async function() {
 
         // 🔍 DEBUG
         console.log('🔍 Filtro tipo personal:', tipoPersonalId || '(vacío - todos)');
-        console.log('🔍 Select existe:', !!selectTipo);
+        console.log('🔍 Búsqueda:', busqueda || '(sin filtro)');
 
         if (!fecha) {
             Swal.fire('Atención', 'Seleccione una fecha', 'warning');
@@ -170,6 +171,7 @@ cargarRegistroAsistencia: async function() {
                 p.nombre_completo.toLowerCase().includes(busqueda) ||
                 p.cedula.toLowerCase().includes(busqueda)
             );
+            console.log('🔍 Resultados filtrados:', personalFiltrado.length);
         }
 
         // Separar en pendientes y registrados
@@ -189,6 +191,23 @@ cargarRegistroAsistencia: async function() {
         Swal.fire('Error', 'No se pudo cargar la asistencia: ' + e.message, 'error');
     }
 },
+
+// ============================================
+// BÚSQUEDA EN TIEMPO REAL (CON DEBOUNCE)
+// ============================================
+buscarEnTiempoReal: function() {
+    // Limpiar búsqueda anterior
+    if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+    }
+    
+    // Esperar 300ms después de dejar de escribir
+    this.debounceTimer = setTimeout(() => {
+        this.cargarRegistroAsistencia();
+    }, 300);
+},
+
+    
     // ============================================
     // RENDERIZAR PENDIENTES
     // ============================================
@@ -1337,6 +1356,7 @@ cargarRegistroAsistencia: async function() {
 window.cargarTiposPersonal = () => window.modules.asistenciaPersonal.cargarTiposPersonal();
 window.cargarTiposAsistencia = () => window.modules.asistenciaPersonal.cargarTiposAsistencia();
 window.cargarRegistroAsistencia = () => window.modules.asistenciaPersonal.cargarRegistroAsistencia();
+window.buscarEnTiempoReal = () => window.modules.asistenciaPersonal.buscarEnTiempoReal();  // ⭐ AGREGAR
 window.abrirModalRegistro = (id) => window.modules.asistenciaPersonal.abrirModalRegistro(id);
 window.guardarRegistroAsistencia = () => window.modules.asistenciaPersonal.guardarRegistroAsistencia();
 window.cambiarTipoRegistro = () => window.modules.asistenciaPersonal.cambiarTipoRegistro();
