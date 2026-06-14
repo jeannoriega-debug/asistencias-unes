@@ -329,16 +329,24 @@
     <script>
     // Inicialización
     document.addEventListener('DOMContentLoaded', async function() {
-        const hoy = new Date().toISOString().split('T')[0];
+        // 🕐 USAR FECHA Y HORA DE CARACAS (UTC-4)
+        const hoy = getFechaCaracas();
         document.getElementById('fecha-asistencia').value = hoy;
         document.getElementById('reg-fecha').value = hoy;
         
-        const now = new Date();
-        document.getElementById('reg-hora').value = now.toTimeString().slice(0, 5);
+        document.getElementById('reg-hora').value = getHoraCaracas();
 
-        // Mostrar fecha actual en header formato DD/MM/AAAA
-        const opcionesFecha = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        document.getElementById('fecha-actual-display').textContent = new Date().toLocaleDateString('es-VE', opcionesFecha);
+        // 🕐 Mostrar fecha actual de Caracas en header
+        const ahoraCaracas = new Date();
+        const opcionesFecha = { 
+            timeZone: 'America/Caracas',
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        };
+        document.getElementById('fecha-actual-display').textContent = 
+            ahoraCaracas.toLocaleDateString('es-VE', opcionesFecha);
 
         let intentos = 0;
         const maxIntentos = 20;
@@ -368,6 +376,8 @@
                     await cargarTiposAsistencia();
                     await cargarRegistroAsistencia();
                     console.log('✅ Módulo inicializado');
+                    console.log('🕐 Fecha Caracas:', getFechaCaracas());
+                    console.log('🕐 Hora Caracas:', getHoraCaracas());
                 } catch (e) {
                     console.error('❌ Error:', e);
                 }
@@ -421,6 +431,10 @@
     window.generarReporteVacaciones = () => window.modules.asistenciaPersonal.generarReporteVacaciones();
     window.cargarDatosPersonales = () => window.modules.asistenciaPersonal.cargarDatosPersonales();
     window.exportarExcel = () => window.modules.asistenciaPersonal.exportarExcel();
+    // 🕐 Funciones de zona horaria Caracas
+    window.getFechaCaracas = () => window.modules.asistenciaPersonal.getFechaCaracas();
+    window.getHoraCaracas = () => window.modules.asistenciaPersonal.getHoraCaracas();
+    window.getFechaFormateadaCaracas = () => window.modules.asistenciaPersonal.getFechaFormateadaCaracas();
     </script>
 
 </body>
