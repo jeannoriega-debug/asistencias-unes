@@ -73,34 +73,23 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-600 mb-1">Tipo de Personal:</label>
-<select id="filtro-tipo-personal" onchange="cargarRegistroAsistencia()"
-        class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm">
-    <option value="">Todos los tipos</option>
-</select>
-
-<script>
-// Forzar "Todos los tipos" al cargar la página
-document.addEventListener('DOMContentLoaded', function() {
-    const select = document.getElementById('filtro-tipo-personal');
-    if (select) {
-        select.value = ''; // Forzar valor vacío
-        console.log('✅ Filtro forzado a "Todos los tipos"');
-    }
-});
-</script>
+                    <select id="filtro-tipo-personal" onchange="cargarRegistroAsistencia()"
+                            class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm">
+                        <option value="">Todos los tipos</option>
+                    </select>
                 </div>
                 <div>
-                   <label class="block text-xs font-bold text-gray-600 mb-1">Buscar:</label>
-                     <input type="text" id="buscar-personal" placeholder="Escribe para buscar..."
-                     oninput="buscarEnTiempoReal()"
-                     class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm">                
+                    <label class="block text-xs font-bold text-gray-600 mb-1">Buscar:</label>
+                    <input type="text" id="buscar-personal" placeholder="Escribe para buscar..."
+                           oninput="buscarEnTiempoReal()"
+                           class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm">
                 </div>
-                    <div class="flex items-end gap-2">
-                        <button onclick="cargarDatosPersonales()" 
-                                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg transition text-sm" title="Agregar Personal">
-                            <i class="fas fa-user-plus"></i>
-                        </button>
-                    </div>            
+                <div class="flex items-end gap-2">
+                    <button onclick="cargarDatosPersonales()" 
+                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg transition text-sm" title="Agregar Personal">
+                        <i class="fas fa-user-plus"></i>
+                    </button>
+                </div>
             </div>
 
             <!-- BOTONES DE ACCIÓN Y REPORTES -->
@@ -340,7 +329,6 @@ document.addEventListener('DOMContentLoaded', function() {
     <script>
     // Inicialización
     document.addEventListener('DOMContentLoaded', async function() {
-        // Establecer fecha de hoy
         const hoy = new Date().toISOString().split('T')[0];
         document.getElementById('fecha-asistencia').value = hoy;
         document.getElementById('reg-fecha').value = hoy;
@@ -348,11 +336,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const now = new Date();
         document.getElementById('reg-hora').value = now.toTimeString().slice(0, 5);
 
-        // Mostrar fecha actual en header
+        // Mostrar fecha actual en header formato DD/MM/AAAA
         const opcionesFecha = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         document.getElementById('fecha-actual-display').textContent = new Date().toLocaleDateString('es-VE', opcionesFecha);
 
-        // Verificar autenticación
         let intentos = 0;
         const maxIntentos = 20;
         
@@ -365,7 +352,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const nombreEl = document.getElementById('profesor-nombre');
                 if (nombreEl) nombreEl.innerText = window.appState.nombreProfesorGlobal;
                 
-                // Verificar permisos
                 const rol = window.appState.rolUsuarioActual?.toLowerCase() || '';
                 if (!rol.includes('talentohumano') && !rol.includes('super') && !rol.includes('admin')) {
                     Swal.fire({
@@ -377,7 +363,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                // Cargar datos
                 try {
                     await cargarTiposPersonal();
                     await cargarTiposAsistencia();
