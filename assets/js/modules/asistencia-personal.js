@@ -1,6 +1,6 @@
 /**
- * MÓDULO DE ASISTENCIA DE PERSONAL - VERSIÓN 2.0
- * Sistema dinámico con botones rápidos P/R/A, modal avanzado y reordenamiento
+ * MÓDULO DE ASISTENCIA DE PERSONAL - VERSIÓN 2.1
+ * Sistema dinámico con zona horaria Caracas (UTC-4)
  */
 
 window.modules = window.modules || {};
@@ -14,7 +14,37 @@ window.modules.asistenciaPersonal = {
     },
     personalSeleccionado: null,
     accionRapidaSeleccionada: null,
-    debounceTimer: null,  // ⭐ AGREGAR ESTA LÍNEA
+    debounceTimer: null,
+
+    // ============================================
+    // 🕐 FUNCIONES DE FECHA/HORA CARACAS (UTC-4)
+    // ============================================
+    getFechaCaracas: function() {
+        const ahora = new Date();
+        const opciones = { 
+            timeZone: 'America/Caracas',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        };
+        return ahora.toLocaleDateString('en-CA', opciones);
+    },
+
+    getHoraCaracas: function() {
+        const ahora = new Date();
+        const opciones = {
+            timeZone: 'America/Caracas',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        };
+        return ahora.toLocaleTimeString('en-GB', opciones);
+    },
+
+    getFechaFormateadaCaracas: function() {
+        const fecha = this.getFechaCaracas();
+        return this.formatearFechaLarga(fecha);
+    },
 
     // ============================================
     // CARGAR TIPOS DE PERSONAL
@@ -133,81 +163,73 @@ window.modules.asistenciaPersonal = {
     // ============================================
     // CARGAR Y MOSTRAR ASISTENCIA (FUNCIÓN PRINCIPAL)
     // ============================================
-cargarRegistroAsistencia: async function() {
-    try {
-        const fecha = document.getElementById('fecha-asistencia')?.value;
-        const selectTipo = document.getElementById('filtro-tipo-personal');
-        const tipoPersonalId = selectTipo ? selectTipo.value : '';
-        const busqueda = document.getElementById('buscar-personal')?.value?.toLowerCase() || '';
+    cargarRegistroAsistencia: async function() {
+        try {
+            const fecha = document.getElementById('fecha-asistencia')?.value;
+            const selectTipo = document.getElementById('filtro-tipo-personal');
+            const tipoPersonalId = selectTipo ? selectTipo.value : '';
+            const busqueda = document.getElementById('buscar-personal')?.value?.toLowerCase() || '';
 
-        // 🔍 DEBUG
-        console.log('🔍 Filtro tipo personal:', tipoPersonalId || '(vacío - todos)');
-        console.log('🔍 Búsqueda:', busqueda || '(sin filtro)');
+            console.log('🔍 Filtro tipo personal:', tipoPersonalId || '(vacío - todos)');
+            console.log('🔍 Búsqueda:', busqueda || '(sin filtro)');
 
-        if (!fecha) {
-            Swal.fire('Atención', 'Seleccione una fecha', 'warning');
-            return;
+            if (!fecha) {
+                Swal.fire('Atención', 'Seleccione una fecha', 'warning');
+                return;
+            }
+
+            this.datosCache.fechaActual = fecha;
+
+            const [personal, registros] = await Promise.all([
+                this.cargarPersonal(tipoPersonalId || null),
+                this.cargarRegistrosAsistencia(fecha)
+            ]);
+
+            console.log('✅ Personal cargado:', personal.length, 'empleados');
+
+            const registrosMap = {};
+            registros.forEach(r => {
+                registrosMap[r.personal_id] = r;
+            });
+
+            let personalFiltrado = personal;
+            if (busqueda) {
+                personalFiltrado = personal.filter(p => 
+                    p.nombre_completo.toLowerCase().includes(busqueda) ||
+                    p.cedula.toLowerCase().includes(busqueda)
+                );
+                console.log('🔍 Resultados filtrados:', personalFiltrado.length);
+            }
+
+            const pendientes = personalFiltrado.filter(p => !registrosMap[p.id]);
+            const registrados = personalFiltrado.filter(p => registrosMap[p.id]);
+
+            this.renderizarPendientes(pendientes);
+            this.renderizarRegistrados(registrados, registrosMap);
+            this.actualizarEstadisticas(personalFiltrado, registros);
+
+            console.log('✅ Asistencia cargada para:', fecha);
+
+        } catch (e) {
+            console.error('❌ Error en cargarRegistroAsistencia:', e);
+            console.error('Stack trace:', e.stack);
+            Swal.fire('Error', 'No se pudo cargar la asistencia: ' + e.message, 'error');
         }
+    },
 
-        this.datosCache.fechaActual = fecha;
-
-        const [personal, registros] = await Promise.all([
-            this.cargarPersonal(tipoPersonalId || null),
-            this.cargarRegistrosAsistencia(fecha)
-        ]);
-
-        console.log('✅ Personal cargado:', personal.length, 'empleados');
-
-        // Crear mapa de registros por personal_id
-        const registrosMap = {};
-        registros.forEach(r => {
-            registrosMap[r.personal_id] = r;
-        });
-
-        // Filtrar por búsqueda
-        let personalFiltrado = personal;
-        if (busqueda) {
-            personalFiltrado = personal.filter(p => 
-                p.nombre_completo.toLowerCase().includes(busqueda) ||
-                p.cedula.toLowerCase().includes(busqueda)
-            );
-            console.log('🔍 Resultados filtrados:', personalFiltrado.length);
+    // ============================================
+    // BÚSQUEDA EN TIEMPO REAL (CON DEBOUNCE)
+    // ============================================
+    buscarEnTiempoReal: function() {
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
         }
+        
+        this.debounceTimer = setTimeout(() => {
+            this.cargarRegistroAsistencia();
+        }, 300);
+    },
 
-        // Separar en pendientes y registrados
-        const pendientes = personalFiltrado.filter(p => !registrosMap[p.id]);
-        const registrados = personalFiltrado.filter(p => registrosMap[p.id]);
-
-        // Renderizar
-        this.renderizarPendientes(pendientes);
-        this.renderizarRegistrados(registrados, registrosMap);
-        this.actualizarEstadisticas(personalFiltrado, registros);
-
-        console.log('✅ Asistencia cargada para:', fecha);
-
-    } catch (e) {
-        console.error('❌ Error en cargarRegistroAsistencia:', e);
-        console.error('Stack trace:', e.stack);
-        Swal.fire('Error', 'No se pudo cargar la asistencia: ' + e.message, 'error');
-    }
-},
-
-// ============================================
-// BÚSQUEDA EN TIEMPO REAL (CON DEBOUNCE)
-// ============================================
-buscarEnTiempoReal: function() {
-    // Limpiar búsqueda anterior
-    if (this.debounceTimer) {
-        clearTimeout(this.debounceTimer);
-    }
-    
-    // Esperar 300ms después de dejar de escribir
-    this.debounceTimer = setTimeout(() => {
-        this.cargarRegistroAsistencia();
-    }, 300);
-},
-
-    
     // ============================================
     // RENDERIZAR PENDIENTES
     // ============================================
@@ -391,7 +413,7 @@ buscarEnTiempoReal: function() {
     // ============================================
     calcularEdad: function(fechaNacimiento) {
         if (!fechaNacimiento) return null;
-        const hoy = new Date();
+        const hoy = new Date(this.getFechaCaracas());
         const nacimiento = new Date(fechaNacimiento);
         let edad = hoy.getFullYear() - nacimiento.getFullYear();
         const mes = hoy.getMonth() - nacimiento.getMonth();
@@ -412,12 +434,24 @@ buscarEnTiempoReal: function() {
     },
 
     // ============================================
+    // FORMATEAR FECHA LARGA (DD/MM/AAAA)
+    // ============================================
+    formatearFechaLarga: function(fecha) {
+        if (!fecha) return '';
+        const partes = fecha.split('-');
+        if (partes.length === 3) {
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+        return fecha;
+    },
+
+    // ============================================
     // REGISTRO RÁPIDO (P/R/A) - SIN MODAL
     // ============================================
     registroRapido: async function(personalId, tipoCodigo) {
         try {
             const fecha = this.datosCache.fechaActual;
-            const hora = new Date().toTimeString().slice(0, 5);
+            const hora = this.getHoraCaracas();
 
             const tipoAsistencia = this.datosCache.tiposAsistencia.find(t => t.codigo === tipoCodigo);
             if (!tipoAsistencia) {
@@ -496,7 +530,7 @@ buscarEnTiempoReal: function() {
         document.getElementById('modal-personal-cedula').textContent = `C.I: ${personal.cedula}`;
         document.getElementById('reg-fecha').value = this.datosCache.fechaActual;
         document.getElementById('reg-tipo').value = '';
-        document.getElementById('reg-hora').value = new Date().toTimeString().slice(0, 5);
+        document.getElementById('reg-hora').value = this.getHoraCaracas();
         document.getElementById('reg-fecha-inicio').value = this.datosCache.fechaActual;
         document.getElementById('reg-fecha-fin').value = this.datosCache.fechaActual;
         document.getElementById('reg-dias').value = 1;
@@ -592,7 +626,7 @@ buscarEnTiempoReal: function() {
                 personal_id: personalId,
                 fecha: fecha,
                 tipo_asistencia_id: tipoAsistenciaId,
-                hora_registro: hora || new Date().toTimeString().slice(0, 5),
+                hora_registro: hora || this.getHoraCaracas(),
                 fecha_inicio: fechaInicio || null,
                 fecha_fin: fechaFin || null,
                 dias: dias ? parseInt(dias) : null,
@@ -735,235 +769,206 @@ buscarEnTiempoReal: function() {
     // ============================================
     // GENERAR REPORTE DIARIO
     // ============================================
-// ============================================
-// GENERAR REPORTE DIARIO (ACTUALIZADO)
-// ============================================
-generarReporteDiario: async function() {
-    try {
-        const fecha = this.datosCache.fechaActual;
-        if (!fecha) {
-            Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
-            return;
-        }
-
-        const personal = await this.cargarPersonal();
-        const registros = await this.cargarRegistrosAsistencia(fecha);
-
-        const agrupado = {};
-        personal.forEach(p => {
-            const tipo = p.tipo_personal?.nombre || 'Sin tipo';
-            if (!agrupado[tipo]) agrupado[tipo] = [];
-            agrupado[tipo].push(p);
-        });
-
-        // Formatear fecha DD/MM/AAAA
-        const fechaFormateada = this.formatearFechaLarga(fecha);
-
-        let contenido = `REPORTE DE ASISTENCIA - ${fechaFormateada}\n\n`;
-        let totalGeneral = 0, presentesGeneral = 0, ausentesGeneral = 0;
-        let otrosGeneral = 0; // Retardos, permisos, vacaciones, etc.
-
-        Object.entries(agrupado).forEach(([tipo, lista]) => {
-            const matricula = lista.length;
-            
-            // Contar por categorías
-            const presentes = lista.filter(p => {
-                const reg = registros.find(r => r.personal_id === p.id);
-                return reg && reg.tipo_asistencia?.codigo === 'ASISTENCIA';
-            }).length;
-
-            const ausenciasInjustificadas = lista.filter(p => {
-                const reg = registros.find(r => r.personal_id === p.id);
-                return reg && reg.tipo_asistencia?.codigo === 'AUS_INJUSTIFICADA';
-            });
-
-            const diasLibres = lista.filter(p => {
-                const reg = registros.find(r => r.personal_id === p.id);
-                return reg && reg.tipo_asistencia?.codigo === 'DIA_LIBRE';
-            });
-
-            const permisos = lista.filter(p => {
-                const reg = registros.find(r => r.personal_id === p.id);
-                return reg && ['PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO'].includes(reg.tipo_asistencia?.codigo);
-            });
-
-            const retardos = lista.filter(p => {
-                const reg = registros.find(r => r.personal_id === p.id);
-                return reg && reg.tipo_asistencia?.codigo === 'RETARDO';
-            });
-
-            const vacaciones = lista.filter(p => {
-                const reg = registros.find(r => r.personal_id === p.id);
-                return reg && reg.tipo_asistencia?.codigo === 'VACACIONES';
-            });
-
-            const reposos = lista.filter(p => {
-                const reg = registros.find(r => r.personal_id === p.id);
-                return reg && reg.tipo_asistencia?.codigo === 'REPOSO';
-            });
-
-            const otros = lista.filter(p => {
-                const reg = registros.find(r => r.personal_id === p.id);
-                return reg && !['ASISTENCIA', 'AUS_INJUSTIFICADA', 'DIA_LIBRE', 'PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO', 'RETARDO', 'VACACIONES', 'REPOSO'].includes(reg.tipo_asistencia?.codigo);
-            });
-
-            const sinRegistro = lista.filter(p => {
-                const reg = registros.find(r => r.personal_id === p.id);
-                return !reg;
-            });
-
-            contenido += `${tipo.toUpperCase()}\n`;
-            contenido += `${'='.repeat(tipo.length)}\n`;
-            contenido += `Matrícula: ${matricula}\n\n`;
-
-            // PRESENTES (solo número)
-            contenido += `✅ PRESENTES: ${presentes}\n\n`;
-
-            // AUSENCIAS INJUSTIFICADAS (con nombres)
-            if (ausenciasInjustificadas.length > 0) {
-                contenido += `❌ AUSENCIAS INJUSTIFICADAS: ${ausenciasInjustificadas.length}\n`;
-                ausenciasInjustificadas.forEach(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
-                });
-                contenido += '\n';
+    generarReporteDiario: async function() {
+        try {
+            const fecha = this.datosCache.fechaActual;
+            if (!fecha) {
+                Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
+                return;
             }
 
-            // DÍAS LIBRES (con nombres)
-            if (diasLibres.length > 0) {
-                contenido += `📅 DÍAS LIBRES: ${diasLibres.length}\n`;
-                diasLibres.forEach(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
-                });
-                contenido += '\n';
-            }
+            const personal = await this.cargarPersonal();
+            const registros = await this.cargarRegistrosAsistencia(fecha);
 
-            // PERMISOS (con nombres)
-            if (permisos.length > 0) {
-                contenido += `📋 PERMISOS: ${permisos.length}\n`;
-                permisos.forEach(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    const tipoPermiso = reg.tipo_asistencia?.nombre || 'Permiso';
-                    contenido += `   • ${p.nombre_completo} - C.I ${p.cedula} (${tipoPermiso})\n`;
-                    if (reg.observaciones) {
-                        contenido += `     Motivo: ${reg.observaciones}\n`;
-                    }
-                });
-                contenido += '\n';
-            }
+            const agrupado = {};
+            personal.forEach(p => {
+                const tipo = p.tipo_personal?.nombre || 'Sin tipo';
+                if (!agrupado[tipo]) agrupado[tipo] = [];
+                agrupado[tipo].push(p);
+            });
 
-            // RETARDOS (con nombres)
-            if (retardos.length > 0) {
-                contenido += `⏰ RETARDOS: ${retardos.length}\n`;
-                retardos.forEach(p => {
+            const fechaFormateada = this.formatearFechaLarga(fecha);
+
+            let contenido = `REPORTE DE ASISTENCIA - ${fechaFormateada}\n\n`;
+            let totalGeneral = 0, presentesGeneral = 0, ausentesGeneral = 0;
+            let otrosGeneral = 0;
+
+            Object.entries(agrupado).forEach(([tipo, lista]) => {
+                const matricula = lista.length;
+                
+                const presentes = lista.filter(p => {
                     const reg = registros.find(r => r.personal_id === p.id);
-                    contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}`;
-                    if (reg.hora_registro) {
-                        contenido += ` (Hora: ${reg.hora_registro})`;
-                    }
+                    return reg && reg.tipo_asistencia?.codigo === 'ASISTENCIA';
+                }).length;
+
+                const ausenciasInjustificadas = lista.filter(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    return reg && reg.tipo_asistencia?.codigo === 'AUS_INJUSTIFICADA';
+                });
+
+                const diasLibres = lista.filter(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    return reg && reg.tipo_asistencia?.codigo === 'DIA_LIBRE';
+                });
+
+                const permisos = lista.filter(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    return reg && ['PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO'].includes(reg.tipo_asistencia?.codigo);
+                });
+
+                const retardos = lista.filter(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    return reg && reg.tipo_asistencia?.codigo === 'RETARDO';
+                });
+
+                const vacaciones = lista.filter(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    return reg && reg.tipo_asistencia?.codigo === 'VACACIONES';
+                });
+
+                const reposos = lista.filter(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    return reg && reg.tipo_asistencia?.codigo === 'REPOSO';
+                });
+
+                const otros = lista.filter(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    return reg && !['ASISTENCIA', 'AUS_INJUSTIFICADA', 'DIA_LIBRE', 'PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO', 'RETARDO', 'VACACIONES', 'REPOSO'].includes(reg.tipo_asistencia?.codigo);
+                });
+
+                const sinRegistro = lista.filter(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    return !reg;
+                });
+
+                contenido += `${tipo.toUpperCase()}\n`;
+                contenido += `${'='.repeat(tipo.length)}\n`;
+                contenido += `Matrícula: ${matricula}\n\n`;
+
+                contenido += `✅ PRESENTES: ${presentes}\n\n`;
+
+                if (ausenciasInjustificadas.length > 0) {
+                    contenido += `❌ AUSENCIAS INJUSTIFICADAS: ${ausenciasInjustificadas.length}\n`;
+                    ausenciasInjustificadas.forEach(p => {
+                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
+                    });
                     contenido += '\n';
-                });
-                contenido += '\n';
-            }
+                }
 
-            // VACACIONES (con nombres)
-            if (vacaciones.length > 0) {
-                contenido += `🏖️ VACACIONES: ${vacaciones.length}\n`;
-                vacaciones.forEach(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
-                    if (reg.fecha_inicio && reg.fecha_fin) {
-                        contenido += `     Período: ${this.formatearFechaLarga(reg.fecha_inicio)} al ${this.formatearFechaLarga(reg.fecha_fin)}`;
-                        if (reg.dias) contenido += ` (${reg.dias} días)`;
+                if (diasLibres.length > 0) {
+                    contenido += `📅 DÍAS LIBRES: ${diasLibres.length}\n`;
+                    diasLibres.forEach(p => {
+                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
+                    });
+                    contenido += '\n';
+                }
+
+                if (permisos.length > 0) {
+                    contenido += `📋 PERMISOS: ${permisos.length}\n`;
+                    permisos.forEach(p => {
+                        const reg = registros.find(r => r.personal_id === p.id);
+                        const tipoPermiso = reg.tipo_asistencia?.nombre || 'Permiso';
+                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula} (${tipoPermiso})\n`;
+                        if (reg.observaciones) {
+                            contenido += `     Motivo: ${reg.observaciones}\n`;
+                        }
+                    });
+                    contenido += '\n';
+                }
+
+                if (retardos.length > 0) {
+                    contenido += `⏰ RETARDOS: ${retardos.length}\n`;
+                    retardos.forEach(p => {
+                        const reg = registros.find(r => r.personal_id === p.id);
+                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}`;
+                        if (reg.hora_registro) {
+                            contenido += ` (Hora: ${reg.hora_registro})`;
+                        }
                         contenido += '\n';
-                    }
-                });
-                contenido += '\n';
-            }
+                    });
+                    contenido += '\n';
+                }
 
-            // REPOSOS (con nombres)
-            if (reposos.length > 0) {
-                contenido += `🏥 REPOSOS: ${reposos.length}\n`;
-                reposos.forEach(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
-                    if (reg.observaciones) {
-                        contenido += `     Motivo: ${reg.observaciones}\n`;
-                    }
-                });
-                contenido += '\n';
-            }
+                if (vacaciones.length > 0) {
+                    contenido += `🏖️ VACACIONES: ${vacaciones.length}\n`;
+                    vacaciones.forEach(p => {
+                        const reg = registros.find(r => r.personal_id === p.id);
+                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
+                        if (reg.fecha_inicio && reg.fecha_fin) {
+                            contenido += `     Período: ${this.formatearFechaLarga(reg.fecha_inicio)} al ${this.formatearFechaLarga(reg.fecha_fin)}`;
+                            if (reg.dias) contenido += ` (${reg.dias} días)`;
+                            contenido += '\n';
+                        }
+                    });
+                    contenido += '\n';
+                }
 
-            // SIN REGISTRO
-            if (sinRegistro.length > 0) {
-                contenido += `⚠️ SIN REGISTRO: ${sinRegistro.length}\n`;
-                sinRegistro.forEach(p => {
-                    contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
-                });
-                contenido += '\n';
-            }
+                if (reposos.length > 0) {
+                    contenido += `🏥 REPOSOS: ${reposos.length}\n`;
+                    reposos.forEach(p => {
+                        const reg = registros.find(r => r.personal_id === p.id);
+                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
+                        if (reg.observaciones) {
+                            contenido += `     Motivo: ${reg.observaciones}\n`;
+                        }
+                    });
+                    contenido += '\n';
+                }
 
-            // OTROS
-            if (otros.length > 0) {
-                contenido += `📌 OTROS: ${otros.length}\n`;
-                otros.forEach(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    contenido += `   • ${p.nombre_completo} - C.I ${p.cedula} (${reg.tipo_asistencia?.nombre || 'Sin clasificar'})\n`;
-                });
-                contenido += '\n';
-            }
+                if (sinRegistro.length > 0) {
+                    contenido += `⚠️ SIN REGISTRO: ${sinRegistro.length}\n`;
+                    sinRegistro.forEach(p => {
+                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
+                    });
+                    contenido += '\n';
+                }
 
-            contenido += `${'-'.repeat(50)}\n\n`;
+                if (otros.length > 0) {
+                    contenido += `📌 OTROS: ${otros.length}\n`;
+                    otros.forEach(p => {
+                        const reg = registros.find(r => r.personal_id === p.id);
+                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula} (${reg.tipo_asistencia?.nombre || 'Sin clasificar'})\n`;
+                    });
+                    contenido += '\n';
+                }
 
-            totalGeneral += matricula;
-            presentesGeneral += presentes;
-            ausentesGeneral += ausenciasInjustificadas.length;
-            otrosGeneral += diasLibres.length + permisos.length + retardos.length + vacaciones.length + reposos.length + otros.length;
-        });
+                contenido += `${'-'.repeat(50)}\n\n`;
 
-        // TOTALES GENERALES
-        contenido += `\n${'='.repeat(50)}\n`;
-        contenido += `RESUMEN GENERAL\n`;
-        contenido += `${'='.repeat(50)}\n`;
-        contenido += `Total de Personal: ${totalGeneral}\n`;
-        contenido += `✅ Presentes: ${presentesGeneral}\n`;
-        contenido += `❌ Ausencias Injustificadas: ${ausentesGeneral}\n`;
-        contenido += `📋 Otros (Permisos, Retardos, Vacaciones, etc.): ${otrosGeneral}\n`;
-        contenido += `⚠️ Sin Registro: ${totalGeneral - presentesGeneral - ausentesGeneral - otrosGeneral}\n`;
+                totalGeneral += matricula;
+                presentesGeneral += presentes;
+                ausentesGeneral += ausenciasInjustificadas.length;
+                otrosGeneral += diasLibres.length + permisos.length + retardos.length + vacaciones.length + reposos.length + otros.length;
+            });
 
-        Swal.fire({
-            title: 'Reporte Diario',
-            html: `<pre class="text-left text-xs max-h-[80vh] overflow-y-auto p-4 bg-gray-50 rounded">${contenido}</pre>`,
-            width: '900px',
-            confirmButtonText: 'Cerrar',
-            showConfirmButton: true
-        });
+            contenido += `\n${'='.repeat(50)}\n`;
+            contenido += `RESUMEN GENERAL\n`;
+            contenido += `${'='.repeat(50)}\n`;
+            contenido += `Total de Personal: ${totalGeneral}\n`;
+            contenido += `✅ Presentes: ${presentesGeneral}\n`;
+            contenido += `❌ Ausencias Injustificadas: ${ausentesGeneral}\n`;
+            contenido += `📋 Otros (Permisos, Retardos, Vacaciones, etc.): ${otrosGeneral}\n`;
+            contenido += `⚠️ Sin Registro: ${totalGeneral - presentesGeneral - ausentesGeneral - otrosGeneral}\n`;
 
-    } catch (e) {
-        console.error('❌ Error generando reporte:', e);
-        Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
-    }
-},
+            Swal.fire({
+                title: 'Reporte Diario',
+                html: `<pre class="text-left text-xs max-h-[80vh] overflow-y-auto p-4 bg-gray-50 rounded">${contenido}</pre>`,
+                width: '900px',
+                confirmButtonText: 'Cerrar',
+                showConfirmButton: true
+            });
 
-// ============================================
-// FORMATEAR FECHA LARGA (DD/MM/AAAA)
-// ============================================
-formatearFechaLarga: function(fecha) {
-    if (!fecha) return '';
-    const partes = fecha.split('-');
-    if (partes.length === 3) {
-        return `${partes[2]}/${partes[1]}/${partes[0]}`;
-    }
-    return fecha;
-},
+        } catch (e) {
+            console.error('❌ Error generando reporte:', e);
+            Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
+        }
+    },
 
-    
     // ============================================
     // REPORTE DE INASISTENCIAS
     // ============================================
     generarReporteInasistencias: async function() {
         try {
+            const fechaHoy = this.getFechaCaracas();
             const { value: fechas } = await Swal.fire({
                 title: 'Período del Reporte',
                 html: `
@@ -971,7 +976,7 @@ formatearFechaLarga: function(fecha) {
                         <label class="font-bold">Fecha inicio:</label>
                         <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
                         <label class="font-bold">Fecha fin:</label>
-                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${new Date().toISOString().split('T')[0]}">
+                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
                     </div>
                 `,
                 focusConfirm: false,
@@ -1011,7 +1016,7 @@ formatearFechaLarga: function(fecha) {
             const top10 = Object.values(agrupado).sort((a, b) => b.total - a.total).slice(0, 10);
 
             let contenido = `TOP 10 - PERSONAL CON MÁS INASISTENCIAS\n`;
-            contenido += `Período: ${fechas.inicio} al ${fechas.fin}\n\n`;
+            contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
             
             if (top10.length === 0) {
                 contenido += 'No hay inasistencias en este período\n';
@@ -1040,6 +1045,7 @@ formatearFechaLarga: function(fecha) {
     // ============================================
     generarReportePermisos: async function() {
         try {
+            const fechaHoy = this.getFechaCaracas();
             const { value: fechas } = await Swal.fire({
                 title: 'Período del Reporte',
                 html: `
@@ -1047,7 +1053,7 @@ formatearFechaLarga: function(fecha) {
                         <label class="font-bold">Fecha inicio:</label>
                         <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
                         <label class="font-bold">Fecha fin:</label>
-                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${new Date().toISOString().split('T')[0]}">
+                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
                     </div>
                 `,
                 focusConfirm: false,
@@ -1094,7 +1100,7 @@ formatearFechaLarga: function(fecha) {
             );
 
             let contenido = `PERSONAL CON MÁS PERMISOS\n`;
-            contenido += `Período: ${fechas.inicio} al ${fechas.fin}\n\n`;
+            contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
             
             if (lista.length === 0) {
                 contenido += 'No hay permisos en este período\n';
@@ -1123,6 +1129,7 @@ formatearFechaLarga: function(fecha) {
     // ============================================
     generarReporteRetardos: async function() {
         try {
+            const fechaHoy = this.getFechaCaracas();
             const { value: fechas } = await Swal.fire({
                 title: 'Período del Reporte',
                 html: `
@@ -1130,7 +1137,7 @@ formatearFechaLarga: function(fecha) {
                         <label class="font-bold">Fecha inicio:</label>
                         <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
                         <label class="font-bold">Fecha fin:</label>
-                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${new Date().toISOString().split('T')[0]}">
+                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
                     </div>
                 `,
                 focusConfirm: false,
@@ -1166,13 +1173,13 @@ formatearFechaLarga: function(fecha) {
                     };
                 }
                 agrupado[id].total++;
-                agrupado[id].fechas.push(`${r.fecha} (${r.hora_registro || 's/h'})`);
+                agrupado[id].fechas.push(`${this.formatearFechaLarga(r.fecha)} (${r.hora_registro || 's/h'})`);
             });
 
             const lista = Object.values(agrupado).sort((a, b) => b.total - a.total);
 
             let contenido = `PERSONAL CON RETARDOS\n`;
-            contenido += `Período: ${fechas.inicio} al ${fechas.fin}\n\n`;
+            contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
             
             if (lista.length === 0) {
                 contenido += 'No hay retardos en este período\n';
@@ -1202,6 +1209,7 @@ formatearFechaLarga: function(fecha) {
     // ============================================
     generarReporteVacaciones: async function() {
         try {
+            const fechaHoy = this.getFechaCaracas();
             const { value: fechas } = await Swal.fire({
                 title: 'Período del Reporte',
                 html: `
@@ -1209,7 +1217,7 @@ formatearFechaLarga: function(fecha) {
                         <label class="font-bold">Fecha inicio:</label>
                         <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
                         <label class="font-bold">Fecha fin:</label>
-                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${new Date().toISOString().split('T')[0]}">
+                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
                     </div>
                 `,
                 focusConfirm: false,
@@ -1234,7 +1242,7 @@ formatearFechaLarga: function(fecha) {
             if (error) throw error;
 
             let contenido = `PERSONAL DE VACACIONES\n`;
-            contenido += `Período: ${fechas.inicio} al ${fechas.fin}\n\n`;
+            contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
             
             if (data.length === 0) {
                 contenido += 'No hay personal de vacaciones en este período\n';
@@ -1244,11 +1252,11 @@ formatearFechaLarga: function(fecha) {
                     contenido += `   C.I: ${r.personal.cedula}\n`;
                     contenido += `   Tipo: ${r.personal.tipo_personal?.nombre}\n`;
                     if (r.fecha_inicio && r.fecha_fin) {
-                        contenido += `   Período: ${r.fecha_inicio} al ${r.fecha_fin}`;
+                        contenido += `   Período: ${this.formatearFechaLarga(r.fecha_inicio)} al ${this.formatearFechaLarga(r.fecha_fin)}`;
                         if (r.dias) contenido += ` (${r.dias} días)`;
                         contenido += '\n';
                     } else {
-                        contenido += `   Fecha: ${r.fecha}\n`;
+                        contenido += `   Fecha: ${this.formatearFechaLarga(r.fecha)}\n`;
                     }
                     if (r.observaciones) contenido += `   Observaciones: ${r.observaciones}\n`;
                     contenido += '\n';
@@ -1344,180 +1352,170 @@ formatearFechaLarga: function(fecha) {
     // ============================================
     // EXPORTAR A EXCEL
     // ============================================
-// ============================================
-// EXPORTAR A EXCEL (ACTUALIZADO)
-// ============================================
-exportarExcel: async function() {
-    try {
-        const fecha = this.datosCache.fechaActual;
-        if (!fecha) {
-            Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
-            return;
-        }
+    exportarExcel: async function() {
+        try {
+            const fecha = this.datosCache.fechaActual;
+            if (!fecha) {
+                Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
+                return;
+            }
 
-        const personal = await this.cargarPersonal();
-        const registros = await this.cargarRegistrosAsistencia(fecha);
+            const personal = await this.cargarPersonal();
+            const registros = await this.cargarRegistrosAsistencia(fecha);
 
-        const registrosMap = {};
-        registros.forEach(r => {
-            registrosMap[r.personal_id] = r;
-        });
-
-        const datosExcel = personal.map(p => {
-            const registro = registrosMap[p.id];
-            const estado = registro?.tipo_asistencia;
-            
-            return {
-                'Cédula': p.cedula,
-                'Nombre Completo': p.nombre_completo,
-                'Tipo Personal': p.tipo_personal?.nombre || '',
-                'Fecha de Reporte': this.formatearFechaLarga(fecha),
-                'Estado': estado?.nombre || 'Sin registro',
-                'Hora Registro': registro?.hora_registro || '',
-                'Fecha Inicio': registro?.fecha_inicio ? this.formatearFechaLarga(registro.fecha_inicio) : '',
-                'Fecha Fin': registro?.fecha_fin ? this.formatearFechaLarga(registro.fecha_fin) : '',
-                'Días': registro?.dias || '',
-                'Observaciones': registro?.observaciones || ''
-            };
-        });
-
-        const workbook = new ExcelJS.Workbook();
-        workbook.creator = window.appState?.nombreProfesorGlobal || 'Sistema UNES';
-        workbook.created = new Date();
-
-        const ws = workbook.addWorksheet('Asistencia');
-
-        // Columnas actualizadas (sin Género, sin Documento, con Fecha de Reporte)
-        ws.columns = [
-            { header: 'Cédula', key: 'Cédula', width: 15 },
-            { header: 'Nombre Completo', key: 'Nombre Completo', width: 40 },
-            { header: 'Tipo Personal', key: 'Tipo Personal', width: 30 },
-            { header: 'Fecha de Reporte', key: 'Fecha de Reporte', width: 15 },
-            { header: 'Estado', key: 'Estado', width: 25 },
-            { header: 'Hora Registro', key: 'Hora Registro', width: 15 },
-            { header: 'Fecha Inicio', key: 'Fecha Inicio', width: 15 },
-            { header: 'Fecha Fin', key: 'Fecha Fin', width: 15 },
-            { header: 'Días', key: 'Días', width: 10 },
-            { header: 'Observaciones', key: 'Observaciones', width: 40 }
-        ];
-
-        // Estilo de encabezados
-        const headerRow = ws.getRow(1);
-        headerRow.height = 25;
-        headerRow.eachCell((cell) => {
-            cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFB4D4F4' }
-            };
-            cell.font = {
-                name: 'Calibri',
-                size: 11,
-                bold: true,
-                color: { argb: 'FF1E3A5F' }
-            };
-            cell.alignment = {
-                horizontal: 'center',
-                vertical: 'middle',
-                wrapText: true
-            };
-            cell.border = {
-                top: { style: 'medium', color: { argb: 'FF1E3A5F' } },
-                bottom: { style: 'medium', color: { argb: 'FF1E3A5F' } }
-            };
-        });
-
-        // Agregar datos
-        datosExcel.forEach((item, index) => {
-            const row = ws.addRow(item);
-            row.height = 18;
-            
-            row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                cell.font = { name: 'Calibri', size: 10 };
-                cell.alignment = { vertical: 'middle', wrapText: true };
-                cell.border = {
-                    top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
-                    bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } }
-                };
-
-                // Filas alternadas
-                if (index % 2 === 1) {
-                    cell.fill = {
-                        type: 'pattern',
-                        pattern: 'solid',
-                        fgColor: { argb: 'FFF5F9FF' }
-                    };
-                }
-
-                // Colorear columna de estado (columna 5)
-                if (colNumber === 5) {
-                    const estado = item['Estado'];
-                    if (estado === 'Asistencia') {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } };
-                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF155724' } };
-                    } else if (estado === 'Ausencia Injustificada') {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8D7DA' } };
-                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF721C24' } };
-                    } else if (estado === 'Retardo') {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4CC' } };
-                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF856404' } };
-                    } else if (estado === 'Permiso Obligatorio' || estado === 'Permiso Potestativo') {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4B5' } };
-                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF8B4513' } };
-                    } else if (estado === 'Vacaciones') {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB6D4FE' } };
-                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF1E40AF' } };
-                    } else if (estado === 'Reposo') {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD8B4FE' } };
-                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF6B21A8' } };
-                    } else if (estado === 'Día Libre') {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
-                        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF374151' } };
-                    }
-                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                }
+            const registrosMap = {};
+            registros.forEach(r => {
+                registrosMap[r.personal_id] = r;
             });
-        });
 
-        // Auto-filtros
-        ws.autoFilter = {
-            from: { row: 1, column: 1 },
-            to: { row: datosExcel.length + 1, column: 10 }
-        };
+            const datosExcel = personal.map(p => {
+                const registro = registrosMap[p.id];
+                const estado = registro?.tipo_asistencia;
+                
+                return {
+                    'Cédula': p.cedula,
+                    'Nombre Completo': p.nombre_completo,
+                    'Tipo Personal': p.tipo_personal?.nombre || '',
+                    'Fecha de Reporte': this.formatearFechaLarga(fecha),
+                    'Estado': estado?.nombre || 'Sin registro',
+                    'Hora Registro': registro?.hora_registro || '',
+                    'Fecha Inicio': registro?.fecha_inicio ? this.formatearFechaLarga(registro.fecha_inicio) : '',
+                    'Fecha Fin': registro?.fecha_fin ? this.formatearFechaLarga(registro.fecha_fin) : '',
+                    'Días': registro?.dias || '',
+                    'Observaciones': registro?.observaciones || ''
+                };
+            });
 
-        // Congelar paneles
-        ws.views = [{ state: 'frozen', ySplit: 1 }];
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = window.appState?.nombreProfesorGlobal || 'Sistema UNES';
+            workbook.created = new Date();
 
-        // Generar y descargar
-        const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-        });
+            const ws = workbook.addWorksheet('Asistencia');
 
-        const fechaFormateada = fecha.replace(/-/g, '');
-        const nombreArchivo = `Asistencia_Personal_${fechaFormateada}.xlsx`;
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = nombreArchivo;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+            ws.columns = [
+                { header: 'Cédula', key: 'Cédula', width: 15 },
+                { header: 'Nombre Completo', key: 'Nombre Completo', width: 40 },
+                { header: 'Tipo Personal', key: 'Tipo Personal', width: 30 },
+                { header: 'Fecha de Reporte', key: 'Fecha de Reporte', width: 15 },
+                { header: 'Estado', key: 'Estado', width: 25 },
+                { header: 'Hora Registro', key: 'Hora Registro', width: 15 },
+                { header: 'Fecha Inicio', key: 'Fecha Inicio', width: 15 },
+                { header: 'Fecha Fin', key: 'Fecha Fin', width: 15 },
+                { header: 'Días', key: 'Días', width: 10 },
+                { header: 'Observaciones', key: 'Observaciones', width: 40 }
+            ];
 
-        Swal.fire({
-            icon: 'success',
-            title: '✅ Excel Exportado',
-            text: `Se exportaron ${datosExcel.length} registros`,
-            timer: 2000,
-            showConfirmButton: false
-        });
+            const headerRow = ws.getRow(1);
+            headerRow.height = 25;
+            headerRow.eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFB4D4F4' }
+                };
+                cell.font = {
+                    name: 'Calibri',
+                    size: 11,
+                    bold: true,
+                    color: { argb: 'FF1E3A5F' }
+                };
+                cell.alignment = {
+                    horizontal: 'center',
+                    vertical: 'middle',
+                    wrapText: true
+                };
+                cell.border = {
+                    top: { style: 'medium', color: { argb: 'FF1E3A5F' } },
+                    bottom: { style: 'medium', color: { argb: 'FF1E3A5F' } }
+                };
+            });
 
-    } catch (e) {
-        console.error('❌ Error exportando Excel:', e);
-        Swal.fire('Error', 'No se pudo exportar: ' + e.message, 'error');
+            datosExcel.forEach((item, index) => {
+                const row = ws.addRow(item);
+                row.height = 18;
+                
+                row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                    cell.font = { name: 'Calibri', size: 10 };
+                    cell.alignment = { vertical: 'middle', wrapText: true };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+                        bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+                    };
+
+                    if (index % 2 === 1) {
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFF5F9FF' }
+                        };
+                    }
+
+                    if (colNumber === 5) {
+                        const estado = item['Estado'];
+                        if (estado === 'Asistencia') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } };
+                            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF155724' } };
+                        } else if (estado === 'Ausencia Injustificada') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8D7DA' } };
+                            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF721C24' } };
+                        } else if (estado === 'Retardo') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4CC' } };
+                            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF856404' } };
+                        } else if (estado === 'Permiso Obligatorio' || estado === 'Permiso Potestativo') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4B5' } };
+                            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF8B4513' } };
+                        } else if (estado === 'Vacaciones') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB6D4FE' } };
+                            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF1E40AF' } };
+                        } else if (estado === 'Reposo') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD8B4FE' } };
+                            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF6B21A8' } };
+                        } else if (estado === 'Día Libre') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+                            cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF374151' } };
+                        }
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    }
+                });
+            });
+
+            ws.autoFilter = {
+                from: { row: 1, column: 1 },
+                to: { row: datosExcel.length + 1, column: 10 }
+            };
+
+            ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            });
+
+            const fechaFormateada = fecha.replace(/-/g, '');
+            const nombreArchivo = `Asistencia_Personal_${fechaFormateada}.xlsx`;
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombreArchivo;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            Swal.fire({
+                icon: 'success',
+                title: '✅ Excel Exportado',
+                text: `Se exportaron ${datosExcel.length} registros`,
+                timer: 2000,
+                showConfirmButton: false
+            });
+
+        } catch (e) {
+            console.error('❌ Error exportando Excel:', e);
+            Swal.fire('Error', 'No se pudo exportar: ' + e.message, 'error');
+        }
     }
-}
+}; // ⭐ AQUÍ ESTABA EL ERROR - Faltaba este cierre del objeto
 
 // ============================================
 // EXPORTAR FUNCIONES GLOBALES
@@ -1525,7 +1523,7 @@ exportarExcel: async function() {
 window.cargarTiposPersonal = () => window.modules.asistenciaPersonal.cargarTiposPersonal();
 window.cargarTiposAsistencia = () => window.modules.asistenciaPersonal.cargarTiposAsistencia();
 window.cargarRegistroAsistencia = () => window.modules.asistenciaPersonal.cargarRegistroAsistencia();
-window.buscarEnTiempoReal = () => window.modules.asistenciaPersonal.buscarEnTiempoReal();  // ⭐ AGREGAR
+window.buscarEnTiempoReal = () => window.modules.asistenciaPersonal.buscarEnTiempoReal();
 window.abrirModalRegistro = (id) => window.modules.asistenciaPersonal.abrirModalRegistro(id);
 window.guardarRegistroAsistencia = () => window.modules.asistenciaPersonal.guardarRegistroAsistencia();
 window.cambiarTipoRegistro = () => window.modules.asistenciaPersonal.cambiarTipoRegistro();
@@ -1540,5 +1538,8 @@ window.generarReporteVacaciones = () => window.modules.asistenciaPersonal.genera
 window.cargarDatosPersonales = () => window.modules.asistenciaPersonal.cargarDatosPersonales();
 window.seleccionarAccionRapida = (codigo) => window.modules.asistenciaPersonal.seleccionarAccionRapida(codigo);
 window.exportarExcel = () => window.modules.asistenciaPersonal.exportarExcel();
+window.getFechaCaracas = () => window.modules.asistenciaPersonal.getFechaCaracas();
+window.getHoraCaracas = () => window.modules.asistenciaPersonal.getHoraCaracas();
+window.getFechaFormateadaCaracas = () => window.modules.asistenciaPersonal.getFechaFormateadaCaracas();
 
-console.log('✅ Módulo de Asistencia de Personal v2.0 cargado');
+console.log('✅ Módulo de Asistencia de Personal v2.1 cargado (Zona Horaria Caracas)');
