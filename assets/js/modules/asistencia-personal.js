@@ -1514,7 +1514,267 @@ window.modules.asistenciaPersonal = {
             console.error('❌ Error exportando Excel:', e);
             Swal.fire('Error', 'No se pudo exportar: ' + e.message, 'error');
         }
+    },
+
+// ============================================
+// 📊 GENERAR TABLA RESUMEN (PIVOT TABLE)
+// ============================================
+generarTablaResumen: async function() {
+    try {
+        const fecha = this.datosCache.fechaActual;
+        if (!fecha) {
+            Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
+            return;
+        }
+
+        const personal = await this.cargarPersonal();
+        const registros = await this.cargarRegistrosAsistencia(fecha);
+
+        // Crear mapa de registros
+        const registrosMap = {};
+        registros.forEach(r => {
+            registrosMap[r.personal_id] = r;
+        });
+
+        // Agrupar por tipo de personal
+        const resumen = {};
+        
+        personal.forEach(p => {
+            const tipoPersonal = p.tipo_personal?.nombre || 'Sin tipo';
+            const registro = registrosMap[p.id];
+            const tipoAsistencia = registro?.tipo_asistencia?.nombre || 'Sin registro';
+            
+            if (!resumen[tipoPersonal]) {
+                resumen[tipoPersonal] = {
+                    total: 0,
+                    porTipo: {}
+                };
+            }
+            
+            resumen[tipoPersonal].total++;
+            
+            if (!resumen[tipoPersonal].porTipo[tipoAsistencia]) {
+                resumen[tipoPersonal].porTipo[tipoAsistencia] = 0;
+            }
+            resumen[tipoPersonal].porTipo[tipoAsistencia]++;
+        });
+
+        // Obtener todos los tipos de asistencia únicos
+        const todosLosTipos = new Set();
+        Object.values(resumen).forEach(data => {
+            Object.keys(data.porTipo).forEach(tipo => todosLosTipos.add(tipo));
+        });
+
+        // Construir tabla HTML
+        let html = `
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-300">
+                    <thead class="bg-indigo-100">
+                        <tr>
+                            <th class="px-4 py-3 border text-left font-bold text-gray-700">Tipo de Personal</th>
+                            ${Array.from(todosLosTipos).map(tipo => `
+                                <th class="px-4 py-3 border text-center font-bold text-gray-700">${tipo}</th>
+                            `).join('')}
+                            <th class="px-4 py-3 border text-center font-bold text-gray-700 bg-indigo-200">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(resumen).map(([tipoPersonal, data], index) => `
+                            <tr class="${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}">
+                                <td class="px-4 py-3 border font-semibold text-gray-800">${tipoPersonal}</td>
+                                ${Array.from(todosLosTipos).map(tipo => `
+                                    <td class="px-4 py-3 border text-center">${data.porTipo[tipo] || 0}</td>
+                                `).join('')}
+                                <td class="px-4 py-3 border text-center font-bold bg-indigo-50">${data.total}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot class="bg-indigo-100 font-bold">
+                        <tr>
+                            <td class="px-4 py-3 border">TOTAL GENERAL</td>
+                            ${Array.from(todosLosTipos).map(tipo => {
+                                const total = Object.values(resumen).reduce((sum, data) => 
+                                    sum + (data.porTipo[tipo] || 0), 0
+                                );
+                                return `<td class="px-4 py-3 border text-center">${total}</td>`;
+                            }).join('')}
+                            <td class="px-4 py-3 border text-center bg-indigo-200">${personal.length}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `;
+
+        Swal.fire({
+            title: `📊 Tabla Resumen - ${this.formatearFechaLarga(fecha)}`,
+            html: html,
+            width: '95%',
+            confirmButtonText: 'Cerrar',
+            showConfirmButton: true
+        });
+
+    } catch (e) {
+        console.error('❌ Error generando tabla resumen:', e);
+        Swal.fire('Error', 'No se pudo generar la tabla: ' + e.message, 'error');
     }
+},
+
+// ============================================
+// 📥 EXPORTAR TABLA RESUMEN A EXCEL
+// ============================================
+exportarTablaResumenExcel: async function() {
+    try {
+        const fecha = this.datosCache.fechaActual;
+        if (!fecha) {
+            Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
+            return;
+        }
+
+        const personal = await this.cargarPersonal();
+        const registros = await this.cargarRegistrosAsistencia(fecha);
+
+        const registrosMap = {};
+        registros.forEach(r => {
+            registrosMap[r.personal_id] = r;
+        });
+
+        const resumen = {};
+        
+        personal.forEach(p => {
+            const tipoPersonal = p.tipo_personal?.nombre || 'Sin tipo';
+            const registro = registrosMap[p.id];
+            const tipoAsistencia = registro?.tipo_asistencia?.nombre || 'Sin registro';
+            
+            if (!resumen[tipoPersonal]) {
+                resumen[tipoPersonal] = {
+                    total: 0,
+                    porTipo: {}
+                };
+            }
+            
+            resumen[tipoPersonal].total++;
+            
+            if (!resumen[tipoPersonal].porTipo[tipoAsistencia]) {
+                resumen[tipoPersonal].porTipo[tipoAsistencia] = 0;
+            }
+            resumen[tipoPersonal].porTipo[tipoAsistencia]++;
+        });
+
+        const todosLosTipos = Array.from(new Set(
+            Object.values(resumen).flatMap(data => Object.keys(data.porTipo))
+        ));
+
+        const workbook = new ExcelJS.Workbook();
+        const ws = workbook.addWorksheet('Resumen');
+
+        // Encabezados
+        const headers = ['Tipo de Personal', ...todosLosTipos, 'TOTAL'];
+        const headerRow = ws.addRow(headers);
+        headerRow.eachCell(cell => {
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFB4D4F4' }
+            };
+            cell.font = { bold: true, color: { argb: 'FF1E3A5F' } };
+            cell.alignment = { horizontal: 'center' };
+            cell.border = {
+                top: { style: 'medium' },
+                bottom: { style: 'medium' },
+                left: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+        });
+
+        // Datos
+        Object.entries(resumen).forEach(([tipoPersonal, data], index) => {
+            const row = [
+                tipoPersonal,
+                ...todosLosTipos.map(tipo => data.porTipo[tipo] || 0),
+                data.total
+            ];
+            const rowObj = ws.addRow(row);
+            
+            rowObj.eachCell((cell, colNumber) => {
+                cell.border = {
+                    top: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    left: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+                
+                if (colNumber === 1 || colNumber === headers.length) {
+                    cell.font = { bold: true };
+                }
+                
+                if (index % 2 === 0 && colNumber > 1 && colNumber < headers.length) {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFF5F9FF' }
+                    };
+                }
+            });
+        });
+
+        // Totales
+        const totalRow = [
+            'TOTAL GENERAL',
+            ...todosLosTipos.map(tipo => 
+                Object.values(resumen).reduce((sum, data) => sum + (data.porTipo[tipo] || 0), 0)
+            ),
+            personal.length
+        ];
+        const totalRowObj = ws.addRow(totalRow);
+        totalRowObj.eachCell(cell => {
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFB4D4F4' }
+            };
+            cell.font = { bold: true };
+            cell.border = {
+                top: { style: 'medium' },
+                bottom: { style: 'medium' },
+                left: { style: 'medium' },
+                right: { style: 'medium' }
+            };
+        });
+
+        // Auto-width columns
+        ws.columns.forEach(column => {
+            column.width = 20;
+        });
+
+        // Descargar
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Resumen_Asistencia_${fecha.replace(/-/g, '')}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        Swal.fire({
+            icon: 'success',
+            title: '✅ Excel Exportado',
+            text: 'Tabla resumen exportada correctamente',
+            timer: 2000,
+            showConfirmButton: false
+        });
+
+    } catch (e) {
+        console.error('❌ Error exportando tabla resumen:', e);
+        Swal.fire('Error', 'No se pudo exportar: ' + e.message, 'error');
+    }
+}    
+
+   
 }; // ⭐ AQUÍ ESTABA EL ERROR - Faltaba este cierre del objeto
 
 // ============================================
@@ -1541,5 +1801,7 @@ window.exportarExcel = () => window.modules.asistenciaPersonal.exportarExcel();
 window.getFechaCaracas = () => window.modules.asistenciaPersonal.getFechaCaracas();
 window.getHoraCaracas = () => window.modules.asistenciaPersonal.getHoraCaracas();
 window.getFechaFormateadaCaracas = () => window.modules.asistenciaPersonal.getFechaFormateadaCaracas();
+window.generarTablaResumen = () => window.modules.asistenciaPersonal.generarTablaResumen();
+window.exportarTablaResumenExcel = () => window.modules.asistenciaPersonal.exportarTablaResumenExcel();
 
 console.log('✅ Módulo de Asistencia de Personal v2.1 cargado (Zona Horaria Caracas)');
