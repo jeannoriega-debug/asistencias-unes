@@ -1517,7 +1517,7 @@ exportarExcel: async function() {
         console.error('❌ Error exportando Excel:', e);
         Swal.fire('Error', 'No se pudo exportar: ' + e.message, 'error');
     }
-};
+}
 
 // ============================================
 // EXPORTAR FUNCIONES GLOBALES
