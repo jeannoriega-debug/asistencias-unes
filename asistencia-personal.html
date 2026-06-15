@@ -16,17 +16,11 @@
         }
         .badge-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
-        }
-        .quick-btn {
-            transition: all 0.15s;
-        }
-        .quick-btn:active {
-            transform: scale(0.95);
         }
         .section-title {
             position: sticky;
@@ -36,17 +30,146 @@
         }
 
         /* ============================================
-           📱 DISEÑO COMPACTO PARA MÓVILES
+           📱 DISEÑO COMPACTO - TIPO IMAGEN 1
            ============================================ */
         
-        /* Tablet y móvil grande (≤ 768px) */
+        /* Tarjeta ultra compacta */
+        .badge-card {
+            padding: 0.6rem;
+            margin-bottom: 0.4rem;
+            border-radius: 0.5rem;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* Layout horizontal compacto */
+        .badge-card .flex.items-start {
+            flex-direction: row;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Avatar pequeño */
+        .badge-card .bg-indigo-100 {
+            width: 2rem;
+            height: 2rem;
+            min-width: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .badge-card .bg-indigo-100 span {
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        /* Información del personal */
+        .badge-card .info-container {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .badge-card .nombre {
+            font-size: 0.85rem;
+            font-weight: 600;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .badge-card .cedula-edad {
+            font-size: 0.7rem;
+            color: #6B7280;
+            margin-top: 0.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        /* Badge de estado pequeño */
+        .badge-card .estado-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.15rem 0.4rem;
+            border-radius: 0.25rem;
+            font-size: 0.65rem;
+            font-weight: 600;
+            background: #E5E7EB;
+            color: #374151;
+            margin-bottom: 0.3rem;
+        }
+
+        /* Botones de acción compactos - ICONOS */
+        .badge-card .action-buttons {
+            display: flex;
+            gap: 0.3rem;
+            margin-top: 0.3rem;
+        }
+
+        .badge-card .action-btn {
+            width: 2rem;
+            height: 1.75rem;
+            border-radius: 0.25rem;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+
+        .badge-card .action-btn:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
+
+        .badge-card .action-btn.presente {
+            background: #10B981;
+            color: white;
+        }
+
+        .badge-card .action-btn.retardo {
+            background: #F59E0B;
+            color: white;
+        }
+
+        .badge-card .action-btn.ausente {
+            background: #EF4444;
+            color: white;
+        }
+
+        .badge-card .action-btn i {
+            font-size: 0.75rem;
+        }
+
+        /* Botón más opciones - solo icono */
+        .badge-card .mas-opciones {
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 0.25rem;
+            background: #EEF2FF;
+            color: #4F46E5;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .badge-card .mas-opciones:hover {
+            background: #E0E7FF;
+        }
+
+        /* Header compacto */
         @media (max-width: 768px) {
-            /* Header compacto */
-            nav .container {
-                padding-left: 0.75rem;
-                padding-right: 0.75rem;
-            }
-            
             nav h1 {
                 font-size: 1rem;
             }
@@ -54,275 +177,79 @@
             #fecha-actual-display {
                 font-size: 0.65rem;
             }
-            
-            /* Contenedor principal más compacto */
+
             .container.mx-auto {
                 padding-left: 0.5rem;
                 padding-right: 0.5rem;
             }
-            
-            /* Estadísticas en 2 columnas */
+
+            /* Estadísticas en 3 columnas */
             .grid.grid-cols-2.md\:grid-cols-4 {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 0.5rem;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.4rem;
             }
-            
+
             .bg-blue-50, .bg-green-50, .bg-yellow-50, .bg-red-50 {
-                padding: 0.5rem;
+                padding: 0.4rem;
             }
-            
+
             .text-2xl {
-                font-size: 1.25rem;
+                font-size: 1.1rem;
             }
-            
+
+            .text-xs {
+                font-size: 0.6rem;
+            }
+
             /* Controles en 1 columna */
             .grid.grid-cols-1.md\:grid-cols-4 {
                 grid-template-columns: 1fr;
-                gap: 0.5rem;
+                gap: 0.4rem;
             }
-            
+
             input[type="date"],
             select,
             input[type="text"] {
-                padding: 0.5rem;
-                font-size: 0.875rem;
+                padding: 0.4rem;
+                font-size: 0.85rem;
             }
-            
+
             /* Botones de acción más pequeños */
             .flex.flex-wrap.gap-2 button {
-                padding: 0.5rem 0.75rem;
-                font-size: 0.75rem;
-                flex: 1 1 calc(50% - 0.5rem);
-            }
-            
-            .flex.flex-wrap.gap-2 button i {
-                margin-right: 0.25rem;
-            }
-            
-            /* Tarjetas de personal compactas */
-            .badge-card {
-                padding: 0.75rem;
-                margin-bottom: 0.5rem;
-            }
-            
-            .badge-card .bg-indigo-100 {
-                width: 2.25rem;
-                height: 2.25rem;
-            }
-            
-            .badge-card .bg-indigo-100 span {
-                font-size: 0.75rem;
-            }
-            
-            .badge-card .font-bold {
-                font-size: 0.875rem;
-            }
-            
-            .badge-card .text-xs {
+                padding: 0.4rem 0.6rem;
                 font-size: 0.7rem;
+                flex: 1 1 calc(50% - 0.4rem);
             }
-            
-            /* Botones P/R/A más compactos */
-            .badge-card .grid.grid-cols-3 {
-                gap: 0.35rem;
-            }
-            
-            .quick-btn {
-                padding: 0.5rem;
-                font-size: 0.75rem;
-            }
-            
-            .quick-btn .text-2xl {
-                font-size: 1.25rem;
-                margin-bottom: 0.1rem;
-            }
-            
-            .quick-btn .text-xs {
-                font-size: 0.65rem;
-            }
-            
-            /* Botón "Más opciones" */
-            .badge-card button.w-full {
-                padding: 0.4rem;
-                font-size: 0.7rem;
-                margin-top: 0.35rem;
-            }
-            
-            /* Badge de estado */
-            .badge-card .inline-flex {
-                padding: 0.2rem 0.5rem;
-                font-size: 0.7rem;
-            }
-            
+
             /* Secciones más compactas */
             .section-title {
-                padding: 0.5rem 0.75rem;
-                margin-bottom: 0.5rem;
+                padding: 0.4rem 0.6rem;
+                margin-bottom: 0.4rem;
             }
-            
-            .section-title h2 {
-                font-size: 0.9rem;
-            }
-            
-            .section-title span {
-                padding: 0.25rem 0.5rem;
-                font-size: 0.75rem;
-            }
-            
-            /* Grid de tarjetas - 1 columna en móvil */
-            #lista-pendientes,
-            #lista-registrados {
-                grid-template-columns: 1fr;
-                gap: 0.5rem;
-            }
-            
-            /* Modal más compacto */
-            #modal-registro .p-6 {
-                padding: 1rem;
-            }
-            
-            #modal-registro .text-xl {
-                font-size: 1.1rem;
-            }
-            
-            #modal-registro .py-3 {
-                padding-top: 0.6rem;
-                padding-bottom: 0.6rem;
-            }
-        }
 
-        /* Móvil pequeño (≤ 480px) */
-        @media (max-width: 480px) {
-            /* Header ultra compacto */
-            nav h1 {
-                font-size: 0.9rem;
-            }
-            
-            #fecha-actual-display {
-                font-size: 0.6rem;
-            }
-            
-            nav .fa-users {
-                font-size: 1.25rem;
-            }
-            
-            /* Estadísticas más pequeñas */
-            .text-2xl {
-                font-size: 1.1rem;
-            }
-            
-            .text-xs {
-                font-size: 0.65rem;
-            }
-            
-            /* Tarjetas ultra compactas */
-            .badge-card {
-                padding: 0.6rem;
-            }
-            
-            .badge-card .bg-indigo-100 {
-                width: 2rem;
-                height: 2rem;
-            }
-            
-            .badge-card .bg-indigo-100 span {
-                font-size: 0.7rem;
-            }
-            
-            .badge-card .font-bold {
-                font-size: 0.8rem;
-                line-height: 1.2;
-            }
-            
-            .badge-card .text-xs {
-                font-size: 0.65rem;
-            }
-            
-            /* Botones P/R/A solo iconos */
-            .quick-btn {
-                padding: 0.4rem;
-            }
-            
-            .quick-btn .text-2xl {
-                font-size: 1rem;
-            }
-            
-            .quick-btn .text-xs {
-                font-size: 0.6rem;
-            }
-            
-            /* Badge de estado más pequeño */
-            .badge-card .inline-flex {
-                padding: 0.15rem 0.4rem;
-                font-size: 0.65rem;
-            }
-            
-            /* Secciones */
             .section-title h2 {
                 font-size: 0.85rem;
             }
-            
+
             .section-title span {
                 padding: 0.2rem 0.4rem;
                 font-size: 0.7rem;
             }
-            
-            /* Modal */
-            #modal-registro .p-6 {
-                padding: 0.75rem;
-            }
-            
-            #modal-registro .text-xl {
-                font-size: 1rem;
-            }
-            
-            #modal-registro .space-y-4 > div {
-                margin-bottom: 0.75rem;
-            }
-            
-            #modal-registro .py-3 {
-                padding-top: 0.5rem;
-                padding-bottom: 0.5rem;
-                font-size: 0.85rem;
-            }
-            
-            #modal-registro .grid.grid-cols-3 {
-                gap: 0.35rem;
-            }
-            
-            #modal-registro .quick-btn {
-                padding: 0.6rem;
-            }
-            
-            #modal-registro .quick-btn .text-2xl {
-                font-size: 1.1rem;
-            }
-            
-            #modal-registro .quick-btn .text-xs {
-                font-size: 0.65rem;
+
+            /* Grid - 1 columna en móvil */
+            #lista-pendientes,
+            #lista-registrados {
+                grid-template-columns: 1fr;
+                gap: 0.4rem;
             }
         }
 
-        /* Móvil muy pequeño (≤ 360px) */
-        @media (max-width: 360px) {
-            nav h1 {
-                font-size: 0.85rem;
-            }
-            
-            .badge-card .font-bold {
-                font-size: 0.75rem;
-            }
-            
-            .badge-card .text-xs {
-                font-size: 0.6rem;
-            }
-            
-            .quick-btn .text-2xl {
-                font-size: 0.95rem;
-            }
-            
-            .quick-btn .text-xs {
-                font-size: 0.55rem;
+        /* Desktop - mantener diseño compacto */
+        @media (min-width: 769px) {
+            #lista-pendientes,
+            #lista-registrados {
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 0.5rem;
             }
         }
     </style>
@@ -624,14 +551,12 @@
     <script>
     // Inicialización
     document.addEventListener('DOMContentLoaded', async function() {
-        // 🕐 USAR FECHA Y HORA DE CARACAS (UTC-4)
         const hoy = getFechaCaracas();
         document.getElementById('fecha-asistencia').value = hoy;
         document.getElementById('reg-fecha').value = hoy;
         
         document.getElementById('reg-hora').value = getHoraCaracas();
 
-        // 🕐 Mostrar fecha actual de Caracas en header
         const ahoraCaracas = new Date();
         const opcionesFecha = { 
             timeZone: 'America/Caracas',
@@ -671,8 +596,6 @@
                     await cargarTiposAsistencia();
                     await cargarRegistroAsistencia();
                     console.log('✅ Módulo inicializado');
-                    console.log('🕐 Fecha Caracas:', getFechaCaracas());
-                    console.log('🕐 Hora Caracas:', getHoraCaracas());
                 } catch (e) {
                     console.error('❌ Error:', e);
                 }
@@ -726,11 +649,8 @@
     window.generarReporteVacaciones = () => window.modules.asistenciaPersonal.generarReporteVacaciones();
     window.cargarDatosPersonales = () => window.modules.asistenciaPersonal.cargarDatosPersonales();
     window.exportarExcel = () => window.modules.asistenciaPersonal.exportarExcel();
-
     window.generarTablaResumen = () => window.modules.asistenciaPersonal.generarTablaResumen();
     window.exportarTablaResumenExcel = () => window.modules.asistenciaPersonal.exportarTablaResumenExcel();
-        
-    // 🕐 Funciones de zona horaria Caracas
     window.getFechaCaracas = () => window.modules.asistenciaPersonal.getFechaCaracas();
     window.getHoraCaracas = () => window.modules.asistenciaPersonal.getHoraCaracas();
     window.getFechaFormateadaCaracas = () => window.modules.asistenciaPersonal.getFechaFormateadaCaracas();
