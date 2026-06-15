@@ -963,294 +963,485 @@ crearTarjetaPersonal: function(personal, registro) {
         }
     },
 
-    // ============================================
-    // REPORTE DE INASISTENCIAS
-    // ============================================
-    generarReporteInasistencias: async function() {
-        try {
-            const fechaHoy = this.getFechaCaracas();
-            const { value: fechas } = await Swal.fire({
-                title: 'Período del Reporte',
-                html: `
-                    <div class="text-left space-y-3">
-                        <label class="font-bold">Fecha inicio:</label>
-                        <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
-                        <label class="font-bold">Fecha fin:</label>
-                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
-                    </div>
-                `,
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonText: 'Generar',
-                cancelButtonText: 'Cancelar',
-                preConfirm: () => ({
-                    inicio: document.getElementById('swal-fecha-inicio').value,
-                    fin: document.getElementById('swal-fecha-fin').value
-                })
+// ============================================
+// REPORTE DE INASISTENCIAS (CORREGIDO)
+// ============================================
+generarReporteInasistencias: async function() {
+    try {
+        const fechaHoy = this.getFechaCaracas();
+        const { value: fechas } = await Swal.fire({
+            title: 'Período del Reporte',
+            html: `
+                <div class="text-left space-y-3">
+                    <label class="font-bold">Fecha inicio:</label>
+                    <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
+                    <label class="font-bold">Fecha fin:</label>
+                    <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Generar',
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => ({
+                inicio: document.getElementById('swal-fecha-inicio').value,
+                fin: document.getElementById('swal-fecha-fin').value
+            })
+        });
+
+        if (!fechas) return;
+
+        // Consulta CORREGIDA - Incluir tipo_asistencia
+        const { data, error } = await window.supabaseClient
+            .from('registro_asistencia')
+            .select(`
+                personal_id,
+                fecha,
+                tipo_asistencia_id,
+                tipo_asistencia (
+                    codigo,
+                    nombre
+                )
+            `)
+            .gte('fecha', fechas.inicio)
+            .lte('fecha', fechas.fin)
+            .in('tipo_asistencia.codigo', ['AUS_INJUSTIFICADA', 'REPOSO', 'VACACIONES']);
+
+        if (error) {
+            console.error('Error en consulta:', error);
+            throw error;
+        }
+
+        if (!data || data.length === 0) {
+            Swal.fire({
+                title: 'Sin Datos',
+                text: 'No hay inasistencias en este período',
+                icon: 'info',
+                confirmButtonText: 'Cerrar'
             });
+            return;
+        }
 
-            if (!fechas) return;
-
-            const { data, error } = await window.supabaseClient
-                .from('registro_asistencia')
-                .select('personal_id, personal(nombre_completo, cedula), tipo_asistencia(codigo)')
-                .gte('fecha', fechas.inicio)
-                .lte('fecha', fechas.fin)
-                .in('tipo_asistencia.codigo', ['AUS_INJUSTIFICADA', 'REPOSO', 'VACACIONES']);
-
-            if (error) throw error;
-
-            const agrupado = {};
-            data.forEach(r => {
-                const id = r.personal_id;
-                if (!agrupado[id]) {
-                    agrupado[id] = {
-                        nombre: r.personal.nombre_completo,
-                        cedula: r.personal.cedula,
-                        total: 0
-                    };
-                }
-                agrupado[id].total++;
-            });
-
-            const top10 = Object.values(agrupado).sort((a, b) => b.total - a.total).slice(0, 10);
-
-            let contenido = `TOP 10 - PERSONAL CON MÁS INASISTENCIAS\n`;
-            contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
+        const agrupado = {};
+        data.forEach(r => {
+            // Validar que tipo_asistencia exista
+            if (!r.tipo_asistencia) {
+                console.warn('Registro sin tipo_asistencia:', r);
+                return;
+            }
             
-            if (top10.length === 0) {
-                contenido += 'No hay inasistencias en este período\n';
-            } else {
-                top10.forEach((p, idx) => {
+            const id = r.personal_id;
+            if (!agrupado[id]) {
+                agrupado[id] = {
+                    total: 0
+                };
+            }
+            agrupado[id].total++;
+        });
+
+        // Obtener información del personal
+        const personalIds = Object.keys(agrupado);
+        const { data: personalData } = await window.supabaseClient
+            .from('personal')
+            .select('id, nombre_completo, cedula')
+            .in('id', personalIds);
+
+        if (personalData) {
+            personalData.forEach(p => {
+                if (agrupado[p.id]) {
+                    agrupado[p.id].nombre = p.nombre_completo;
+                    agrupado[p.id].cedula = p.cedula;
+                }
+            });
+        }
+
+        const top10 = Object.entries(agrupado)
+            .map(([id, data]) => ({ id, ...data }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 10);
+
+        let contenido = `TOP 10 - PERSONAL CON MÁS INASISTENCIAS\n`;
+        contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
+        
+        if (top10.length === 0) {
+            contenido += 'No hay inasistencias en este período\n';
+        } else {
+            top10.forEach((p, idx) => {
+                if (p.nombre && p.cedula) {
                     contenido += `${idx + 1}. ${p.nombre} - C.I: ${p.cedula}\n`;
                     contenido += `   Total inasistencias: ${p.total}\n\n`;
-                });
-            }
+                }
+            });
+        }
 
+        Swal.fire({
+            title: 'Reporte de Inasistencias',
+            html: `<pre class="text-left text-sm max-h-96 overflow-y-auto">${contenido}</pre>`,
+            width: '800px',
+            confirmButtonText: 'Cerrar'
+        });
+
+    } catch (e) {
+        console.error('❌ Error en reporte de inasistencias:', e);
+        Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
+    }
+},
+
+// ============================================
+// REPORTE DE PERMISOS (CORREGIDO)
+// ============================================
+generarReportePermisos: async function() {
+    try {
+        const fechaHoy = this.getFechaCaracas();
+        const { value: fechas } = await Swal.fire({
+            title: 'Período del Reporte',
+            html: `
+                <div class="text-left space-y-3">
+                    <label class="font-bold">Fecha inicio:</label>
+                    <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
+                    <label class="font-bold">Fecha fin:</label>
+                    <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Generar',
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => ({
+                inicio: document.getElementById('swal-fecha-inicio').value,
+                fin: document.getElementById('swal-fecha-fin').value
+            })
+        });
+
+        if (!fechas) return;
+
+        // Consulta CORREGIDA
+        const { data, error } = await window.supabaseClient
+            .from('registro_asistencia')
+            .select(`
+                personal_id,
+                fecha,
+                tipo_asistencia_id,
+                tipo_asistencia (
+                    codigo,
+                    nombre
+                )
+            `)
+            .gte('fecha', fechas.inicio)
+            .lte('fecha', fechas.fin)
+            .in('tipo_asistencia.codigo', ['PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO']);
+
+        if (error) {
+            console.error('Error en consulta:', error);
+            throw error;
+        }
+
+        if (!data || data.length === 0) {
             Swal.fire({
-                title: 'Reporte de Inasistencias',
-                html: `<pre class="text-left text-sm max-h-96 overflow-y-auto">${contenido}</pre>`,
-                width: '800px',
+                title: 'Sin Datos',
+                text: 'No hay permisos en este período',
+                icon: 'info',
                 confirmButtonText: 'Cerrar'
             });
-
-        } catch (e) {
-            console.error('❌ Error:', e);
-            Swal.fire('Error', e.message, 'error');
+            return;
         }
-    },
 
-    // ============================================
-    // REPORTE DE PERMISOS
-    // ============================================
-    generarReportePermisos: async function() {
-        try {
-            const fechaHoy = this.getFechaCaracas();
-            const { value: fechas } = await Swal.fire({
-                title: 'Período del Reporte',
-                html: `
-                    <div class="text-left space-y-3">
-                        <label class="font-bold">Fecha inicio:</label>
-                        <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
-                        <label class="font-bold">Fecha fin:</label>
-                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
-                    </div>
-                `,
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonText: 'Generar',
-                cancelButtonText: 'Cancelar',
-                preConfirm: () => ({
-                    inicio: document.getElementById('swal-fecha-inicio').value,
-                    fin: document.getElementById('swal-fecha-fin').value
-                })
-            });
-
-            if (!fechas) return;
-
-            const { data, error } = await window.supabaseClient
-                .from('registro_asistencia')
-                .select('personal_id, personal(nombre_completo, cedula), tipo_asistencia(codigo)')
-                .gte('fecha', fechas.inicio)
-                .lte('fecha', fechas.fin)
-                .in('tipo_asistencia.codigo', ['PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO']);
-
-            if (error) throw error;
-
-            const agrupado = {};
-            data.forEach(r => {
-                const id = r.personal_id;
-                if (!agrupado[id]) {
-                    agrupado[id] = {
-                        nombre: r.personal.nombre_completo,
-                        cedula: r.personal.cedula,
-                        obligatorios: 0,
-                        potestativos: 0
-                    };
-                }
-                if (r.tipo_asistencia.codigo === 'PERMISO_OBLIGATORIO') {
-                    agrupado[id].obligatorios++;
-                } else {
-                    agrupado[id].potestativos++;
-                }
-            });
-
-            const lista = Object.values(agrupado).sort((a, b) => 
-                (b.obligatorios + b.potestativos) - (a.obligatorios + a.potestativos)
-            );
-
-            let contenido = `PERSONAL CON MÁS PERMISOS\n`;
-            contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
+        const agrupado = {};
+        data.forEach(r => {
+            if (!r.tipo_asistencia) {
+                console.warn('Registro sin tipo_asistencia:', r);
+                return;
+            }
             
-            if (lista.length === 0) {
-                contenido += 'No hay permisos en este período\n';
-            } else {
-                lista.forEach((p, idx) => {
+            const id = r.personal_id;
+            if (!agrupado[id]) {
+                agrupado[id] = {
+                    obligatorios: 0,
+                    potestativos: 0
+                };
+            }
+            if (r.tipo_asistencia.codigo === 'PERMISO_OBLIGATORIO') {
+                agrupado[id].obligatorios++;
+            } else if (r.tipo_asistencia.codigo === 'PERMISO_POTESTATIVO') {
+                agrupado[id].potestativos++;
+            }
+        });
+
+        // Obtener información del personal
+        const personalIds = Object.keys(agrupado);
+        const { data: personalData } = await window.supabaseClient
+            .from('personal')
+            .select('id, nombre_completo, cedula')
+            .in('id', personalIds);
+
+        if (personalData) {
+            personalData.forEach(p => {
+                if (agrupado[p.id]) {
+                    agrupado[p.id].nombre = p.nombre_completo;
+                    agrupado[p.id].cedula = p.cedula;
+                }
+            });
+        }
+
+        const lista = Object.entries(agrupado)
+            .map(([id, data]) => ({ id, ...data }))
+            .sort((a, b) => (b.obligatorios + b.potestativos) - (a.obligatorios + a.potestativos));
+
+        let contenido = `PERSONAL CON MÁS PERMISOS\n`;
+        contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
+        
+        if (lista.length === 0) {
+            contenido += 'No hay permisos en este período\n';
+        } else {
+            lista.forEach((p, idx) => {
+                if (p.nombre && p.cedula) {
                     contenido += `${idx + 1}. ${p.nombre} - C.I: ${p.cedula}\n`;
                     contenido += `   Obligatorios: ${p.obligatorios} | Potestativos: ${p.potestativos}\n\n`;
-                });
-            }
+                }
+            });
+        }
 
+        Swal.fire({
+            title: 'Reporte de Permisos',
+            html: `<pre class="text-left text-sm max-h-96 overflow-y-auto">${contenido}</pre>`,
+            width: '800px',
+            confirmButtonText: 'Cerrar'
+        });
+
+    } catch (e) {
+        console.error('❌ Error en reporte de permisos:', e);
+        Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
+    }
+},
+
+// ============================================
+// REPORTE DE RETARDOS (CORREGIDO)
+// ============================================
+generarReporteRetardos: async function() {
+    try {
+        const fechaHoy = this.getFechaCaracas();
+        const { value: fechas } = await Swal.fire({
+            title: 'Período del Reporte',
+            html: `
+                <div class="text-left space-y-3">
+                    <label class="font-bold">Fecha inicio:</label>
+                    <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
+                    <label class="font-bold">Fecha fin:</label>
+                    <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Generar',
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => ({
+                inicio: document.getElementById('swal-fecha-inicio').value,
+                fin: document.getElementById('swal-fecha-fin').value
+            })
+        });
+
+        if (!fechas) return;
+
+        // Consulta CORREGIDA
+        const { data, error } = await window.supabaseClient
+            .from('registro_asistencia')
+            .select(`
+                personal_id,
+                fecha,
+                hora_registro,
+                tipo_asistencia_id,
+                tipo_asistencia (
+                    codigo,
+                    nombre
+                )
+            `)
+            .gte('fecha', fechas.inicio)
+            .lte('fecha', fechas.fin);
+
+        if (error) {
+            console.error('Error en consulta:', error);
+            throw error;
+        }
+
+        if (!data || data.length === 0) {
             Swal.fire({
-                title: 'Reporte de Permisos',
-                html: `<pre class="text-left text-sm max-h-96 overflow-y-auto">${contenido}</pre>`,
-                width: '800px',
+                title: 'Sin Datos',
+                text: 'No hay retardos en este período',
+                icon: 'info',
                 confirmButtonText: 'Cerrar'
             });
-
-        } catch (e) {
-            console.error('❌ Error:', e);
-            Swal.fire('Error', e.message, 'error');
+            return;
         }
-    },
 
-    // ============================================
-    // REPORTE DE RETARDOS
-    // ============================================
-    generarReporteRetardos: async function() {
-        try {
-            const fechaHoy = this.getFechaCaracas();
-            const { value: fechas } = await Swal.fire({
-                title: 'Período del Reporte',
-                html: `
-                    <div class="text-left space-y-3">
-                        <label class="font-bold">Fecha inicio:</label>
-                        <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
-                        <label class="font-bold">Fecha fin:</label>
-                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
-                    </div>
-                `,
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonText: 'Generar',
-                cancelButtonText: 'Cancelar',
-                preConfirm: () => ({
-                    inicio: document.getElementById('swal-fecha-inicio').value,
-                    fin: document.getElementById('swal-fecha-fin').value
-                })
+        // Filtrar solo retardos
+        const retardosData = data.filter(r => r.tipo_asistencia && r.tipo_asistencia.codigo === 'RETARDO');
+
+        if (retardosData.length === 0) {
+            Swal.fire({
+                title: 'Sin Datos',
+                text: 'No hay retardos en este período',
+                icon: 'info',
+                confirmButtonText: 'Cerrar'
             });
+            return;
+        }
 
-            if (!fechas) return;
+        const agrupado = {};
+        retardosData.forEach(r => {
+            const id = r.personal_id;
+            if (!agrupado[id]) {
+                agrupado[id] = {
+                    total: 0,
+                    fechas: []
+                };
+            }
+            agrupado[id].total++;
+            agrupado[id].fechas.push(`${this.formatearFechaLarga(r.fecha)} (${r.hora_registro || 's/h'})`);
+        });
 
-            const { data, error } = await window.supabaseClient
-                .from('registro_asistencia')
-                .select('personal_id, personal(nombre_completo, cedula), hora_registro, fecha')
-                .gte('fecha', fechas.inicio)
-                .lte('fecha', fechas.fin)
-                .eq('tipo_asistencia.codigo', 'RETARDO');
+        // Obtener información del personal
+        const personalIds = Object.keys(agrupado);
+        const { data: personalData } = await window.supabaseClient
+            .from('personal')
+            .select('id, nombre_completo, cedula')
+            .in('id', personalIds);
 
-            if (error) throw error;
-
-            const agrupado = {};
-            data.forEach(r => {
-                const id = r.personal_id;
-                if (!agrupado[id]) {
-                    agrupado[id] = {
-                        nombre: r.personal.nombre_completo,
-                        cedula: r.personal.cedula,
-                        total: 0,
-                        fechas: []
-                    };
+        if (personalData) {
+            personalData.forEach(p => {
+                if (agrupado[p.id]) {
+                    agrupado[p.id].nombre = p.nombre_completo;
+                    agrupado[p.id].cedula = p.cedula;
                 }
-                agrupado[id].total++;
-                agrupado[id].fechas.push(`${this.formatearFechaLarga(r.fecha)} (${r.hora_registro || 's/h'})`);
             });
+        }
 
-            const lista = Object.values(agrupado).sort((a, b) => b.total - a.total);
+        const lista = Object.entries(agrupado)
+            .map(([id, data]) => ({ id, ...data }))
+            .sort((a, b) => b.total - a.total);
 
-            let contenido = `PERSONAL CON RETARDOS\n`;
-            contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
-            
-            if (lista.length === 0) {
-                contenido += 'No hay retardos en este período\n';
-            } else {
-                lista.forEach((p, idx) => {
+        let contenido = `PERSONAL CON RETARDOS\n`;
+        contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
+        
+        if (lista.length === 0) {
+            contenido += 'No hay retardos en este período\n';
+        } else {
+            lista.forEach((p, idx) => {
+                if (p.nombre && p.cedula) {
                     contenido += `${idx + 1}. ${p.nombre} - C.I: ${p.cedula}\n`;
                     contenido += `   Total retardos: ${p.total}\n`;
                     contenido += `   Fechas: ${p.fechas.join(', ')}\n\n`;
-                });
-            }
+                }
+            });
+        }
 
+        Swal.fire({
+            title: 'Reporte de Retardos',
+            html: `<pre class="text-left text-sm max-h-96 overflow-y-auto">${contenido}</pre>`,
+            width: '800px',
+            confirmButtonText: 'Cerrar'
+        });
+
+    } catch (e) {
+        console.error('❌ Error en reporte de retardos:', e);
+        Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
+    }
+},
+
+// ============================================
+// REPORTE DE VACACIONES (CORREGIDO)
+// ============================================
+generarReporteVacaciones: async function() {
+    try {
+        const fechaHoy = this.getFechaCaracas();
+        const { value: fechas } = await Swal.fire({
+            title: 'Período del Reporte',
+            html: `
+                <div class="text-left space-y-3">
+                    <label class="font-bold">Fecha inicio:</label>
+                    <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
+                    <label class="font-bold">Fecha fin:</label>
+                    <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Generar',
+            cancelButtonText: 'Cancelar',
+            preConfirm: () => ({
+                inicio: document.getElementById('swal-fecha-inicio').value,
+                fin: document.getElementById('swal-fecha-fin').value
+            })
+        });
+
+        if (!fechas) return;
+
+        // Consulta CORREGIDA
+        const { data, error } = await window.supabaseClient
+            .from('registro_asistencia')
+            .select(`
+                personal_id,
+                fecha,
+                fecha_inicio,
+                fecha_fin,
+                dias,
+                observaciones,
+                tipo_asistencia_id,
+                tipo_asistencia (
+                    codigo,
+                    nombre
+                ),
+                personal (
+                    nombre_completo,
+                    cedula,
+                    tipo_personal (
+                        nombre
+                    )
+                )
+            `)
+            .gte('fecha', fechas.inicio)
+            .lte('fecha', fechas.fin);
+
+        if (error) {
+            console.error('Error en consulta:', error);
+            throw error;
+        }
+
+        if (!data || data.length === 0) {
             Swal.fire({
-                title: 'Reporte de Retardos',
-                html: `<pre class="text-left text-sm max-h-96 overflow-y-auto">${contenido}</pre>`,
-                width: '800px',
+                title: 'Sin Datos',
+                text: 'No hay personal de vacaciones en este período',
+                icon: 'info',
                 confirmButtonText: 'Cerrar'
             });
-
-        } catch (e) {
-            console.error('❌ Error:', e);
-            Swal.fire('Error', e.message, 'error');
+            return;
         }
-    },
 
-    // ============================================
-    // REPORTE DE VACACIONES
-    // ============================================
-    generarReporteVacaciones: async function() {
-        try {
-            const fechaHoy = this.getFechaCaracas();
-            const { value: fechas } = await Swal.fire({
-                title: 'Período del Reporte',
-                html: `
-                    <div class="text-left space-y-3">
-                        <label class="font-bold">Fecha inicio:</label>
-                        <input type="date" id="swal-fecha-inicio" class="swal2-input" value="2026-01-01">
-                        <label class="font-bold">Fecha fin:</label>
-                        <input type="date" id="swal-fecha-fin" class="swal2-input" value="${fechaHoy}">
-                    </div>
-                `,
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonText: 'Generar',
-                cancelButtonText: 'Cancelar',
-                preConfirm: () => ({
-                    inicio: document.getElementById('swal-fecha-inicio').value,
-                    fin: document.getElementById('swal-fecha-fin').value
-                })
+        // Filtrar solo vacaciones
+        const vacacionesData = data.filter(r => r.tipo_asistencia && r.tipo_asistencia.codigo === 'VACACIONES');
+
+        if (vacacionesData.length === 0) {
+            Swal.fire({
+                title: 'Sin Datos',
+                text: 'No hay personal de vacaciones en este período',
+                icon: 'info',
+                confirmButtonText: 'Cerrar'
             });
+            return;
+        }
 
-            if (!fechas) return;
-
-            const { data, error } = await window.supabaseClient
-                .from('registro_asistencia')
-                .select('personal_id, personal(nombre_completo, cedula, tipo_personal(nombre)), fecha, fecha_inicio, fecha_fin, dias, observaciones')
-                .gte('fecha', fechas.inicio)
-                .lte('fecha', fechas.fin)
-                .eq('tipo_asistencia.codigo', 'VACACIONES');
-
-            if (error) throw error;
-
-            let contenido = `PERSONAL DE VACACIONES\n`;
-            contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
-            
-            if (data.length === 0) {
-                contenido += 'No hay personal de vacaciones en este período\n';
-            } else {
-                data.forEach((r, idx) => {
+        let contenido = `PERSONAL DE VACACIONES\n`;
+        contenido += `Período: ${this.formatearFechaLarga(fechas.inicio)} al ${this.formatearFechaLarga(fechas.fin)}\n\n`;
+        
+        if (vacacionesData.length === 0) {
+            contenido += 'No hay personal de vacaciones en este período\n';
+        } else {
+            vacacionesData.forEach((r, idx) => {
+                if (r.personal) {
                     contenido += `${idx + 1}. ${r.personal.nombre_completo}\n`;
                     contenido += `   C.I: ${r.personal.cedula}\n`;
-                    contenido += `   Tipo: ${r.personal.tipo_personal?.nombre}\n`;
+                    if (r.personal.tipo_personal) {
+                        contenido += `   Tipo: ${r.personal.tipo_personal.nombre}\n`;
+                    }
                     if (r.fecha_inicio && r.fecha_fin) {
                         contenido += `   Período: ${this.formatearFechaLarga(r.fecha_inicio)} al ${this.formatearFechaLarga(r.fecha_fin)}`;
                         if (r.dias) contenido += ` (${r.dias} días)`;
@@ -1260,21 +1451,22 @@ crearTarjetaPersonal: function(personal, registro) {
                     }
                     if (r.observaciones) contenido += `   Observaciones: ${r.observaciones}\n`;
                     contenido += '\n';
-                });
-            }
-
-            Swal.fire({
-                title: 'Reporte de Vacaciones',
-                html: `<pre class="text-left text-sm max-h-96 overflow-y-auto">${contenido}</pre>`,
-                width: '800px',
-                confirmButtonText: 'Cerrar'
+                }
             });
-
-        } catch (e) {
-            console.error('❌ Error:', e);
-            Swal.fire('Error', e.message, 'error');
         }
-    },
+
+        Swal.fire({
+            title: 'Reporte de Vacaciones',
+            html: `<pre class="text-left text-sm max-h-96 overflow-y-auto">${contenido}</pre>`,
+            width: '800px',
+            confirmButtonText: 'Cerrar'
+        });
+
+    } catch (e) {
+        console.error('❌ Error en reporte de vacaciones:', e);
+        Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
+    }
+},
 
     // ============================================
     // GESTIONAR PERSONAL (AGREGAR NUEVO)
