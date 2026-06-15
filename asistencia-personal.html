@@ -34,6 +34,297 @@
             z-index: 10;
             backdrop-filter: blur(8px);
         }
+
+        /* ============================================
+           📱 DISEÑO COMPACTO PARA MÓVILES
+           ============================================ */
+        
+        /* Tablet y móvil grande (≤ 768px) */
+        @media (max-width: 768px) {
+            /* Header compacto */
+            nav .container {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+            
+            nav h1 {
+                font-size: 1rem;
+            }
+            
+            #fecha-actual-display {
+                font-size: 0.65rem;
+            }
+            
+            /* Contenedor principal más compacto */
+            .container.mx-auto {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            
+            /* Estadísticas en 2 columnas */
+            .grid.grid-cols-2.md\:grid-cols-4 {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
+            }
+            
+            .bg-blue-50, .bg-green-50, .bg-yellow-50, .bg-red-50 {
+                padding: 0.5rem;
+            }
+            
+            .text-2xl {
+                font-size: 1.25rem;
+            }
+            
+            /* Controles en 1 columna */
+            .grid.grid-cols-1.md\:grid-cols-4 {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+            
+            input[type="date"],
+            select,
+            input[type="text"] {
+                padding: 0.5rem;
+                font-size: 0.875rem;
+            }
+            
+            /* Botones de acción más pequeños */
+            .flex.flex-wrap.gap-2 button {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.75rem;
+                flex: 1 1 calc(50% - 0.5rem);
+            }
+            
+            .flex.flex-wrap.gap-2 button i {
+                margin-right: 0.25rem;
+            }
+            
+            /* Tarjetas de personal compactas */
+            .badge-card {
+                padding: 0.75rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .badge-card .bg-indigo-100 {
+                width: 2.25rem;
+                height: 2.25rem;
+            }
+            
+            .badge-card .bg-indigo-100 span {
+                font-size: 0.75rem;
+            }
+            
+            .badge-card .font-bold {
+                font-size: 0.875rem;
+            }
+            
+            .badge-card .text-xs {
+                font-size: 0.7rem;
+            }
+            
+            /* Botones P/R/A más compactos */
+            .badge-card .grid.grid-cols-3 {
+                gap: 0.35rem;
+            }
+            
+            .quick-btn {
+                padding: 0.5rem;
+                font-size: 0.75rem;
+            }
+            
+            .quick-btn .text-2xl {
+                font-size: 1.25rem;
+                margin-bottom: 0.1rem;
+            }
+            
+            .quick-btn .text-xs {
+                font-size: 0.65rem;
+            }
+            
+            /* Botón "Más opciones" */
+            .badge-card button.w-full {
+                padding: 0.4rem;
+                font-size: 0.7rem;
+                margin-top: 0.35rem;
+            }
+            
+            /* Badge de estado */
+            .badge-card .inline-flex {
+                padding: 0.2rem 0.5rem;
+                font-size: 0.7rem;
+            }
+            
+            /* Secciones más compactas */
+            .section-title {
+                padding: 0.5rem 0.75rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .section-title h2 {
+                font-size: 0.9rem;
+            }
+            
+            .section-title span {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.75rem;
+            }
+            
+            /* Grid de tarjetas - 1 columna en móvil */
+            #lista-pendientes,
+            #lista-registrados {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+            
+            /* Modal más compacto */
+            #modal-registro .p-6 {
+                padding: 1rem;
+            }
+            
+            #modal-registro .text-xl {
+                font-size: 1.1rem;
+            }
+            
+            #modal-registro .py-3 {
+                padding-top: 0.6rem;
+                padding-bottom: 0.6rem;
+            }
+        }
+
+        /* Móvil pequeño (≤ 480px) */
+        @media (max-width: 480px) {
+            /* Header ultra compacto */
+            nav h1 {
+                font-size: 0.9rem;
+            }
+            
+            #fecha-actual-display {
+                font-size: 0.6rem;
+            }
+            
+            nav .fa-users {
+                font-size: 1.25rem;
+            }
+            
+            /* Estadísticas más pequeñas */
+            .text-2xl {
+                font-size: 1.1rem;
+            }
+            
+            .text-xs {
+                font-size: 0.65rem;
+            }
+            
+            /* Tarjetas ultra compactas */
+            .badge-card {
+                padding: 0.6rem;
+            }
+            
+            .badge-card .bg-indigo-100 {
+                width: 2rem;
+                height: 2rem;
+            }
+            
+            .badge-card .bg-indigo-100 span {
+                font-size: 0.7rem;
+            }
+            
+            .badge-card .font-bold {
+                font-size: 0.8rem;
+                line-height: 1.2;
+            }
+            
+            .badge-card .text-xs {
+                font-size: 0.65rem;
+            }
+            
+            /* Botones P/R/A solo iconos */
+            .quick-btn {
+                padding: 0.4rem;
+            }
+            
+            .quick-btn .text-2xl {
+                font-size: 1rem;
+            }
+            
+            .quick-btn .text-xs {
+                font-size: 0.6rem;
+            }
+            
+            /* Badge de estado más pequeño */
+            .badge-card .inline-flex {
+                padding: 0.15rem 0.4rem;
+                font-size: 0.65rem;
+            }
+            
+            /* Secciones */
+            .section-title h2 {
+                font-size: 0.85rem;
+            }
+            
+            .section-title span {
+                padding: 0.2rem 0.4rem;
+                font-size: 0.7rem;
+            }
+            
+            /* Modal */
+            #modal-registro .p-6 {
+                padding: 0.75rem;
+            }
+            
+            #modal-registro .text-xl {
+                font-size: 1rem;
+            }
+            
+            #modal-registro .space-y-4 > div {
+                margin-bottom: 0.75rem;
+            }
+            
+            #modal-registro .py-3 {
+                padding-top: 0.5rem;
+                padding-bottom: 0.5rem;
+                font-size: 0.85rem;
+            }
+            
+            #modal-registro .grid.grid-cols-3 {
+                gap: 0.35rem;
+            }
+            
+            #modal-registro .quick-btn {
+                padding: 0.6rem;
+            }
+            
+            #modal-registro .quick-btn .text-2xl {
+                font-size: 1.1rem;
+            }
+            
+            #modal-registro .quick-btn .text-xs {
+                font-size: 0.65rem;
+            }
+        }
+
+        /* Móvil muy pequeño (≤ 360px) */
+        @media (max-width: 360px) {
+            nav h1 {
+                font-size: 0.85rem;
+            }
+            
+            .badge-card .font-bold {
+                font-size: 0.75rem;
+            }
+            
+            .badge-card .text-xs {
+                font-size: 0.6rem;
+            }
+            
+            .quick-btn .text-2xl {
+                font-size: 0.95rem;
+            }
+            
+            .quick-btn .text-xs {
+                font-size: 0.55rem;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -106,7 +397,6 @@
                         class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition text-sm">
                     <i class="fas fa-file-excel mr-1"></i>Exportar Excel
                 </button>
-                            <!-- NUEVO BOTÓN: TABLA RESUMEN -->
                 <button onclick="generarTablaResumen()" 
                         class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition text-sm">
                     <i class="fas fa-table mr-1"></i>Tabla Resumen
