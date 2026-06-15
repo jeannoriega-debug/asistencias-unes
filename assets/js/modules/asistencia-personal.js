@@ -297,116 +297,110 @@ window.modules.asistenciaPersonal = {
         }
     },
 
-    // ============================================
-    // CREAR TARJETA DE PERSONAL (CARD)
-    // ============================================
-    crearTarjetaPersonal: function(personal, registro) {
-        const tieneRegistro = registro !== null;
-        const estado = tieneRegistro ? registro.tipo_asistencia : null;
-        
-        let badgeColor = 'bg-gray-200 text-gray-600';
-        let badgeIcon = 'fa-question-circle';
-        let badgeText = 'Sin registro';
-        
-        if (estado) {
-            const colores = {
-                'ASISTENCIA': 'bg-green-100 text-green-800',
-                'AUS_INJUSTIFICADA': 'bg-red-100 text-red-800',
-                'RETARDO': 'bg-yellow-100 text-yellow-800',
-                'PERMISO_OBLIGATORIO': 'bg-orange-100 text-orange-800',
-                'PERMISO_POTESTATIVO': 'bg-orange-100 text-orange-800',
-                'REPOSO': 'bg-purple-100 text-purple-800',
-                'VACACIONES': 'bg-blue-100 text-blue-800',
-                'DIA_LIBRE': 'bg-gray-100 text-gray-800',
-                'EGRESO': 'bg-pink-100 text-pink-800',
-                'INGRESO': 'bg-teal-100 text-teal-800'
-            };
-            badgeColor = colores[estado.codigo] || 'bg-gray-200 text-gray-600';
-            badgeIcon = `fa-${estado.icono || 'circle'}`;
-            badgeText = estado.nombre;
-        }
+// ============================================
+// CREAR TARJETA DE PERSONAL (VERSIÓN COMPACTA)
+// ============================================
+crearTarjetaPersonal: function(personal, registro) {
+    const tieneRegistro = registro !== null;
+    const estado = tieneRegistro ? registro.tipo_asistencia : null;
+    
+    // Iniciales
+    const iniciales = personal.nombre_completo
+        .split(' ')
+        .map(n => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
 
-        const iniciales = personal.nombre_completo
-            .split(' ')
-            .map(n => n[0])
-            .slice(0, 2)
-            .join('')
-            .toUpperCase();
+    // Edad y género
+    let infoExtra = '';
+    if (personal.fecha_nacimiento) {
+        const edad = this.calcularEdad(personal.fecha_nacimiento);
+        infoExtra += `<span>${edad} años</span>`;
+    }
+    if (personal.genero) {
+        const generoIcon = personal.genero === 'M' ? '♂' : '♀';
+        const generoColor = personal.genero === 'M' ? '#3B82F6' : '#EC4899';
+        if (infoExtra) infoExtra += ' ';
+        infoExtra += `<span style="color: ${generoColor}">${generoIcon}</span>`;
+    }
 
-        let infoExtra = '';
-        if (personal.fecha_nacimiento) {
-            const edad = this.calcularEdad(personal.fecha_nacimiento);
-            infoExtra += `<span class="text-xs text-gray-500">${edad} años</span>`;
-        }
-        if (personal.genero) {
-            const generoIcon = personal.genero === 'M' ? '♂️' : '♀️';
-            infoExtra += ` <span class="text-xs">${generoIcon}</span>`;
-        }
+    // Estado badge
+    let estadoHtml = '';
+    if (estado) {
+        const colores = {
+            'ASISTENCIA': 'bg-green-100 text-green-700',
+            'AUS_INJUSTIFICADA': 'bg-red-100 text-red-700',
+            'RETARDO': 'bg-yellow-100 text-yellow-700',
+            'PERMISO_OBLIGATORIO': 'bg-orange-100 text-orange-700',
+            'PERMISO_POTESTATIVO': 'bg-orange-100 text-orange-700',
+            'REPOSO': 'bg-purple-100 text-purple-700',
+            'VACACIONES': 'bg-blue-100 text-blue-700',
+            'DIA_LIBRE': 'bg-gray-100 text-gray-700',
+            'EGRESO': 'bg-pink-100 text-pink-700',
+            'INGRESO': 'bg-teal-100 text-teal-700'
+        };
+        const colorClass = colores[estado.codigo] || 'bg-gray-100 text-gray-700';
+        estadoHtml = `<div class="estado-badge ${colorClass}">${estado.nombre}</div>`;
+    } else {
+        estadoHtml = `<div class="estado-badge"><i class="fas fa-question-circle mr-1"></i>Sin registro</div>`;
+    }
 
-        let infoRegistro = '';
-        if (tieneRegistro && registro.fecha_inicio && registro.fecha_fin) {
-            infoRegistro = `
-                <div class="text-xs text-gray-500 mt-1">
-                    <i class="fas fa-calendar-alt mr-1"></i>
-                    ${this.formatearFechaCorta(registro.fecha_inicio)} al ${this.formatearFechaCorta(registro.fecha_fin)}
-                    ${registro.dias ? `(${registro.dias} días)` : ''}
-                </div>
-            `;
-        }
-
-        return `
-            <div class="badge-card bg-white rounded-lg shadow-md p-4 border-2 ${tieneRegistro ? 'border-green-200' : 'border-gray-200'}">
-                <div class="flex items-start justify-between mb-3">
-                    <div class="flex items-center space-x-3 flex-1 min-w-0">
-                        <div class="bg-indigo-100 rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
-                            <span class="text-indigo-600 font-bold text-sm">${iniciales}</span>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="font-bold text-gray-800 text-sm truncate">${personal.nombre_completo}</p>
-                            <p class="text-xs text-gray-500">C.I: ${personal.cedula} ${infoExtra}</p>
-                        </div>
-                    </div>
-                    ${tieneRegistro ? `
-                        <button onclick="window.modules.asistenciaPersonal.editarRegistro('${personal.id}')" 
-                                class="text-indigo-600 hover:text-indigo-800 transition ml-2" title="Editar">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    ` : ''}
-                </div>
-
-                <div class="mb-3">
-                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${badgeColor}">
-                        <i class="fas ${badgeIcon} mr-1"></i>
-                        ${badgeText}
-                    </span>
-                    ${infoRegistro}
-                </div>
-
-                ${!tieneRegistro ? `
-                    <div class="space-y-2">
-                        <div class="grid grid-cols-3 gap-2">
-                            <button onclick="window.modules.asistenciaPersonal.registroRapido('${personal.id}', 'ASISTENCIA')" 
-                                    class="quick-btn bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded text-xs" title="Presente">
-                                P
-                            </button>
-                            <button onclick="window.modules.asistenciaPersonal.registroRapido('${personal.id}', 'RETARDO')" 
-                                    class="quick-btn bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 rounded text-xs" title="Retardo">
-                                R
-                            </button>
-                            <button onclick="window.modules.asistenciaPersonal.registroRapido('${personal.id}', 'AUS_INJUSTIFICADA')" 
-                                    class="quick-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded text-xs" title="Ausente">
-                                A
-                            </button>
-                        </div>
-                        <button onclick="window.modules.asistenciaPersonal.abrirModalRegistro('${personal.id}')" 
-                                class="w-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-semibold py-2 rounded text-xs transition">
-                            <i class="fas fa-ellipsis-h mr-1"></i>Más opciones
-                        </button>
-                    </div>
-                ` : ''}
+    // Info adicional del registro
+    let infoRegistro = '';
+    if (tieneRegistro && registro.fecha_inicio && registro.fecha_fin) {
+        infoRegistro = `
+            <div class="text-xs text-gray-500 mt-1">
+                <i class="fas fa-calendar-alt mr-1"></i>
+                ${this.formatearFechaCorta(registro.fecha_inicio)} al ${this.formatearFechaCorta(registro.fecha_fin)}
+                ${registro.dias ? `(${registro.dias} días)` : ''}
             </div>
         `;
-    },
+    }
+
+    return `
+        <div class="badge-card">
+            <div class="flex items-start">
+                <div class="bg-indigo-100">
+                    <span>${iniciales}</span>
+                </div>
+                
+                <div class="info-container">
+                    <div class="nombre">${personal.nombre_completo}</div>
+                    <div class="cedula-edad">
+                        <span>C.I. ${personal.cedula}</span>
+                        ${infoExtra ? `<span>|</span><span>${infoExtra}</span>` : ''}
+                    </div>
+                    ${estadoHtml}
+                    ${infoRegistro}
+                    
+                    ${!tieneRegistro ? `
+                        <div class="action-buttons">
+                            <button class="action-btn presente" onclick="window.modules.asistenciaPersonal.registroRapido('${personal.id}', 'ASISTENCIA')" title="Presente">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button class="action-btn retardo" onclick="window.modules.asistenciaPersonal.registroRapido('${personal.id}', 'RETARDO')" title="Retardo">
+                                <i class="fas fa-clock"></i>
+                            </button>
+                            <button class="action-btn ausente" onclick="window.modules.asistenciaPersonal.registroRapido('${personal.id}', 'AUS_INJUSTIFICADA')" title="Ausente">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <button class="mas-opciones" onclick="window.modules.asistenciaPersonal.abrirModalRegistro('${personal.id}')" title="Más opciones">
+                                <i class="fas fa-ellipsis-h"></i>
+                            </button>
+                        </div>
+                    ` : `
+                        <div class="action-buttons">
+                            <button class="mas-opciones" onclick="window.modules.asistenciaPersonal.editarRegistro('${personal.id}')" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    `}
+                </div>
+            </div>
+        </div>
+    `;
+},
 
     // ============================================
     // CALCULAR EDAD
