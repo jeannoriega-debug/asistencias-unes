@@ -1103,11 +1103,10 @@ generarReporteDiario: async function() {
 },
 
 // ============================================
-// DESCARGAR REPORTE DIARIO COMO PDF (CORREGIDO)
+// DESCARGAR REPORTE DIARIO COMO PDF (OPTIMIZADO)
 // ============================================
 descargarReportePDF: async function() {
     try {
-        // Verificar que las librerías estén cargadas
         if (typeof window.jspdf === 'undefined') {
             throw new Error('La librería jsPDF no está cargada');
         }
@@ -1117,21 +1116,20 @@ descargarReportePDF: async function() {
         }
 
         const { jsPDF } = window.jspdf;
-        
-        // Crear contenido del reporte
         const contenido = window.reporteDiarioHTML;
+        
         if (!contenido) {
-            throw new Error('No hay contenido del reporte para generar el PDF');
+            throw new Error('No hay contenido del reporte');
         }
 
-        // Crear un div temporal fuera del DOM visible
+        // Crear div temporal
         const tempDiv = document.createElement('div');
         tempDiv.id = 'temp-reporte-pdf';
         tempDiv.style.cssText = `
             position: absolute;
             left: -9999px;
             top: 0;
-            width: 800px;
+            width: 794px;
             background: white;
             padding: 20px;
             font-family: Arial, sans-serif;
@@ -1139,28 +1137,27 @@ descargarReportePDF: async function() {
         `;
         tempDiv.innerHTML = `
             <div style="text-align: center; margin-bottom: 20px;">
-                <h1 style="color: #4F46E5; margin: 0; font-size: 22px;">REPORTE DIARIO DE ASISTENCIA</h1>
-                <h2 style="color: #6B7280; margin: 10px 0; font-size: 16px;">${window.reporteDiarioFecha || ''}</h2>
-                <div style="border-top: 3px solid #4F46E5; margin-top: 10px;"></div>
+                <h1 style="color: #4F46E5; margin: 0; font-size: 20px;">REPORTE DIARIO DE ASISTENCIA</h1>
+                <h2 style="color: #6B7280; margin: 10px 0; font-size: 14px;">${window.reporteDiarioFecha || ''}</h2>
+                <div style="border-top: 2px solid #4F46E5; margin-top: 10px;"></div>
             </div>
             ${contenido}
         `;
 
         document.body.appendChild(tempDiv);
+        await new Promise(resolve => setTimeout(resolve, 300));
 
-        // Esperar a que se renderice
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Convertir a canvas
+        // Canvas OPTIMIZADO
         const canvas = await html2canvas(tempDiv, {
-            scale: 2,
+            scale: 1,
             useCORS: true,
             logging: false,
-            allowTaint: true,
-            backgroundColor: '#FFFFFF'
+            allowTaint: false,
+            backgroundColor: '#FFFFFF',
+            imageTimeout: 0,
+            removeContainer: true
         });
 
-        // Remover div temporal
         document.body.removeChild(tempDiv);
 
         // Crear PDF
@@ -1174,29 +1171,31 @@ descargarReportePDF: async function() {
         const imgX = (pdfWidth - imgWidth * ratio) / 2;
         const imgY = 10;
         
-        const imgData = canvas.toDataURL('image/png');
-        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+        // JPEG con compresión
+        const imgData = canvas.toDataURL('image/jpeg', 0.7);
+        pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
         
-        // Guardar PDF
+        // Guardar
         const fechaArchivo = new Date().toISOString().split('T')[0].replace(/-/g, '');
-        pdf.save(`Reporte_Diario_Asistencia_${fechaArchivo}.pdf`);
+        pdf.save(`Reporte_Diario_${fechaArchivo}.pdf`);
+        
+        // Mostrar tamaño
+        const pdfOutput = pdf.output('arraybuffer');
+        const sizeMB = (pdfOutput.byteLength / (1024 * 1024)).toFixed(2);
+        
+        console.log('📄 Tamaño del PDF:', sizeMB, 'MB');
         
         Swal.fire({
             icon: 'success',
             title: '✅ PDF Descargado',
-            text: 'El reporte se ha descargado correctamente',
-            timer: 2000,
+            text: `El reporte se descargó correctamente (${sizeMB} MB)`,
+            timer: 2500,
             showConfirmButton: false
         });
 
     } catch (e) {
         console.error('❌ Error generando PDF:', e);
-        Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'No se pudo generar el PDF: ' + e.message,
-            footer: 'Verifica que las librerías jsPDF y html2canvas estén cargadas'
-        });
+        Swal.fire('Error', 'No se pudo generar el PDF: ' + e.message, 'error');
     }
 },
 
