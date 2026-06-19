@@ -766,203 +766,404 @@ crearTarjetaPersonal: function(personal, registro) {
         this.guardarRegistroAsistencia();
     },
 
-    // ============================================
-    // GENERAR REPORTE DIARIO
-    // ============================================
-    generarReporteDiario: async function() {
-        try {
-            const fecha = this.datosCache.fechaActual;
-            if (!fecha) {
-                Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
-                return;
+   // ============================================
+// GENERAR REPORTE DIARIO (ACTUALIZADO CON PDF)
+// ============================================
+generarReporteDiario: async function() {
+    try {
+        const fecha = this.datosCache.fechaActual;
+        if (!fecha) {
+            Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
+            return;
+        }
+
+        const personal = await this.cargarPersonal();
+        const registros = await this.cargarRegistrosAsistencia(fecha);
+
+        const agrupado = {};
+        personal.forEach(p => {
+            const tipo = p.tipo_personal?.nombre || 'Sin tipo';
+            if (!agrupado[tipo]) agrupado[tipo] = [];
+            agrupado[tipo].push(p);
+        });
+
+        const fechaFormateada = this.formatearFechaLarga(fecha);
+
+        // Variables para totales generales
+        let totalGeneral = 0, presentesGeneral = 0;
+        let ausenciasInjustificadasGeneral = 0, diasLibresGeneral = 0;
+        let permisosGeneral = 0, retardosGeneral = 0;
+        let vacacionesGeneral = 0, repososGeneral = 0, otrosGeneral = 0, sinRegistroGeneral = 0;
+
+        let contenidoHTML = `
+            <div id="reporte-diario-content" style="font-family: Arial, sans-serif; padding: 20px; background: white;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="color: #4F46E5; margin: 0; font-size: 24px;">REPORTE DIARIO DE ASISTENCIA</h1>
+                    <h2 style="color: #6B7280; margin: 10px 0; font-size: 18px;">${fechaFormateada}</h2>
+                    <div style="border-top: 3px solid #4F46E5; margin-top: 10px;"></div>
+                </div>
+        `;
+
+        Object.entries(agrupado).forEach(([tipo, lista]) => {
+            const matricula = lista.length;
+            
+            // Contadores por tipo
+            const presentes = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'ASISTENCIA';
+            }).length;
+
+            const ausenciasInjustificadas = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'AUS_INJUSTIFICADA';
+            });
+
+            const diasLibres = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'DIA_LIBRE';
+            });
+
+            const permisos = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && ['PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO'].includes(reg.tipo_asistencia?.codigo);
+            });
+
+            const retardos = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'RETARDO';
+            });
+
+            const vacaciones = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'VACACIONES';
+            });
+
+            const reposos = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'REPOSO';
+            });
+
+            const otros = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && !['ASISTENCIA', 'AUS_INJUSTIFICADA', 'DIA_LIBRE', 'PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO', 'RETARDO', 'VACACIONES', 'REPOSO'].includes(reg.tipo_asistencia?.codigo);
+            });
+
+            const sinRegistro = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return !reg;
+            });
+
+            // Acumular totales generales
+            totalGeneral += matricula;
+            presentesGeneral += presentes;
+            ausenciasInjustificadasGeneral += ausenciasInjustificadas.length;
+            diasLibresGeneral += diasLibres.length;
+            permisosGeneral += permisos.length;
+            retardosGeneral += retardos.length;
+            vacacionesGeneral += vacaciones.length;
+            repososGeneral += reposos.length;
+            otrosGeneral += otros.length;
+            sinRegistroGeneral += sinRegistro.length;
+
+            // HTML por tipo de personal
+            contenidoHTML += `
+                <div style="margin: 25px 0; padding: 15px; background: #F9FAFB; border-left: 4px solid #4F46E5; border-radius: 4px;">
+                    <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 16px; text-transform: uppercase;">${tipo}</h3>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <div style="background: #DBEAFE; padding: 8px; border-radius: 4px;">
+                            <strong style="color: #1E40AF;">Matrícula:</strong> <span style="color: #1E40AF;">${matricula}</span>
+                        </div>
+                        <div style="background: #D1FAE5; padding: 8px; border-radius: 4px;">
+                            <strong style="color: #065F46;">Presentes:</strong> <span style="color: #065F46;">${presentes}</span>
+                        </div>
+                    </div>
+            `;
+
+            // Presentes
+            if (presentes > 0) {
+                contenidoHTML += `<div style="margin: 10px 0;"><strong style="color: #059669;">✅ PRESENTES: ${presentes}</strong></div>`;
             }
 
-            const personal = await this.cargarPersonal();
-            const registros = await this.cargarRegistrosAsistencia(fecha);
+            // Ausencias Injustificadas
+            if (ausenciasInjustificadas.length > 0) {
+                contenidoHTML += `
+                    <div style="margin: 10px 0; padding: 10px; background: #FEE2E2; border-radius: 4px;">
+                        <strong style="color: #DC2626;">❌ AUSENCIAS INJUSTIFICADAS: ${ausenciasInjustificadas.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            ${ausenciasInjustificadas.map(p => `<li style="color: #7F1D1D; margin: 3px 0;">${p.nombre_completo} - C.I ${p.cedula}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
 
-            const agrupado = {};
-            personal.forEach(p => {
-                const tipo = p.tipo_personal?.nombre || 'Sin tipo';
-                if (!agrupado[tipo]) agrupado[tipo] = [];
-                agrupado[tipo].push(p);
-            });
+            // Días Libres
+            if (diasLibres.length > 0) {
+                contenidoHTML += `
+                    <div style="margin: 10px 0; padding: 10px; background: #FEF3C7; border-radius: 4px;">
+                        <strong style="color: #D97706;">📅 DÍAS LIBRES: ${diasLibres.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            ${diasLibres.map(p => `<li style="color: #92400E; margin: 3px 0;">${p.nombre_completo} - C.I ${p.cedula}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
 
-            const fechaFormateada = this.formatearFechaLarga(fecha);
+            // Permisos
+            if (permisos.length > 0) {
+                contenidoHTML += `
+                    <div style="margin: 10px 0; padding: 10px; background: #FEF3C7; border-radius: 4px;">
+                        <strong style="color: #D97706;">📋 PERMISOS: ${permisos.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            ${permisos.map(p => {
+                                const reg = registros.find(r => r.personal_id === p.id);
+                                const tipoPermiso = reg.tipo_asistencia?.nombre || 'Permiso';
+                                return `<li style="color: #92400E; margin: 3px 0;">
+                                    <strong>${p.nombre_completo}</strong> - C.I ${p.cedula}<br/>
+                                    <em style="font-size: 12px;">(${tipoPermiso})${reg.observaciones ? ' - ' + reg.observaciones : ''}</em>
+                                </li>`;
+                            }).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
 
-            let contenido = `REPORTE DE ASISTENCIA - ${fechaFormateada}\n\n`;
-            let totalGeneral = 0, presentesGeneral = 0, ausentesGeneral = 0;
-            let otrosGeneral = 0;
+            // Retardos
+            if (retardos.length > 0) {
+                contenidoHTML += `
+                    <div style="margin: 10px 0; padding: 10px; background: #FEF3C7; border-radius: 4px;">
+                        <strong style="color: #D97706;">⏰ RETARDOS: ${retardos.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            ${retardos.map(p => {
+                                const reg = registros.find(r => r.personal_id === p.id);
+                                return `<li style="color: #92400E; margin: 3px 0;">
+                                    <strong>${p.nombre_completo}</strong> - C.I ${p.cedula}
+                                    ${reg.hora_registro ? `<em style="font-size: 12px;"> (Hora: ${reg.hora_registro})</em>` : ''}
+                                </li>`;
+                            }).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
 
-            Object.entries(agrupado).forEach(([tipo, lista]) => {
-                const matricula = lista.length;
+            // Vacaciones
+            if (vacaciones.length > 0) {
+                contenidoHTML += `
+                    <div style="margin: 10px 0; padding: 10px; background: #DBEAFE; border-radius: 4px;">
+                        <strong style="color: #1E40AF;">🏖️ VACACIONES: ${vacaciones.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            ${vacaciones.map(p => {
+                                const reg = registros.find(r => r.personal_id === p.id);
+                                return `<li style="color: #1E3A8A; margin: 3px 0;">
+                                    <strong>${p.nombre_completo}</strong> - C.I ${p.cedula}<br/>
+                                    <em style="font-size: 12px;">${reg.fecha_inicio && reg.fecha_fin ? 
+                                        'Período: ' + this.formatearFechaLarga(reg.fecha_inicio) + ' al ' + this.formatearFechaLarga(reg.fecha_fin) + 
+                                        (reg.dias ? ` (${reg.dias} días)` : '') : ''}</em>
+                                </li>`;
+                            }).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // Reposos
+            if (reposos.length > 0) {
+                contenidoHTML += `
+                    <div style="margin: 10px 0; padding: 10px; background: #E9D5FF; border-radius: 4px;">
+                        <strong style="color: #6B21A8;">🏥 REPOSOS: ${reposos.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            ${reposos.map(p => {
+                                const reg = registros.find(r => r.personal_id === p.id);
+                                return `<li style="color: #581C87; margin: 3px 0;">
+                                    <strong>${p.nombre_completo}</strong> - C.I ${p.cedula}<br/>
+                                    <em style="font-size: 12px;">${reg.observaciones || ''}</em>
+                                </li>`;
+                            }).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // Otros
+            if (otros.length > 0) {
+                contenidoHTML += `
+                    <div style="margin: 10px 0; padding: 10px; background: #F3F4F6; border-radius: 4px;">
+                        <strong style="color: #374151;">📌 OTROS: ${otros.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            ${otros.map(p => {
+                                const reg = registros.find(r => r.personal_id === p.id);
+                                return `<li style="color: #4B5563; margin: 3px 0;">
+                                    <strong>${p.nombre_completo}</strong> - C.I ${p.cedula}
+                                    <em style="font-size: 12px;"> (${reg.tipo_asistencia?.nombre || 'Sin clasificar'})</em>
+                                </li>`;
+                            }).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // Sin Registro
+            if (sinRegistro.length > 0) {
+                contenidoHTML += `
+                    <div style="margin: 10px 0; padding: 10px; background: #FEE2E2; border-radius: 4px;">
+                        <strong style="color: #DC2626;">⚠️ SIN REGISTRO: ${sinRegistro.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            ${sinRegistro.map(p => `<li style="color: #7F1D1D; margin: 3px 0;">${p.nombre_completo} - C.I ${p.cedula}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            contenidoHTML += `</div><div style="border-bottom: 2px dashed #E5E7EB; margin: 20px 0;"></div>`;
+        });
+
+        // RESUMEN GENERAL DETALLADO
+        contenidoHTML += `
+            <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px;">
+                <h3 style="margin: 0 0 20px 0; text-align: center; font-size: 20px; text-transform: uppercase;">📊 RESUMEN GENERAL</h3>
                 
-                const presentes = lista.filter(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    return reg && reg.tipo_asistencia?.codigo === 'ASISTENCIA';
-                }).length;
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                    <div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 12px; opacity: 0.9;">Total de Personal</div>
+                        <div style="font-size: 24px; font-weight: bold;">${totalGeneral}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 12px; opacity: 0.9;">Sin Registro</div>
+                        <div style="font-size: 24px; font-weight: bold;">${sinRegistroGeneral}</div>
+                    </div>
+                    <div style="background: rgba(34, 197, 94, 0.3); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 12px; opacity: 0.9;">✅ Presentes</div>
+                        <div style="font-size: 24px; font-weight: bold;">${presentesGeneral}</div>
+                    </div>
+                    <div style="background: rgba(239, 68, 68, 0.3); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 12px; opacity: 0.9;">❌ Ausencias Injustificadas</div>
+                        <div style="font-size: 24px; font-weight: bold;">${ausenciasInjustificadasGeneral}</div>
+                    </div>
+                    <div style="background: rgba(245, 158, 11, 0.3); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 12px; opacity: 0.9;">📅 Días Libres</div>
+                        <div style="font-size: 24px; font-weight: bold;">${diasLibresGeneral}</div>
+                    </div>
+                    <div style="background: rgba(245, 158, 11, 0.3); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 12px; opacity: 0.9;">📋 Permisos</div>
+                        <div style="font-size: 24px; font-weight: bold;">${permisosGeneral}</div>
+                    </div>
+                    <div style="background: rgba(245, 158, 11, 0.3); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 12px; opacity: 0.9;">⏰ Retardos</div>
+                        <div style="font-size: 24px; font-weight: bold;">${retardosGeneral}</div>
+                    </div>
+                    <div style="background: rgba(59, 130, 246, 0.3); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 12px; opacity: 0.9;">🏖️ Vacaciones</div>
+                        <div style="font-size: 24px; font-weight: bold;">${vacacionesGeneral}</div>
+                    </div>
+                    <div style="background: rgba(168, 85, 247, 0.3); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 12px; opacity: 0.9;">🏥 Reposos</div>
+                        <div style="font-size: 24px; font-weight: bold;">${repososGeneral}</div>
+                    </div>
+                    <div style="background: rgba(107, 114, 128, 0.3); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 12px; opacity: 0.9;">📌 Otros</div>
+                        <div style="font-size: 24px; font-weight: bold;">${otrosGeneral}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: center; color: #6B7280; font-size: 12px;">
+                <p>Generado el ${new Date().toLocaleString('es-VE')}</p>
+                <p>Sistema de Asistencia PNF - UNES</p>
+            </div>
+            </div>
+        `;
 
-                const ausenciasInjustificadas = lista.filter(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    return reg && reg.tipo_asistencia?.codigo === 'AUS_INJUSTIFICADA';
-                });
+        // Mostrar modal con botón de descarga
+        Swal.fire({
+            title: 'Reporte Diario',
+            html: `
+                <div style="margin-bottom: 15px;">
+                    <button id="btn-descargar-pdf" onclick="descargarReportePDF()" 
+                            style="background: #DC2626; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; display: inline-flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-file-pdf"></i> Descargar PDF
+                    </button>
+                </div>
+                <div style="max-height: 70vh; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px;">
+                    ${contenidoHTML}
+                </div>
+            `,
+            width: '900px',
+            showConfirmButton: false,
+            showCloseButton: true
+        });
 
-                const diasLibres = lista.filter(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    return reg && reg.tipo_asistencia?.codigo === 'DIA_LIBRE';
-                });
+        // Guardar contenido para PDF
+        window.reporteDiarioHTML = contenidoHTML;
+        window.reporteDiarioFecha = fechaFormateada;
 
-                const permisos = lista.filter(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    return reg && ['PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO'].includes(reg.tipo_asistencia?.codigo);
-                });
+    } catch (e) {
+        console.error('❌ Error generando reporte:', e);
+        Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
+    }
+},
 
-                const retardos = lista.filter(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    return reg && reg.tipo_asistencia?.codigo === 'RETARDO';
-                });
+// ============================================
+// DESCARGAR REPORTE DIARIO COMO PDF
+// ============================================
+descargarReportePDF: async function() {
+    try {
+        const { jsPDF } = window.jspdf;
+        
+        // Crear elemento temporal para renderizar HTML
+        const element = document.createElement('div');
+        element.innerHTML = `
+            <div style="padding: 20px;">
+                <h1 style="text-align: center; color: #4F46E5; margin-bottom: 10px;">REPORTE DIARIO DE ASISTENCIA</h1>
+                <h2 style="text-align: center; color: #6B7280; margin-bottom: 20px;">${window.reporteDiarioFecha || ''}</h2>
+                ${window.reporteDiarioHTML || ''}
+            </div>
+        `;
+        
+        // Ocultar botón de descarga
+        const btnDescargar = element.querySelector('#btn-descargar-pdf');
+        if (btnDescargar) btnDescargar.remove();
 
-                const vacaciones = lista.filter(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    return reg && reg.tipo_asistencia?.codigo === 'VACACIONES';
-                });
+        // Usar html2canvas para convertir HTML a imagen
+        const canvas = await html2canvas(element, {
+            scale: 2,
+            useCORS: true,
+            logging: false
+        });
 
-                const reposos = lista.filter(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    return reg && reg.tipo_asistencia?.codigo === 'REPOSO';
-                });
+        const imgData = canvas.toDataURL('image/png');
+        
+        // Crear PDF
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+        const imgX = (pdfWidth - imgWidth * ratio) / 2;
+        const imgY = 10;
+        
+        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+        
+        // Guardar PDF
+        const fechaArchivo = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        pdf.save(`Reporte_Diario_Asistencia_${fechaArchivo}.pdf`);
+        
+        Swal.fire({
+            icon: 'success',
+            title: 'PDF Descargado',
+            text: 'El reporte se ha descargado correctamente',
+            timer: 2000,
+            showConfirmButton: false
+        });
 
-                const otros = lista.filter(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    return reg && !['ASISTENCIA', 'AUS_INJUSTIFICADA', 'DIA_LIBRE', 'PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO', 'RETARDO', 'VACACIONES', 'REPOSO'].includes(reg.tipo_asistencia?.codigo);
-                });
+    } catch (e) {
+        console.error('❌ Error generando PDF:', e);
+        Swal.fire('Error', 'No se pudo generar el PDF: ' + e.message, 'error');
+    }
+},
 
-                const sinRegistro = lista.filter(p => {
-                    const reg = registros.find(r => r.personal_id === p.id);
-                    return !reg;
-                });
-
-                contenido += `${tipo.toUpperCase()}\n`;
-                contenido += `${'='.repeat(tipo.length)}\n`;
-                contenido += `Matrícula: ${matricula}\n\n`;
-
-                contenido += `✅ PRESENTES: ${presentes}\n\n`;
-
-                if (ausenciasInjustificadas.length > 0) {
-                    contenido += `❌ AUSENCIAS INJUSTIFICADAS: ${ausenciasInjustificadas.length}\n`;
-                    ausenciasInjustificadas.forEach(p => {
-                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
-                    });
-                    contenido += '\n';
-                }
-
-                if (diasLibres.length > 0) {
-                    contenido += `📅 DÍAS LIBRES: ${diasLibres.length}\n`;
-                    diasLibres.forEach(p => {
-                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
-                    });
-                    contenido += '\n';
-                }
-
-                if (permisos.length > 0) {
-                    contenido += `📋 PERMISOS: ${permisos.length}\n`;
-                    permisos.forEach(p => {
-                        const reg = registros.find(r => r.personal_id === p.id);
-                        const tipoPermiso = reg.tipo_asistencia?.nombre || 'Permiso';
-                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula} (${tipoPermiso})\n`;
-                        if (reg.observaciones) {
-                            contenido += `     Motivo: ${reg.observaciones}\n`;
-                        }
-                    });
-                    contenido += '\n';
-                }
-
-                if (retardos.length > 0) {
-                    contenido += `⏰ RETARDOS: ${retardos.length}\n`;
-                    retardos.forEach(p => {
-                        const reg = registros.find(r => r.personal_id === p.id);
-                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}`;
-                        if (reg.hora_registro) {
-                            contenido += ` (Hora: ${reg.hora_registro})`;
-                        }
-                        contenido += '\n';
-                    });
-                    contenido += '\n';
-                }
-
-                if (vacaciones.length > 0) {
-                    contenido += `🏖️ VACACIONES: ${vacaciones.length}\n`;
-                    vacaciones.forEach(p => {
-                        const reg = registros.find(r => r.personal_id === p.id);
-                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
-                        if (reg.fecha_inicio && reg.fecha_fin) {
-                            contenido += `     Período: ${this.formatearFechaLarga(reg.fecha_inicio)} al ${this.formatearFechaLarga(reg.fecha_fin)}`;
-                            if (reg.dias) contenido += ` (${reg.dias} días)`;
-                            contenido += '\n';
-                        }
-                    });
-                    contenido += '\n';
-                }
-
-                if (reposos.length > 0) {
-                    contenido += `🏥 REPOSOS: ${reposos.length}\n`;
-                    reposos.forEach(p => {
-                        const reg = registros.find(r => r.personal_id === p.id);
-                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
-                        if (reg.observaciones) {
-                            contenido += `     Motivo: ${reg.observaciones}\n`;
-                        }
-                    });
-                    contenido += '\n';
-                }
-
-                if (sinRegistro.length > 0) {
-                    contenido += `⚠️ SIN REGISTRO: ${sinRegistro.length}\n`;
-                    sinRegistro.forEach(p => {
-                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula}\n`;
-                    });
-                    contenido += '\n';
-                }
-
-                if (otros.length > 0) {
-                    contenido += `📌 OTROS: ${otros.length}\n`;
-                    otros.forEach(p => {
-                        const reg = registros.find(r => r.personal_id === p.id);
-                        contenido += `   • ${p.nombre_completo} - C.I ${p.cedula} (${reg.tipo_asistencia?.nombre || 'Sin clasificar'})\n`;
-                    });
-                    contenido += '\n';
-                }
-
-                contenido += `${'-'.repeat(50)}\n\n`;
-
-                totalGeneral += matricula;
-                presentesGeneral += presentes;
-                ausentesGeneral += ausenciasInjustificadas.length;
-                otrosGeneral += diasLibres.length + permisos.length + retardos.length + vacaciones.length + reposos.length + otros.length;
-            });
-
-            contenido += `\n${'='.repeat(50)}\n`;
-            contenido += `RESUMEN GENERAL\n`;
-            contenido += `${'='.repeat(50)}\n`;
-            contenido += `Total de Personal: ${totalGeneral}\n`;
-            contenido += `✅ Presentes: ${presentesGeneral}\n`;
-            contenido += `❌ Ausencias Injustificadas: ${ausentesGeneral}\n`;
-            contenido += `📋 Otros (Permisos, Retardos, Vacaciones, etc.): ${otrosGeneral}\n`;
-            contenido += `⚠️ Sin Registro: ${totalGeneral - presentesGeneral - ausentesGeneral - otrosGeneral}\n`;
-
-            Swal.fire({
-                title: 'Reporte Diario',
-                html: `<pre class="text-left text-xs max-h-[80vh] overflow-y-auto p-4 bg-gray-50 rounded">${contenido}</pre>`,
-                width: '900px',
-                confirmButtonText: 'Cerrar',
-                showConfirmButton: true
-            });
-
-        } catch (e) {
-            console.error('❌ Error generando reporte:', e);
-            Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
-        }
-    },
-
+    
 // ============================================
 // REPORTE DE INASISTENCIAS (CORREGIDO)
 // ============================================
