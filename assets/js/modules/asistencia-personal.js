@@ -766,8 +766,8 @@ crearTarjetaPersonal: function(personal, registro) {
         this.guardarRegistroAsistencia();
     },
 
-   // ============================================
-// GENERAR REPORTE DIARIO (ACTUALIZADO CON PDF)
+// ============================================
+// GENERAR REPORTE DIARIO (CON 2 OPCIONES)
 // ============================================
 generarReporteDiario: async function() {
     try {
@@ -796,18 +796,12 @@ generarReporteDiario: async function() {
         let vacacionesGeneral = 0, repososGeneral = 0, otrosGeneral = 0, sinRegistroGeneral = 0;
 
         let contenidoHTML = `
-            <div id="reporte-diario-content" style="font-family: Arial, sans-serif; padding: 20px; background: white;">
-                <div style="text-align: center; margin-bottom: 30px;">
-                    <h1 style="color: #4F46E5; margin: 0; font-size: 24px;">REPORTE DIARIO DE ASISTENCIA</h1>
-                    <h2 style="color: #6B7280; margin: 10px 0; font-size: 18px;">${fechaFormateada}</h2>
-                    <div style="border-top: 3px solid #4F46E5; margin-top: 10px;"></div>
-                </div>
+            <div id="reporte-diario-content" style="font-family: Arial, sans-serif; padding: 15px; background: white;">
         `;
 
         Object.entries(agrupado).forEach(([tipo, lista]) => {
             const matricula = lista.length;
             
-            // Contadores por tipo
             const presentes = lista.filter(p => {
                 const reg = registros.find(r => r.personal_id === p.id);
                 return reg && reg.tipo_asistencia?.codigo === 'ASISTENCIA';
@@ -853,7 +847,6 @@ generarReporteDiario: async function() {
                 return !reg;
             });
 
-            // Acumular totales generales
             totalGeneral += matricula;
             presentesGeneral += presentes;
             ausenciasInjustificadasGeneral += ausenciasInjustificadas.length;
@@ -865,62 +858,57 @@ generarReporteDiario: async function() {
             otrosGeneral += otros.length;
             sinRegistroGeneral += sinRegistro.length;
 
-            // HTML por tipo de personal
             contenidoHTML += `
-                <div style="margin: 25px 0; padding: 15px; background: #F9FAFB; border-left: 4px solid #4F46E5; border-radius: 4px;">
-                    <h3 style="color: #1F2937; margin: 0 0 15px 0; font-size: 16px; text-transform: uppercase;">${tipo}</h3>
+                <div style="margin: 20px 0; padding: 12px; background: #F9FAFB; border-left: 4px solid #4F46E5; border-radius: 4px;">
+                    <h3 style="color: #1F2937; margin: 0 0 12px 0; font-size: 15px; text-transform: uppercase;">${tipo}</h3>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                        <div style="background: #DBEAFE; padding: 8px; border-radius: 4px;">
-                            <strong style="color: #1E40AF;">Matrícula:</strong> <span style="color: #1E40AF;">${matricula}</span>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                        <div style="background: #DBEAFE; padding: 6px; border-radius: 4px;">
+                            <strong style="color: #1E40AF; font-size: 12px;">Matrícula:</strong> <span style="color: #1E40AF; font-size: 12px;">${matricula}</span>
                         </div>
-                        <div style="background: #D1FAE5; padding: 8px; border-radius: 4px;">
-                            <strong style="color: #065F46;">Presentes:</strong> <span style="color: #065F46;">${presentes}</span>
+                        <div style="background: #D1FAE5; padding: 6px; border-radius: 4px;">
+                            <strong style="color: #065F46; font-size: 12px;">Presentes:</strong> <span style="color: #065F46; font-size: 12px;">${presentes}</span>
                         </div>
                     </div>
             `;
 
-            // Presentes
             if (presentes > 0) {
-                contenidoHTML += `<div style="margin: 10px 0;"><strong style="color: #059669;">✅ PRESENTES: ${presentes}</strong></div>`;
+                contenidoHTML += `<div style="margin: 8px 0;"><strong style="color: #059669; font-size: 13px;">✅ PRESENTES: ${presentes}</strong></div>`;
             }
 
-            // Ausencias Injustificadas
             if (ausenciasInjustificadas.length > 0) {
                 contenidoHTML += `
-                    <div style="margin: 10px 0; padding: 10px; background: #FEE2E2; border-radius: 4px;">
-                        <strong style="color: #DC2626;">❌ AUSENCIAS INJUSTIFICADAS: ${ausenciasInjustificadas.length}</strong>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
-                            ${ausenciasInjustificadas.map(p => `<li style="color: #7F1D1D; margin: 3px 0;">${p.nombre_completo} - C.I ${p.cedula}</li>`).join('')}
+                    <div style="margin: 8px 0; padding: 8px; background: #FEE2E2; border-radius: 4px;">
+                        <strong style="color: #DC2626; font-size: 13px;">❌ AUSENCIAS INJUSTIFICADAS: ${ausenciasInjustificadas.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 18px;">
+                            ${ausenciasInjustificadas.map(p => `<li style="color: #7F1D1D; margin: 2px 0; font-size: 12px;">${p.nombre_completo} - C.I ${p.cedula}</li>`).join('')}
                         </ul>
                     </div>
                 `;
             }
 
-            // Días Libres
             if (diasLibres.length > 0) {
                 contenidoHTML += `
-                    <div style="margin: 10px 0; padding: 10px; background: #FEF3C7; border-radius: 4px;">
-                        <strong style="color: #D97706;">📅 DÍAS LIBRES: ${diasLibres.length}</strong>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
-                            ${diasLibres.map(p => `<li style="color: #92400E; margin: 3px 0;">${p.nombre_completo} - C.I ${p.cedula}</li>`).join('')}
+                    <div style="margin: 8px 0; padding: 8px; background: #FEF3C7; border-radius: 4px;">
+                        <strong style="color: #D97706; font-size: 13px;">📅 DÍAS LIBRES: ${diasLibres.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 18px;">
+                            ${diasLibres.map(p => `<li style="color: #92400E; margin: 2px 0; font-size: 12px;">${p.nombre_completo} - C.I ${p.cedula}</li>`).join('')}
                         </ul>
                     </div>
                 `;
             }
 
-            // Permisos
             if (permisos.length > 0) {
                 contenidoHTML += `
-                    <div style="margin: 10px 0; padding: 10px; background: #FEF3C7; border-radius: 4px;">
-                        <strong style="color: #D97706;">📋 PERMISOS: ${permisos.length}</strong>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
+                    <div style="margin: 8px 0; padding: 8px; background: #FEF3C7; border-radius: 4px;">
+                        <strong style="color: #D97706; font-size: 13px;">📋 PERMISOS: ${permisos.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 18px;">
                             ${permisos.map(p => {
                                 const reg = registros.find(r => r.personal_id === p.id);
                                 const tipoPermiso = reg.tipo_asistencia?.nombre || 'Permiso';
-                                return `<li style="color: #92400E; margin: 3px 0;">
+                                return `<li style="color: #92400E; margin: 2px 0; font-size: 12px;">
                                     <strong>${p.nombre_completo}</strong> - C.I ${p.cedula}<br/>
-                                    <em style="font-size: 12px;">(${tipoPermiso})${reg.observaciones ? ' - ' + reg.observaciones : ''}</em>
+                                    <em style="font-size: 11px;">(${tipoPermiso})${reg.observaciones ? ' - ' + reg.observaciones : ''}</em>
                                 </li>`;
                             }).join('')}
                         </ul>
@@ -928,17 +916,16 @@ generarReporteDiario: async function() {
                 `;
             }
 
-            // Retardos
             if (retardos.length > 0) {
                 contenidoHTML += `
-                    <div style="margin: 10px 0; padding: 10px; background: #FEF3C7; border-radius: 4px;">
-                        <strong style="color: #D97706;">⏰ RETARDOS: ${retardos.length}</strong>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
+                    <div style="margin: 8px 0; padding: 8px; background: #FEF3C7; border-radius: 4px;">
+                        <strong style="color: #D97706; font-size: 13px;">⏰ RETARDOS: ${retardos.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 18px;">
                             ${retardos.map(p => {
                                 const reg = registros.find(r => r.personal_id === p.id);
-                                return `<li style="color: #92400E; margin: 3px 0;">
+                                return `<li style="color: #92400E; margin: 2px 0; font-size: 12px;">
                                     <strong>${p.nombre_completo}</strong> - C.I ${p.cedula}
-                                    ${reg.hora_registro ? `<em style="font-size: 12px;"> (Hora: ${reg.hora_registro})</em>` : ''}
+                                    ${reg.hora_registro ? `<em style="font-size: 11px;"> (Hora: ${reg.hora_registro})</em>` : ''}
                                 </li>`;
                             }).join('')}
                         </ul>
@@ -946,17 +933,16 @@ generarReporteDiario: async function() {
                 `;
             }
 
-            // Vacaciones
             if (vacaciones.length > 0) {
                 contenidoHTML += `
-                    <div style="margin: 10px 0; padding: 10px; background: #DBEAFE; border-radius: 4px;">
-                        <strong style="color: #1E40AF;">🏖️ VACACIONES: ${vacaciones.length}</strong>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
+                    <div style="margin: 8px 0; padding: 8px; background: #DBEAFE; border-radius: 4px;">
+                        <strong style="color: #1E40AF; font-size: 13px;">️ VACACIONES: ${vacaciones.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 18px;">
                             ${vacaciones.map(p => {
                                 const reg = registros.find(r => r.personal_id === p.id);
-                                return `<li style="color: #1E3A8A; margin: 3px 0;">
+                                return `<li style="color: #1E3A8A; margin: 2px 0; font-size: 12px;">
                                     <strong>${p.nombre_completo}</strong> - C.I ${p.cedula}<br/>
-                                    <em style="font-size: 12px;">${reg.fecha_inicio && reg.fecha_fin ? 
+                                    <em style="font-size: 11px;">${reg.fecha_inicio && reg.fecha_fin ? 
                                         'Período: ' + this.formatearFechaLarga(reg.fecha_inicio) + ' al ' + this.formatearFechaLarga(reg.fecha_fin) + 
                                         (reg.dias ? ` (${reg.dias} días)` : '') : ''}</em>
                                 </li>`;
@@ -966,17 +952,16 @@ generarReporteDiario: async function() {
                 `;
             }
 
-            // Reposos
             if (reposos.length > 0) {
                 contenidoHTML += `
-                    <div style="margin: 10px 0; padding: 10px; background: #E9D5FF; border-radius: 4px;">
-                        <strong style="color: #6B21A8;">🏥 REPOSOS: ${reposos.length}</strong>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
+                    <div style="margin: 8px 0; padding: 8px; background: #E9D5FF; border-radius: 4px;">
+                        <strong style="color: #6B21A8; font-size: 13px;">🏥 REPOSOS: ${reposos.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 18px;">
                             ${reposos.map(p => {
                                 const reg = registros.find(r => r.personal_id === p.id);
-                                return `<li style="color: #581C87; margin: 3px 0;">
+                                return `<li style="color: #581C87; margin: 2px 0; font-size: 12px;">
                                     <strong>${p.nombre_completo}</strong> - C.I ${p.cedula}<br/>
-                                    <em style="font-size: 12px;">${reg.observaciones || ''}</em>
+                                    <em style="font-size: 11px;">${reg.observaciones || ''}</em>
                                 </li>`;
                             }).join('')}
                         </ul>
@@ -984,17 +969,16 @@ generarReporteDiario: async function() {
                 `;
             }
 
-            // Otros
             if (otros.length > 0) {
                 contenidoHTML += `
-                    <div style="margin: 10px 0; padding: 10px; background: #F3F4F6; border-radius: 4px;">
-                        <strong style="color: #374151;">📌 OTROS: ${otros.length}</strong>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
+                    <div style="margin: 8px 0; padding: 8px; background: #F3F4F6; border-radius: 4px;">
+                        <strong style="color: #374151; font-size: 13px;">📌 OTROS: ${otros.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 18px;">
                             ${otros.map(p => {
                                 const reg = registros.find(r => r.personal_id === p.id);
-                                return `<li style="color: #4B5563; margin: 3px 0;">
+                                return `<li style="color: #4B5563; margin: 2px 0; font-size: 12px;">
                                     <strong>${p.nombre_completo}</strong> - C.I ${p.cedula}
-                                    <em style="font-size: 12px;"> (${reg.tipo_asistencia?.nombre || 'Sin clasificar'})</em>
+                                    <em style="font-size: 11px;"> (${reg.tipo_asistencia?.nombre || 'Sin clasificar'})</em>
                                 </li>`;
                             }).join('')}
                         </ul>
@@ -1002,88 +986,91 @@ generarReporteDiario: async function() {
                 `;
             }
 
-            // Sin Registro
             if (sinRegistro.length > 0) {
                 contenidoHTML += `
-                    <div style="margin: 10px 0; padding: 10px; background: #FEE2E2; border-radius: 4px;">
-                        <strong style="color: #DC2626;">⚠️ SIN REGISTRO: ${sinRegistro.length}</strong>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
-                            ${sinRegistro.map(p => `<li style="color: #7F1D1D; margin: 3px 0;">${p.nombre_completo} - C.I ${p.cedula}</li>`).join('')}
+                    <div style="margin: 8px 0; padding: 8px; background: #FEE2E2; border-radius: 4px;">
+                        <strong style="color: #DC2626; font-size: 13px;">⚠️ SIN REGISTRO: ${sinRegistro.length}</strong>
+                        <ul style="margin: 5px 0; padding-left: 18px;">
+                            ${sinRegistro.map(p => `<li style="color: #7F1D1D; margin: 2px 0; font-size: 12px;">${p.nombre_completo} - C.I ${p.cedula}</li>`).join('')}
                         </ul>
                     </div>
                 `;
             }
 
-            contenidoHTML += `</div><div style="border-bottom: 2px dashed #E5E7EB; margin: 20px 0;"></div>`;
+            contenidoHTML += `</div><div style="border-bottom: 2px dashed #E5E7EB; margin: 15px 0;"></div>`;
         });
 
-        // RESUMEN GENERAL DETALLADO
+        // RESUMEN GENERAL
         contenidoHTML += `
-            <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px;">
-                <h3 style="margin: 0 0 20px 0; text-align: center; font-size: 20px; text-transform: uppercase;">📊 RESUMEN GENERAL</h3>
+            <div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px;">
+                <h3 style="margin: 0 0 15px 0; text-align: center; font-size: 16px; text-transform: uppercase;">📊 RESUMEN GENERAL</h3>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
-                    <div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 12px; opacity: 0.9;">Total de Personal</div>
-                        <div style="font-size: 24px; font-weight: bold;">${totalGeneral}</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                    <div style="background: rgba(255,255,255,0.2); padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; opacity: 0.9;">Total Personal</div>
+                        <div style="font-size: 20px; font-weight: bold;">${totalGeneral}</div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 12px; opacity: 0.9;">Sin Registro</div>
-                        <div style="font-size: 24px; font-weight: bold;">${sinRegistroGeneral}</div>
+                    <div style="background: rgba(255,255,255,0.2); padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; opacity: 0.9;">Sin Registro</div>
+                        <div style="font-size: 20px; font-weight: bold;">${sinRegistroGeneral}</div>
                     </div>
-                    <div style="background: rgba(34, 197, 94, 0.3); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 12px; opacity: 0.9;">✅ Presentes</div>
-                        <div style="font-size: 24px; font-weight: bold;">${presentesGeneral}</div>
+                    <div style="background: rgba(34, 197, 94, 0.3); padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; opacity: 0.9;">✅ Presentes</div>
+                        <div style="font-size: 20px; font-weight: bold;">${presentesGeneral}</div>
                     </div>
-                    <div style="background: rgba(239, 68, 68, 0.3); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 12px; opacity: 0.9;">❌ Ausencias Injustificadas</div>
-                        <div style="font-size: 24px; font-weight: bold;">${ausenciasInjustificadasGeneral}</div>
+                    <div style="background: rgba(239, 68, 68, 0.3); padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; opacity: 0.9;">❌ Ausencias</div>
+                        <div style="font-size: 20px; font-weight: bold;">${ausenciasInjustificadasGeneral}</div>
                     </div>
-                    <div style="background: rgba(245, 158, 11, 0.3); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 12px; opacity: 0.9;">📅 Días Libres</div>
-                        <div style="font-size: 24px; font-weight: bold;">${diasLibresGeneral}</div>
+                    <div style="background: rgba(245, 158, 11, 0.3); padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; opacity: 0.9;">📅 Días Libres</div>
+                        <div style="font-size: 20px; font-weight: bold;">${diasLibresGeneral}</div>
                     </div>
-                    <div style="background: rgba(245, 158, 11, 0.3); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 12px; opacity: 0.9;">📋 Permisos</div>
-                        <div style="font-size: 24px; font-weight: bold;">${permisosGeneral}</div>
+                    <div style="background: rgba(245, 158, 11, 0.3); padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; opacity: 0.9;"> Permisos</div>
+                        <div style="font-size: 20px; font-weight: bold;">${permisosGeneral}</div>
                     </div>
-                    <div style="background: rgba(245, 158, 11, 0.3); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 12px; opacity: 0.9;">⏰ Retardos</div>
-                        <div style="font-size: 24px; font-weight: bold;">${retardosGeneral}</div>
+                    <div style="background: rgba(245, 158, 11, 0.3); padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; opacity: 0.9;"> Retardos</div>
+                        <div style="font-size: 20px; font-weight: bold;">${retardosGeneral}</div>
                     </div>
-                    <div style="background: rgba(59, 130, 246, 0.3); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 12px; opacity: 0.9;">🏖️ Vacaciones</div>
-                        <div style="font-size: 24px; font-weight: bold;">${vacacionesGeneral}</div>
+                    <div style="background: rgba(59, 130, 246, 0.3); padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; opacity: 0.9;">🏖️ Vacaciones</div>
+                        <div style="font-size: 20px; font-weight: bold;">${vacacionesGeneral}</div>
                     </div>
-                    <div style="background: rgba(168, 85, 247, 0.3); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 12px; opacity: 0.9;">🏥 Reposos</div>
-                        <div style="font-size: 24px; font-weight: bold;">${repososGeneral}</div>
+                    <div style="background: rgba(168, 85, 247, 0.3); padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; opacity: 0.9;">🏥 Reposos</div>
+                        <div style="font-size: 20px; font-weight: bold;">${repososGeneral}</div>
                     </div>
-                    <div style="background: rgba(107, 114, 128, 0.3); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 12px; opacity: 0.9;">📌 Otros</div>
-                        <div style="font-size: 24px; font-weight: bold;">${otrosGeneral}</div>
+                    <div style="background: rgba(107, 114, 128, 0.3); padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 11px; opacity: 0.9;"> Otros</div>
+                        <div style="font-size: 20px; font-weight: bold;">${otrosGeneral}</div>
                     </div>
                 </div>
             </div>
             
-            <div style="margin-top: 20px; text-align: center; color: #6B7280; font-size: 12px;">
+            <div style="margin-top: 15px; text-align: center; color: #6B7280; font-size: 11px;">
                 <p>Generado el ${new Date().toLocaleString('es-VE')}</p>
                 <p>Sistema de Asistencia PNF - UNES</p>
             </div>
             </div>
         `;
 
-        // Mostrar modal con botón de descarga
+        // Mostrar modal con 2 botones
         Swal.fire({
             title: 'Reporte Diario',
             html: `
-                <div style="margin-bottom: 15px;">
+                <div style="margin-bottom: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                     <button id="btn-descargar-pdf" onclick="descargarReportePDF()" 
-                            style="background: #DC2626; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; display: inline-flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-file-pdf"></i> Descargar PDF
+                            style="background: #DC2626; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </button>
+                    <button id="btn-descargar-html" onclick="generarReporteHTML()" 
+                            style="background: #2563EB; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-file-code"></i> HTML
                     </button>
                 </div>
-                <div style="max-height: 70vh; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px;">
+                <div style="max-height: 65vh; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px;">
                     ${contenidoHTML}
                 </div>
             `,
@@ -1092,7 +1079,7 @@ generarReporteDiario: async function() {
             showCloseButton: true
         });
 
-        // Guardar contenido para PDF
+        // Guardar contenido para descarga
         window.reporteDiarioHTML = contenidoHTML;
         window.reporteDiarioFecha = fechaFormateada;
 
@@ -1103,12 +1090,15 @@ generarReporteDiario: async function() {
 },
 
 // ============================================
-// DESCARGAR REPORTE DIARIO COMO PDF (MÓVIL OPTIMIZADO)
+// DESCARGAR REPORTE DIARIO COMO PDF (MÓVIL)
 // ============================================
 descargarReportePDF: async function() {
     try {
         if (typeof window.jspdf === 'undefined') {
             throw new Error('jsPDF no está cargada');
+        }
+        if (typeof html2canvas === 'undefined') {
+            throw new Error('html2canvas no está cargada');
         }
 
         const { jsPDF } = window.jspdf;
@@ -1118,14 +1108,14 @@ descargarReportePDF: async function() {
             throw new Error('No hay contenido');
         }
 
-        // Crear div temporal OPTIMIZADO PARA MÓVIL
+        // Div temporal optimizado para móvil
         const tempDiv = document.createElement('div');
         tempDiv.id = 'temp-reporte-pdf';
         tempDiv.style.cssText = `
             position: absolute;
             left: -9999px;
             top: 0;
-            width: 375px; /* Ancho iPhone */
+            width: 375px;
             background: white;
             padding: 15px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -1148,7 +1138,7 @@ descargarReportePDF: async function() {
         await new Promise(resolve => setTimeout(resolve, 500));
 
         const canvas = await html2canvas(tempDiv, {
-            scale: 1.5, // Mejor calidad para móvil
+            scale: 1.5,
             useCORS: true,
             logging: false,
             backgroundColor: '#FFFFFF',
@@ -1157,16 +1147,14 @@ descargarReportePDF: async function() {
 
         document.body.removeChild(tempDiv);
 
-        // Crear PDF vertical optimizado para móvil
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = pdf.internal.pageSize.getWidth();
-        const imgWidth = 190; // Ancho casi completo
+        const imgWidth = 190;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
         
         const imgData = canvas.toDataURL('image/jpeg', 0.85);
         pdf.addImage(imgData, 'JPEG', 10, 10, imgWidth, imgHeight);
         
-        // Guardar
         const fechaArchivo = new Date().toISOString().split('T')[0].replace(/-/g, '');
         pdf.save(`Reporte_Movil_${fechaArchivo}.pdf`);
         
