@@ -230,6 +230,142 @@ window.modules.asistenciaPersonal = {
         }, 300);
     },
 
+// ============================================
+// MOSTRAR LISTADO POR ESTADO (PERMISOS, REPOSOS, RETARDOS)
+// ============================================
+mostrarListadoPorEstado: async function(tipo) {
+    try {
+        const fecha = this.datosCache.fechaActual;
+        if (!fecha) {
+            Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
+            return;
+        }
+
+        const personal = await this.cargarPersonal();
+        const registros = await this.cargarRegistrosAsistencia(fecha);
+
+        const registrosMap = {};
+        registros.forEach(r => {
+            registrosMap[r.personal_id] = r;
+        });
+
+        // Filtrar según el tipo
+        let listaFiltrada = [];
+        let titulo = '';
+        let icono = '';
+        let color = '';
+
+        if (tipo === 'PERMISO') {
+            titulo = ' PERSONAL CON PERMISOS';
+            icono = 'fa-file-alt';
+            color = '#F97316';
+            listaFiltrada = personal.filter(p => {
+                const reg = registrosMap[p.id];
+                return reg && ['PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO'].includes(reg.tipo_asistencia?.codigo);
+            });
+        } else if (tipo === 'REPOSO') {
+            titulo = '🏥 PERSONAL EN REPOSO';
+            icono = 'fa-bed';
+            color = '#A855F7';
+            listaFiltrada = personal.filter(p => {
+                const reg = registrosMap[p.id];
+                return reg && reg.tipo_asistencia?.codigo === 'REPOSO';
+            });
+        } else if (tipo === 'RETARDO') {
+            titulo = '⏰ PERSONAL CON RETARDOS';
+            icono = 'fa-clock';
+            color = '#EAB308';
+            listaFiltrada = personal.filter(p => {
+                const reg = registrosMap[p.id];
+                return reg && reg.tipo_asistencia?.codigo === 'RETARDO';
+            });
+        } else if (tipo === 'AUSENTE') {
+            titulo = '❌ PERSONAL AUSENTE';
+            icono = 'fa-user-times';
+            color = '#EF4444';
+            listaFiltrada = personal.filter(p => {
+                const reg = registrosMap[p.id];
+                return reg && reg.tipo_asistencia?.codigo === 'AUS_INJUSTIFICADA';
+            });
+        } else if (tipo === 'VACACIONES') {
+            titulo = '🏖️ PERSONAL DE VACACIONES';
+            icono = 'fa-plane';
+            color = '#3B82F6';
+            listaFiltrada = personal.filter(p => {
+                const reg = registrosMap[p.id];
+                return reg && reg.tipo_asistencia?.codigo === 'VACACIONES';
+            });
+        } else if (tipo === 'SIN_REGISTRO') {
+            titulo = '⚠️ PERSONAL SIN REGISTRO';
+            icono = 'fa-question-circle';
+            color = '#6B7280';
+            listaFiltrada = personal.filter(p => !registrosMap[p.id]);
+        }
+
+        if (listaFiltrada.length === 0) {
+            Swal.fire({
+                icon: 'info',
+                title: 'Sin registros',
+                text: `No hay personal con ${titulo.toLowerCase()} para esta fecha`,
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+
+        // Construir HTML del listado
+        let contenidoHTML = `
+            <div style="text-align: left; max-height: 60vh; overflow-y: auto;">
+                <div style="background: ${color}; color: white; padding: 12px; border-radius: 8px; margin-bottom: 15px; text-align: center;">
+                    <h3 style="margin: 0; font-size: 16px;">${titulo}</h3>
+                    <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">Fecha: ${this.formatearFechaLarga(fecha)} | Total: ${listaFiltrada.length}</p>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+        `;
+
+        listaFiltrada.forEach((p, idx) => {
+            const reg = registrosMap[p.id];
+            const tipoAsistencia = reg?.tipo_asistencia?.nombre || '';
+            const hora = reg?.hora_registro || '';
+            const observaciones = reg?.observaciones || '';
+            const fechaInicio = reg?.fecha_inicio ? this.formatearFechaLarga(reg.fecha_inicio) : '';
+            const fechaFin = reg?.fecha_fin ? this.formatearFechaLarga(reg.fecha_fin) : '';
+            const dias = reg?.dias || '';
+
+            contenidoHTML += `
+                <div style="background: #F9FAFB; padding: 12px; border-radius: 6px; border-left: 4px solid ${color};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <strong style="font-size: 14px; color: #1F2937;">${idx + 1}. ${p.nombre_completo}</strong>
+                        <span style="background: ${color}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px;">${tipoAsistencia}</span>
+                    </div>
+                    <div style="font-size: 12px; color: #6B7280;">
+                        C.I: ${p.cedula}
+                        ${p.tipo_personal?.nombre ? ` | ${p.tipo_personal.nombre}` : ''}
+                    </div>
+                    ${hora ? `<div style="font-size: 11px; color: #9CA3AF; margin-top: 3px;"> Hora: ${hora}</div>` : ''}
+                    ${fechaInicio && fechaFin ? `<div style="font-size: 11px; color: #9CA3AF; margin-top: 3px;">📅 ${fechaInicio} al ${fechaFin}${dias ? ` (${dias} días)` : ''}</div>` : ''}
+                    ${observaciones ? `<div style="font-size: 11px; color: #9CA3AF; margin-top: 3px;">📝 ${observaciones}</div>` : ''}
+                </div>
+            `;
+        });
+
+        contenidoHTML += `</div></div>`;
+
+        Swal.fire({
+            title: false,
+            html: contenidoHTML,
+            width: '600px',
+            showConfirmButton: true,
+            confirmButtonText: 'Cerrar',
+            confirmButtonColor: color
+        });
+
+    } catch (e) {
+        console.error('❌ Error:', e);
+        Swal.fire('Error', 'No se pudo mostrar el listado: ' + e.message, 'error');
+    }
+},
+
+    
     // ============================================
     // RENDERIZAR PENDIENTES
     // ============================================
@@ -727,27 +863,38 @@ crearTarjetaPersonal: function(personal, registro) {
     // ============================================
     // ACTUALIZAR ESTADÍSTICAS
     // ============================================
-    actualizarEstadisticas: function(personal, registros) {
-        try {
-            const total = personal.length;
-            const presentes = registros.filter(r => r.tipo_asistencia?.codigo === 'ASISTENCIA').length;
-            const ausentes = registros.filter(r => r.tipo_asistencia?.codigo === 'AUS_INJUSTIFICADA').length;
-            const pendientes = total - registros.length;
+actualizarEstadisticas: function(personal, registros) {
+    try {
+        const total = personal.length;
+        const presentes = registros.filter(r => r.tipo_asistencia?.codigo === 'ASISTENCIA').length;
+        const ausentes = registros.filter(r => r.tipo_asistencia?.codigo === 'AUS_INJUSTIFICADA').length;
+        const retardos = registros.filter(r => r.tipo_asistencia?.codigo === 'RETARDO').length;
+        const permisos = registros.filter(r => 
+            ['PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO'].includes(r.tipo_asistencia?.codigo)
+        ).length;
+        const reposos = registros.filter(r => r.tipo_asistencia?.codigo === 'REPOSO').length;
+        const pendientes = total - registros.length;
 
-            const elTotal = document.getElementById('count-total');
-            const elPresentes = document.getElementById('count-presentes');
-            const elPendientes = document.getElementById('count-pendientes');
-            const elAusentes = document.getElementById('count-ausentes');
+        const elTotal = document.getElementById('count-total');
+        const elPresentes = document.getElementById('count-presentes');
+        const elPendientes = document.getElementById('count-pendientes');
+        const elAusentes = document.getElementById('count-ausentes');
+        const elRetardos = document.getElementById('count-retardos');
+        const elPermisos = document.getElementById('count-permisos');
+        const elReposos = document.getElementById('count-reposos');
 
-            if (elTotal) elTotal.textContent = total;
-            if (elPresentes) elPresentes.textContent = presentes;
-            if (elPendientes) elPendientes.textContent = pendientes;
-            if (elAusentes) elAusentes.textContent = ausentes;
-            
-        } catch (e) {
-            console.error('❌ Error en actualizarEstadisticas:', e);
-        }
-    },
+        if (elTotal) elTotal.textContent = total;
+        if (elPresentes) elPresentes.textContent = presentes;
+        if (elPendientes) elPendientes.textContent = pendientes;
+        if (elAusentes) elAusentes.textContent = ausentes;
+        if (elRetardos) elRetardos.textContent = retardos;
+        if (elPermisos) elPermisos.textContent = permisos;
+        if (elReposos) elReposos.textContent = reposos;
+        
+    } catch (e) {
+        console.error('❌ Error en actualizarEstadisticas:', e);
+    }
+},
 
     // ============================================
     // CERRAR MODAL
