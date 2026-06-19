@@ -1103,99 +1103,87 @@ generarReporteDiario: async function() {
 },
 
 // ============================================
-// DESCARGAR REPORTE DIARIO COMO PDF (OPTIMIZADO)
+// DESCARGAR REPORTE DIARIO COMO PDF (MÓVIL OPTIMIZADO)
 // ============================================
 descargarReportePDF: async function() {
     try {
         if (typeof window.jspdf === 'undefined') {
-            throw new Error('La librería jsPDF no está cargada');
-        }
-        
-        if (typeof html2canvas === 'undefined') {
-            throw new Error('La librería html2canvas no está cargada');
+            throw new Error('jsPDF no está cargada');
         }
 
         const { jsPDF } = window.jspdf;
         const contenido = window.reporteDiarioHTML;
         
         if (!contenido) {
-            throw new Error('No hay contenido del reporte');
+            throw new Error('No hay contenido');
         }
 
-        // Crear div temporal
+        // Crear div temporal OPTIMIZADO PARA MÓVIL
         const tempDiv = document.createElement('div');
         tempDiv.id = 'temp-reporte-pdf';
         tempDiv.style.cssText = `
             position: absolute;
             left: -9999px;
             top: 0;
-            width: 794px;
+            width: 375px; /* Ancho iPhone */
             background: white;
-            padding: 20px;
-            font-family: Arial, sans-serif;
+            padding: 15px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             z-index: -1;
         `;
+        
         tempDiv.innerHTML = `
-            <div style="text-align: center; margin-bottom: 20px;">
-                <h1 style="color: #4F46E5; margin: 0; font-size: 20px;">REPORTE DIARIO DE ASISTENCIA</h1>
-                <h2 style="color: #6B7280; margin: 10px 0; font-size: 14px;">${window.reporteDiarioFecha || ''}</h2>
-                <div style="border-top: 2px solid #4F46E5; margin-top: 10px;"></div>
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; text-align: center;">
+                <h1 style="margin: 0; font-size: 20px; font-weight: 700;">📋 REPORTE DIARIO</h1>
+                <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">${window.reporteDiarioFecha || ''}</p>
             </div>
             ${contenido}
+            <div style="margin-top: 20px; padding: 15px; background: #F3F4F6; border-radius: 8px; text-align: center;">
+                <p style="margin: 0; font-size: 11px; color: #6B7280;">Generado el ${new Date().toLocaleString('es-VE')}</p>
+                <p style="margin: 5px 0 0 0; font-size: 11px; color: #6B7280;">Sistema PNF - UNES</p>
+            </div>
         `;
 
         document.body.appendChild(tempDiv);
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Canvas OPTIMIZADO
         const canvas = await html2canvas(tempDiv, {
-            scale: 1,
+            scale: 1.5, // Mejor calidad para móvil
             useCORS: true,
             logging: false,
-            allowTaint: false,
             backgroundColor: '#FFFFFF',
-            imageTimeout: 0,
-            removeContainer: true
+            windowHeight: tempDiv.scrollHeight
         });
 
         document.body.removeChild(tempDiv);
 
-        // Crear PDF
+        // Crear PDF vertical optimizado para móvil
         const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const imgWidth = 190; // Ancho casi completo
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
         
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        const ratio = Math.min(pdfWidth / imgWidth, (pdfHeight - 20) / imgHeight);
-        const imgX = (pdfWidth - imgWidth * ratio) / 2;
-        const imgY = 10;
-        
-        // JPEG con compresión
-        const imgData = canvas.toDataURL('image/jpeg', 0.7);
-        pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
+        pdf.addImage(imgData, 'JPEG', 10, 10, imgWidth, imgHeight);
         
         // Guardar
         const fechaArchivo = new Date().toISOString().split('T')[0].replace(/-/g, '');
-        pdf.save(`Reporte_Diario_${fechaArchivo}.pdf`);
+        pdf.save(`Reporte_Movil_${fechaArchivo}.pdf`);
         
-        // Mostrar tamaño
         const pdfOutput = pdf.output('arraybuffer');
         const sizeMB = (pdfOutput.byteLength / (1024 * 1024)).toFixed(2);
         
-        console.log('📄 Tamaño del PDF:', sizeMB, 'MB');
-        
         Swal.fire({
             icon: 'success',
-            title: '✅ PDF Descargado',
-            text: `El reporte se descargó correctamente (${sizeMB} MB)`,
-            timer: 2500,
+            title: '✅ PDF Listo',
+            text: `Optimizado para móvil (${sizeMB} MB)`,
+            timer: 2000,
             showConfirmButton: false
         });
 
     } catch (e) {
-        console.error('❌ Error generando PDF:', e);
-        Swal.fire('Error', 'No se pudo generar el PDF: ' + e.message, 'error');
+        console.error('❌ Error:', e);
+        Swal.fire('Error', e.message, 'error');
     }
 },
 
