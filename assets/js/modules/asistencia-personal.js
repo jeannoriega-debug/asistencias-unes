@@ -1561,6 +1561,110 @@ generarReporteRetardos: async function() {
 },
 
 // ============================================
+// GENERAR REPORTE COMO HTML (LIGERO)
+// ============================================
+generarReporteHTML: function() {
+    try {
+        const contenido = window.reporteDiarioHTML;
+        const fecha = window.reporteDiarioFecha;
+        
+        if (!contenido) {
+            throw new Error('No hay contenido');
+        }
+
+        const htmlContent = `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Diario - ${fecha}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #F3F4F6;
+            padding: 15px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header h1 { font-size: 22px; margin-bottom: 5px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+        .section {
+            margin: 15px 0;
+            padding: 15px;
+            background: #F9FAFB;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .section h3 { color: #1F2937; margin-bottom: 10px; font-size: 16px; }
+        .footer {
+            text-align: center;
+            padding: 15px;
+            color: #6B7280;
+            font-size: 11px;
+            margin-top: 20px;
+        }
+        @media print {
+            body { background: white; }
+            .container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1> REPORTE DIARIO</h1>
+            <p>${fecha}</p>
+        </div>
+        ${contenido}
+        <div class="footer">
+            <p>Generado el ${new Date().toLocaleString('es-VE')}</p>
+            <p>Sistema de Asistencia PNF - UNES</p>
+        </div>
+    </div>
+</body>
+</html>`;
+
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Reporte_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        Swal.fire({
+            icon: 'success',
+            title: '✅ HTML Descargado',
+            text: 'Se puede abrir en cualquier navegador del móvil',
+            timer: 2500,
+            showConfirmButton: false
+        });
+
+    } catch (e) {
+        console.error('❌ Error:', e);
+        Swal.fire('Error', e.message, 'error');
+    }
+},
+    
+    
+// ============================================
 // REPORTE DE VACACIONES (CORREGIDO)
 // ============================================
 generarReporteVacaciones: async function() {
