@@ -1090,87 +1090,376 @@ generarReporteDiario: async function() {
 },
 
 // ============================================
-// DESCARGAR REPORTE DIARIO COMO PDF (MÓVIL)
+// DESCARGAR REPORTE DIARIO COMO PDF (TEXTO REAL - MULTIPÁGINA)
 // ============================================
 descargarReportePDF: async function() {
     try {
         if (typeof window.jspdf === 'undefined') {
             throw new Error('jsPDF no está cargada');
         }
-        if (typeof html2canvas === 'undefined') {
-            throw new Error('html2canvas no está cargada');
-        }
 
         const { jsPDF } = window.jspdf;
-        const contenido = window.reporteDiarioHTML;
+        const fecha = this.datosCache.fechaActual;
         
-        if (!contenido) {
-            throw new Error('No hay contenido');
+        if (!fecha) {
+            Swal.fire('Atención', 'Seleccione una fecha primero', 'warning');
+            return;
         }
 
-        // Div temporal optimizado para móvil
-        const tempDiv = document.createElement('div');
-        tempDiv.id = 'temp-reporte-pdf';
-        tempDiv.style.cssText = `
-            position: absolute;
-            left: -9999px;
-            top: 0;
-            width: 375px;
-            background: white;
-            padding: 15px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            z-index: -1;
-        `;
-        
-        tempDiv.innerHTML = `
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; margin-bottom: 15px; text-align: center;">
-                <h1 style="margin: 0; font-size: 20px; font-weight: 700;">📋 REPORTE DIARIO</h1>
-                <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">${window.reporteDiarioFecha || ''}</p>
-            </div>
-            ${contenido}
-            <div style="margin-top: 20px; padding: 15px; background: #F3F4F6; border-radius: 8px; text-align: center;">
-                <p style="margin: 0; font-size: 11px; color: #6B7280;">Generado el ${new Date().toLocaleString('es-VE')}</p>
-                <p style="margin: 5px 0 0 0; font-size: 11px; color: #6B7280;">Sistema PNF - UNES</p>
-            </div>
-        `;
-
-        document.body.appendChild(tempDiv);
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const canvas = await html2canvas(tempDiv, {
-            scale: 1.5,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#FFFFFF',
-            windowHeight: tempDiv.scrollHeight
-        });
-
-        document.body.removeChild(tempDiv);
+        const personal = await this.cargarPersonal();
+        const registros = await this.cargarRegistrosAsistencia(fecha);
+        const fechaFormateada = this.formatearFechaLarga(fecha);
 
         const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const imgWidth = 190;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const marginL = 12;
+        const marginR = 12;
+        const contentW = pageW - marginL - marginR;
+        let y = 20;
+        let pageNum = 1;
+
+        // Función para verificar espacio y crear nueva página
+        const checkSpace = (needed) => {
+            if (y + needed > pageH - 20) {
+                // Pie de página
+                pdf.setFontSize(8);
+                pdf.setTextColor(150, 150, 150);
+                pdf.text(`Página ${pageNum} | Generado: ${new Date().toLocaleString('es-VE')} | Sistema UNES`, pageW / 2, pageH - 8, { align: 'center' });
+                pdf.addPage();
+                pageNum++;
+                y = 15;
+                return true;
+            }
+            return false;
+        };
+
+        // Función para escribir texto con wrap
+        const writeText = (text, fontSize, color, bold, indent) => {
+            pdf.setFontSize(fontSize);
+            pdf.setTextColor(color[0], color[1], color[2]);
+            if (bold) pdf.setFont('helvetica', 'bold');
+            else pdf.setFont('helvetica', 'normal');
+            
+            const x = marginL + (indent || 0);
+            const maxWidth = contentW - (indent || 0);
+            const lines = pdf.splitTextToSize(text, maxWidth);
+            
+            lines.forEach(line => {
+                checkSpace(fontSize * 0.5 + 1);
+                pdf.text(line, x, y);
+                y += fontSize * 0.45 + 1;
+            });
+        };
+
+        // Función para línea separadora
+        const drawLine = (color) => {
+            checkSpace(5);
+            pdf.setDrawColor(color[0], color[1], color[2]);
+            pdf.setLineWidth(0.3);
+            pdf.line(marginL, y, pageW - marginR, y);
+            y += 4;
+        };
+
+        // Función para rectángulo de color
+        const drawBox = (text, bgColor, textColor) => {
+            checkSpace(12);
+            pdf.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+            pdf.roundedRect(marginL, y - 4, contentW, 9, 2, 2, 'F');
+            pdf.setFontSize(10);
+            pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(text, marginL + 4, y + 2);
+            y += 9;
+        };
+
+        // ==========================================
+        // ENCABEZADO
+        // ==========================================
+        pdf.setFillColor(79, 70, 229);
+        pdf.roundedRect(marginL, y - 5, contentW, 25, 3, 3, 'F');
+        pdf.setFontSize(18);
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('REPORTE DIARIO DE ASISTENCIA', pageW / 2, y + 5, { align: 'center' });
+        pdf.setFontSize(13);
+        pdf.text(fechaFormateada, pageW / 2, y + 13, { align: 'center' });
+        y += 30;
+
+        // ==========================================
+        // CONTENIDO POR TIPO DE PERSONAL
+        // ==========================================
+        const agrupado = {};
+        personal.forEach(p => {
+            const tipo = p.tipo_personal?.nombre || 'Sin tipo';
+            if (!agrupado[tipo]) agrupado[tipo] = [];
+            agrupado[tipo].push(p);
+        });
+
+        let totalGeneral = 0, presentesGeneral = 0;
+        let ausenciasGeneral = 0, diasLibresGeneral = 0;
+        let permisosGeneral = 0, retardosGeneral = 0;
+        let vacacionesGeneral = 0, repososGeneral = 0;
+        let otrosGeneral = 0, sinRegistroGeneral = 0;
+
+        Object.entries(agrupado).forEach(([tipo, lista]) => {
+            checkSpace(50);
+
+            const matricula = lista.length;
+            
+            const presentes = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'ASISTENCIA';
+            }).length;
+
+            const ausencias = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'AUS_INJUSTIFICADA';
+            });
+
+            const diasLibres = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'DIA_LIBRE';
+            });
+
+            const permisos = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && ['PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO'].includes(reg.tipo_asistencia?.codigo);
+            });
+
+            const retardos = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'RETARDO';
+            });
+
+            const vacaciones = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'VACACIONES';
+            });
+
+            const reposos = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && reg.tipo_asistencia?.codigo === 'REPOSO';
+            });
+
+            const otros = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return reg && !['ASISTENCIA', 'AUS_INJUSTIFICADA', 'DIA_LIBRE', 'PERMISO_OBLIGATORIO', 'PERMISO_POTESTATIVO', 'RETARDO', 'VACACIONES', 'REPOSO'].includes(reg.tipo_asistencia?.codigo);
+            });
+
+            const sinRegistro = lista.filter(p => {
+                const reg = registros.find(r => r.personal_id === p.id);
+                return !reg;
+            });
+
+            totalGeneral += matricula;
+            presentesGeneral += presentes;
+            ausenciasGeneral += ausencias.length;
+            diasLibresGeneral += diasLibres.length;
+            permisosGeneral += permisos.length;
+            retardosGeneral += retardos.length;
+            vacacionesGeneral += vacaciones.length;
+            repososGeneral += reposos.length;
+            otrosGeneral += otros.length;
+            sinRegistroGeneral += sinRegistro.length;
+
+            // Título del tipo
+            drawBox(`${tipo.toUpperCase()} - Matricula: ${matricula} | Presentes: ${presentes}`, [79, 70, 229], [255, 255, 255]);
+            y += 3;
+
+            // Presentes
+            writeText(`PRESENTES: ${presentes}`, 10, [5, 150, 105], true, 0);
+
+            // Ausencias
+            if (ausencias.length > 0) {
+                writeText(`AUSENCIAS INJUSTIFICADAS: ${ausencias.length}`, 10, [220, 38, 38], true, 0);
+                ausencias.forEach(p => {
+                    writeText(`• ${p.nombre_completo} - C.I ${p.cedula}`, 9, [127, 29, 29], false, 5);
+                });
+            }
+
+            // Días Libres
+            if (diasLibres.length > 0) {
+                writeText(`DIAS LIBRES: ${diasLibres.length}`, 10, [217, 119, 6], true, 0);
+                diasLibres.forEach(p => {
+                    writeText(`• ${p.nombre_completo} - C.I ${p.cedula}`, 9, [146, 64, 14], false, 5);
+                });
+            }
+
+            // Permisos
+            if (permisos.length > 0) {
+                writeText(`PERMISOS: ${permisos.length}`, 10, [217, 119, 6], true, 0);
+                permisos.forEach(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    const tipoPermiso = reg.tipo_asistencia?.nombre || 'Permiso';
+                    writeText(`• ${p.nombre_completo} - C.I ${p.cedula} (${tipoPermiso})`, 9, [146, 64, 14], false, 5);
+                    if (reg.observaciones) {
+                        writeText(`  Motivo: ${reg.observaciones}`, 8, [107, 114, 128], false, 8);
+                    }
+                });
+            }
+
+            // Retardos
+            if (retardos.length > 0) {
+                writeText(`RETARDOS: ${retardos.length}`, 10, [217, 119, 6], true, 0);
+                retardos.forEach(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    let texto = `• ${p.nombre_completo} - C.I ${p.cedula}`;
+                    if (reg.hora_registro) texto += ` (Hora: ${reg.hora_registro})`;
+                    writeText(texto, 9, [146, 64, 14], false, 5);
+                });
+            }
+
+            // Vacaciones
+            if (vacaciones.length > 0) {
+                writeText(`VACACIONES: ${vacaciones.length}`, 10, [30, 64, 175], true, 0);
+                vacaciones.forEach(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    writeText(`• ${p.nombre_completo} - C.I ${p.cedula}`, 9, [30, 58, 138], false, 5);
+                    if (reg.fecha_inicio && reg.fecha_fin) {
+                        let periodo = `  Periodo: ${this.formatearFechaLarga(reg.fecha_inicio)} al ${this.formatearFechaLarga(reg.fecha_fin)}`;
+                        if (reg.dias) periodo += ` (${reg.dias} dias)`;
+                        writeText(periodo, 8, [59, 130, 246], false, 8);
+                    }
+                });
+            }
+
+            // Reposos
+            if (reposos.length > 0) {
+                writeText(`REPOSOS: ${reposos.length}`, 10, [107, 33, 168], true, 0);
+                reposos.forEach(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    writeText(`• ${p.nombre_completo} - C.I ${p.cedula}`, 9, [88, 28, 135], false, 5);
+                    if (reg.observaciones) {
+                        writeText(`  Motivo: ${reg.observaciones}`, 8, [107, 114, 128], false, 8);
+                    }
+                });
+            }
+
+            // Otros
+            if (otros.length > 0) {
+                writeText(`OTROS: ${otros.length}`, 10, [55, 65, 81], true, 0);
+                otros.forEach(p => {
+                    const reg = registros.find(r => r.personal_id === p.id);
+                    writeText(`• ${p.nombre_completo} - C.I ${p.cedula} (${reg.tipo_asistencia?.nombre || 'Sin clasificar'})`, 9, [75, 85, 99], false, 5);
+                });
+            }
+
+            // Sin Registro
+            if (sinRegistro.length > 0) {
+                writeText(`SIN REGISTRO: ${sinRegistro.length}`, 10, [220, 38, 38], true, 0);
+                sinRegistro.forEach(p => {
+                    writeText(`• ${p.nombre_completo} - C.I ${p.cedula}`, 9, [127, 29, 29], false, 5);
+                });
+            }
+
+            drawLine([200, 200, 200]);
+            y += 3;
+        });
+
+        // ==========================================
+        // RESUMEN GENERAL
+        // ==========================================
+        checkSpace(80);
+        y += 5;
+
+        // Fondo del resumen
+        pdf.setFillColor(79, 70, 229);
+        const resumenStartY = y - 5;
         
-        const imgData = canvas.toDataURL('image/jpeg', 0.85);
-        pdf.addImage(imgData, 'JPEG', 10, 10, imgWidth, imgHeight);
-        
-        const fechaArchivo = new Date().toISOString().split('T')[0].replace(/-/g, '');
-        pdf.save(`Reporte_Movil_${fechaArchivo}.pdf`);
-        
+        writeText('RESUMEN GENERAL', 14, [79, 70, 229], true, 0);
+        drawLine([79, 70, 229]);
+
+        const resumenItems = [
+            [`Total de Personal: ${totalGeneral}`, [31, 41, 55]],
+            [`Presentes: ${presentesGeneral}`, [5, 150, 105]],
+            [`Ausencias Injustificadas: ${ausenciasGeneral}`, [220, 38, 38]],
+            [`Dias Libres: ${diasLibresGeneral}`, [217, 119, 6]],
+            [`Permisos: ${permisosGeneral}`, [234, 88, 12]],
+            [`Retardos: ${retardosGeneral}`, [245, 158, 11]],
+            [`Vacaciones: ${vacacionesGeneral}`, [30, 64, 175]],
+            [`Reposos: ${repososGeneral}`, [107, 33, 168]],
+            [`Otros: ${otrosGeneral}`, [107, 114, 128]],
+            [`Sin Registro: ${sinRegistroGeneral}`, [220, 38, 38]]
+        ];
+
+        resumenItems.forEach(([texto, color]) => {
+            writeText(texto, 11, color, true, 5);
+        });
+
+        // Pie de página final
+        checkSpace(15);
+        y += 5;
+        pdf.setFontSize(8);
+        pdf.setTextColor(150, 150, 150);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`Generado el ${new Date().toLocaleString('es-VE')} | Sistema de Asistencia PNF - UNES`, pageW / 2, y, { align: 'center' });
+
+        // Numerar todas las páginas
+        const totalPages = pdf.internal.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            pdf.setPage(i);
+            pdf.setFontSize(8);
+            pdf.setTextColor(150, 150, 150);
+            pdf.text(`Pagina ${i} de ${totalPages}`, pageW - marginR, pageH - 8, { align: 'right' });
+        }
+
+        // Guardar
+        const fechaArchivo = fecha.replace(/-/g, '');
+        pdf.save(`Reporte_Diario_${fechaArchivo}.pdf`);
+
         const pdfOutput = pdf.output('arraybuffer');
-        const sizeMB = (pdfOutput.byteLength / (1024 * 1024)).toFixed(2);
-        
+        const sizeKB = (pdfOutput.byteLength / 1024).toFixed(0);
+
         Swal.fire({
             icon: 'success',
-            title: '✅ PDF Listo',
-            text: `Optimizado para móvil (${sizeMB} MB)`,
-            timer: 2000,
+            title: 'PDF Descargado',
+            text: `${totalPages} pagina(s) - ${sizeKB} KB`,
+            timer: 2500,
             showConfirmButton: false
         });
 
     } catch (e) {
-        console.error('❌ Error:', e);
+        console.error('Error generando PDF:', e);
+        Swal.fire('Error', 'No se pudo generar el PDF: ' + e.message, 'error');
+    }
+},
+
+// ============================================
+// GENERAR REPORTE COMO HTML (CORREGIDO)
+// ============================================
+generarReporteHTML: function() {
+    try {
+        const contenido = window.reporteDiarioHTML;
+        const fecha = window.reporteDiarioFecha;
+        
+        if (!contenido) {
+            Swal.fire('Atención', 'Primero genere el reporte', 'warning');
+            return;
+        }
+
+        const htmlContent = '<!DOCTYPE html>\n<html lang="es">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Reporte Diario - ' + fecha + '</title>\n<style>\n* { margin: 0; padding: 0; box-sizing: border-box; }\nbody { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; background: #F3F4F6; padding: 15px; }\n.container { max-width: 600px; margin: 0 auto; background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }\n.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; }\n.header h1 { font-size: 22px; margin-bottom: 5px; }\n.header p { font-size: 14px; opacity: 0.9; }\n.footer { text-align: center; padding: 15px; color: #6B7280; font-size: 11px; margin-top: 20px; }\nul { padding-left: 18px; }\nli { margin: 3px 0; }\n</style>\n</head>\n<body>\n<div class="container">\n<div class="header">\n<h1>REPORTE DIARIO</h1>\n<p>' + fecha + '</p>\n</div>\n' + contenido + '\n<div class="footer">\n<p>Generado el ' + new Date().toLocaleString('es-VE') + '</p>\n<p>Sistema de Asistencia PNF - UNES</p>\n</div>\n</div>\n</body>\n</html>';
+
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Reporte_Diario_' + new Date().toISOString().split('T')[0].replace(/-/g, '') + '.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        Swal.fire({
+            icon: 'success',
+            title: 'HTML Descargado',
+            text: 'Abrir en cualquier navegador del movil',
+            timer: 2500,
+            showConfirmButton: false
+        });
+
+    } catch (e) {
+        console.error('Error:', e);
         Swal.fire('Error', e.message, 'error');
     }
 },
@@ -1557,109 +1846,6 @@ generarReporteRetardos: async function() {
     } catch (e) {
         console.error('❌ Error en reporte de retardos:', e);
         Swal.fire('Error', 'No se pudo generar el reporte: ' + e.message, 'error');
-    }
-},
-
-// ============================================
-// GENERAR REPORTE COMO HTML (LIGERO)
-// ============================================
-generarReporteHTML: function() {
-    try {
-        const contenido = window.reporteDiarioHTML;
-        const fecha = window.reporteDiarioFecha;
-        
-        if (!contenido) {
-            throw new Error('No hay contenido');
-        }
-
-        const htmlContent = `<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reporte Diario - ${fecha}</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #F3F4F6;
-            padding: 15px;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .header h1 { font-size: 22px; margin-bottom: 5px; }
-        .header p { font-size: 14px; opacity: 0.9; }
-        .section {
-            margin: 15px 0;
-            padding: 15px;
-            background: #F9FAFB;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-        .section h3 { color: #1F2937; margin-bottom: 10px; font-size: 16px; }
-        .footer {
-            text-align: center;
-            padding: 15px;
-            color: #6B7280;
-            font-size: 11px;
-            margin-top: 20px;
-        }
-        @media print {
-            body { background: white; }
-            .container { box-shadow: none; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1> REPORTE DIARIO</h1>
-            <p>${fecha}</p>
-        </div>
-        ${contenido}
-        <div class="footer">
-            <p>Generado el ${new Date().toLocaleString('es-VE')}</p>
-            <p>Sistema de Asistencia PNF - UNES</p>
-        </div>
-    </div>
-</body>
-</html>`;
-
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Reporte_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.html`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        Swal.fire({
-            icon: 'success',
-            title: '✅ HTML Descargado',
-            text: 'Se puede abrir en cualquier navegador del móvil',
-            timer: 2500,
-            showConfirmButton: false
-        });
-
-    } catch (e) {
-        console.error('❌ Error:', e);
-        Swal.fire('Error', e.message, 'error');
     }
 },
     
