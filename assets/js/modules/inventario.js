@@ -609,8 +609,8 @@ window.modules.inventario = {
                 doc.setFontSize(9);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(255, 255, 255);
-                doc.text(`📍 ${ubicacion} (${totalEnUbicacion} items - ${operativosEnUbicacion} operativos - ${danadosEnUbicacion} dañados)`, 22, startYListado);
-
+                doc.text(`UBICACION: ${ubicacion} (${totalEnUbicacion} items - ${operativosEnUbicacion} operativos - ${danadosEnUbicacion} danados)`, 22, startYListado);
+                
                 startYListado += 3;
 
                 // Filas de items con numeración reiniciada
@@ -693,8 +693,8 @@ window.modules.inventario = {
             doc.setFontSize(11);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(255, 255, 255);
-            doc.text(`📊 TOTAL GENERAL: ${totalArticulos} BIENES REGISTRADOS`, 105, startYListado + 2, { align: 'center' });
-
+            doc.text(`TOTAL GENERAL: ${totalArticulos} BIENES REGISTRADOS`, 105, startYListado + 2, { align: 'center' });
+            
             startYListado += 8;
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
